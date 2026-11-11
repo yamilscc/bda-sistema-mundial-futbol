@@ -6,20 +6,8 @@ Integrantes:
 - Casella, Mateo Ezequiel
 - Torczuk, Elías Alexei
 - Canseco Carrizo, Yamil Simón
-Objetivo: Creación y eliminación de las tablas de Staging y Log para los procesos de importación de datos.
+Objetivo: Creación de las tablas de Staging y Log para los procesos de importación de datos.
 */
-
--- =========================================================================
--- ELIMINACIÓN DE TABLAS
--- =========================================================================
-
-IF OBJECT_ID('eventos.LogImportacion', 'U') IS NOT NULL
-    DROP TABLE eventos.LogImportacion;
-GO
-
-IF OBJECT_ID('eventos.StagingEvento', 'U') IS NOT NULL
-    DROP TABLE eventos.StagingEvento;
-GO
 
 -- =========================================================================
 -- CREACIÓN DE TABLAS
