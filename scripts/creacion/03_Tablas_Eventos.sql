@@ -6,35 +6,8 @@ Integrantes:
 - Casella, Mateo Ezequiel
 - Torczuk, Elías Alexei
 - Canseco Carrizo, Yamil Simón
-Objetivo: Creación y eliminación de tablas de eventos de partido, reglas de suspensión e infraestructura de importación.
+Objetivo: Creación de tablas de eventos de partido, reglas de suspensión e infraestructura de importación.
 */
-
--- Eliminar tablas existentes (en orden inverso de dependencias).
-
-IF OBJECT_ID('eventos.LogImportacion', 'U') IS NOT NULL
-    DROP TABLE eventos.LogImportacion;
-GO
-IF OBJECT_ID('eventos.StagingEvento', 'U') IS NOT NULL
-    DROP TABLE eventos.StagingEvento;
-GO
-IF OBJECT_ID('eventos.Amonestacion', 'U') IS NOT NULL
-    DROP TABLE eventos.Amonestacion;
-GO
-IF OBJECT_ID('eventos.Tarjeta', 'U') IS NOT NULL
-    DROP TABLE eventos.Tarjeta;
-GO
-IF OBJECT_ID('eventos.Gol', 'U') IS NOT NULL
-    DROP TABLE eventos.Gol;
-GO
-IF OBJECT_ID('eventos.Periodo', 'U') IS NOT NULL
-    DROP TABLE eventos.Periodo;
-GO
-IF OBJECT_ID('eventos.TipoGol', 'U') IS NOT NULL
-    DROP TABLE eventos.TipoGol;
-GO
-IF OBJECT_ID('eventos.ReglaSuspension', 'U') IS NOT NULL
-    DROP TABLE eventos.ReglaSuspension;
-GO
 
 -- Creación de tablas de eventos de partido e importación.
 
