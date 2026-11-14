@@ -8,32 +8,14 @@ Integrantes:
 - Chungara Tenorio, Denis Abner
 - Torczuk, Elías Alexei
 - Canseco Carrizo, Yamil Simón
-Objetivo: Crear la base de datos, los esquemas y las tablas del núcleo del sistema:
+Objetivo: Crear las tablas del núcleo del sistema (requiere 00_Reset_Total.sql ya ejecutado):
           Confederacion, Pais, Ciudad, Sede, Fase, Grupo, Seleccion, StaffTecnico,
           Idioma, Categoria, Arbitro, ArbitroIdioma, Partido, DesignacionArbitral y Sancion.
           Las FK que cruzan módulos (Convocatoria, Formacion, Gol, etc.) están en 06_FK_Cruzadas.sql.
 */
 
--- =========================================================================
--- BASE DE DATOS Y ESQUEMAS
--- (si Yamil ya los tiene en otro script, este bloque es inofensivo: valida existencia)
--- =========================================================================
-USE master;
-GO
-
-IF DB_ID('MundialFutbol') IS NULL
-    CREATE DATABASE MundialFutbol;
-GO
-
+-- La base y los schemas los crea 00_Reset_Total.sql (ejecutar siempre primero).
 USE MundialFutbol;
-GO
-
--- CREATE SCHEMA debe ir solo en su batch, por eso el EXEC (único uso de SQL dinámico del script).
-IF SCHEMA_ID('nucleo') IS NULL EXEC('CREATE SCHEMA nucleo');
-GO
-IF SCHEMA_ID('jugadores') IS NULL EXEC('CREATE SCHEMA jugadores');
-GO
-IF SCHEMA_ID('eventos') IS NULL EXEC('CREATE SCHEMA eventos');
 GO
 
 -- =========================================================================
