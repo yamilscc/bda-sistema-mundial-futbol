@@ -1,3 +1,21 @@
+/*
+Universidad: Universidad Nacional de La Matanza
+Materia: Bases de Datos Aplicadas - Grupo 05
+Autor: Casella, Mateo Ezequiel
+Fecha: 2026-11-14
+Integrantes:
+- Casella, Mateo Ezequiel
+- Chungara Tenorio, Denis Abner
+- Torczuk, Elías Alexei
+- Canseco Carrizo, Yamil Simón
+Objetivo: Crear las tablas de jugadores, convocatoria y alineaciones: reglas de convocados y
+          de cambios, Club, Jugador, Convocatoria, Baja, Formacion, FormacionJugador y
+          Sustitucion. Las FK hacia el núcleo se agregan en 06_FK_Cruzadas.sql.
+*/
+
+USE MundialFutbol;
+GO
+
 -- Creación de tablas de los jugadores y las alineaciones.
 
 IF OBJECT_ID('jugadores.ReglaConvocados', 'U') IS NULL
