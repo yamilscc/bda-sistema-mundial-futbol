@@ -4,7 +4,6 @@ Materia: Bases de Datos Aplicadas - Grupo 05
 Autor: Torczuk, Elías Alexei
 Integrantes:
 - Casella, Mateo Ezequiel
-- Chungara Tenorio, Denis Abner
 - Torczuk, Elías Alexei
 - Canseco Carrizo, Yamil Simón
 Objetivo: Crear las tablas del módulo de publicidad: monedas, anunciantes,
