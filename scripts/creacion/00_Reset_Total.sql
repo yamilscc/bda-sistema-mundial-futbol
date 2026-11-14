@@ -8,14 +8,24 @@ Integrantes:
 - Chungara Tenorio, Denis Abner
 - Torczuk, Elías Alexei
 - Canseco Carrizo, Yamil Simón
-Objetivo: Script maestro de arranque. Se ejecuta SIEMPRE primero, cada vez que se quiere
-          levantar la base desde cero:
-            1. Elimina la base MundialFutbol si existe (con ella desaparecen tablas, SP,
-               funciones, vistas, triggers, roles y usuarios viejos).
-            2. Crea la base MundialFutbol vacía.
-            3. Crea todos los schemas del proyecto.
-          Después se ejecutan los demás scripts numerados (01, 02, 03...) en orden.
+Objetivo: Script maestro. Se ejecuta SIEMPRE primero para levantar la base desde cero:
+            1. Borra la base MundialFutbol si existe (con ella desaparecen tablas, SP, funciones,
+               vistas, triggers, roles, usuarios y claves de cifrado de la base).
+            2. Crea la base vacía y todos los schemas.
+            3. Ejecuta en orden los scripts de creación (tablas, FK, funciones, SP).
+            4. Muestra un resumen de los objetos creados.
+
+REQUISITOS PARA EJECUTARLO:
+  - Activar el modo SQLCMD en SSMS: menú Consulta > Modo SQLCMD (sin esto fallan :setvar y :r).
+  - Editar abajo la variable RUTA con la carpeta scripts\creacion de TU copia del repositorio,
+    sin barra final. Ejemplo: C:\Users\elias\bda-sistema-mundial-futbol\scripts\creacion
+  - Conectarse con un usuario que pueda borrar y crear bases (sysadmin o dbcreator).
+
+Los scripts de testing y de seed NO se ejecutan desde acá (se corren aparte, después).
 */
+
+:on error exit
+:setvar RUTA "C:\CAMBIAR\bda-sistema-mundial-futbol\scripts\creacion"
 
 SET NOCOUNT ON;
 GO
@@ -24,8 +34,12 @@ USE master;
 GO
 
 -- =========================================================================
--- 1. ELIMINAR LA BASE ANTERIOR
--- Se cierran las conexiones abiertas a la base para poder borrarla.
+-- 1. BORRADO: elimina todo lo que ya exista
+-- Se cierran las conexiones abiertas a la base y se la borra completa.
+-- Al borrar la base se eliminan todos sus objetos (tablas, SP, funciones, vistas,
+-- triggers, roles, usuarios, certificados y claves de la base).
+-- Los logins se crean a nivel servidor y NO se borran con la base: si la entrega de
+-- seguridad crea logins, hay que sumarlos acá con un DROP LOGIN ... validado.
 -- =========================================================================
 IF DB_ID('MundialFutbol') IS NOT NULL
 BEGIN
@@ -38,7 +52,7 @@ ELSE
 GO
 
 -- =========================================================================
--- 2. CREAR LA BASE
+-- 2. CREACIÓN DE LA BASE
 -- =========================================================================
 CREATE DATABASE MundialFutbol;
 GO
@@ -49,7 +63,7 @@ USE MundialFutbol;
 GO
 
 -- =========================================================================
--- 3. CREAR LOS SCHEMAS
+-- 3. SCHEMAS
 -- CREATE SCHEMA no admite variables ni IF dentro de su batch, por eso es uno de los pocos
 -- casos donde el SQL dinámico es estrictamente necesario. La lista se recorre con un cursor.
 -- Para agregar un schema nuevo, sumarlo a la lista de abajo.
@@ -86,16 +100,69 @@ DEALLOCATE cSchemas;
 GO
 
 -- =========================================================================
--- VERIFICACIÓN
--- Resultado esperado: una fila por cada schema de la lista, y 0 tablas.
+-- 4. EJECUCIÓN ORDENADA DE LOS SCRIPTS DE CREACIÓN
+-- :r incluye cada archivo en esta misma sesión (quedan en la base MundialFutbol).
+-- Si alguno falla, :on error exit corta toda la ejecución en ese punto.
+-- Cada PRINT lleva su GO para que el primer comando del archivo incluido (ej: CREATE OR ALTER
+-- PROCEDURE, que exige ir primero en su batch) no comparta batch con el PRINT.
+-- Los scripts que todavía no existen en la rama están comentados: descomentar al sumarlos.
 -- =========================================================================
-SELECT s.name AS SchemaCreado
-FROM sys.schemas AS s
-WHERE s.name IN ('nucleo', 'jugadores', 'eventos', 'publicidad')
-ORDER BY s.name;
 
-SELECT COUNT(*) AS TablasExistentes_Esperado_0 FROM sys.tables;
+PRINT '--- 01 Tablas del núcleo';
+GO
+:r "$(RUTA)\01_Tablas_Nucleo.sql"
+
+PRINT '--- 02 Tablas de jugadores y alineaciones';
+GO
+:r "$(RUTA)\02_Tablas_Jugadores_y_Alineaciones.sql"
+
+PRINT '--- 03 Tablas de eventos';
+GO
+:r "$(RUTA)\03_Tablas_Eventos.sql"
+
+-- PRINT '--- 04 Tablas de publicidad';
+-- :r "$(RUTA)\04_Tablas_Publicidad.sql"
+
+PRINT '--- 05 Tablas de logs y staging';
+GO
+:r "$(RUTA)\05_Tablas_Logs_Staging.sql"
+
+PRINT '--- 06 FK cruzadas entre módulos';
+GO
+:r "$(RUTA)\06_FK_Cruzadas.sql"
+
+PRINT '--- 07 Funciones del núcleo';
+GO
+:r "$(RUTA)\07_Funciones_Nucleo.sql"
+
+PRINT '--- 08 SP de control arbitral';
+GO
+:r "$(RUTA)\08_SP_ControlArbitral.sql"
+
+PRINT '--- 09 SP de sedes, partidos, resultados y clasificadas';
+GO
+:r "$(RUTA)\09_SP_Sedes_Partidos.sql"
+
+-- Los próximos SP, vistas y funciones se suman acá, siempre en orden numérico.
+
+-- =========================================================================
+-- 5. RESUMEN
+-- Resultado esperado: filas por schema con la cantidad de tablas, SP y funciones creadas.
+-- =========================================================================
+USE MundialFutbol;
 GO
 
-PRINT 'Reset completo. Ejecutar ahora los scripts 01, 02, 03... en orden.';
+SELECT s.name AS [Schema],
+       SUM(CASE WHEN o.type = 'U' THEN 1 ELSE 0 END)                AS Tablas,
+       SUM(CASE WHEN o.type = 'P' THEN 1 ELSE 0 END)                AS StoredProcedures,
+       SUM(CASE WHEN o.type IN ('FN', 'IF', 'TF') THEN 1 ELSE 0 END) AS Funciones,
+       SUM(CASE WHEN o.type = 'V' THEN 1 ELSE 0 END)                AS Vistas
+FROM sys.schemas AS s
+LEFT JOIN sys.objects AS o ON o.schema_id = s.schema_id AND o.is_ms_shipped = 0
+WHERE s.name IN ('nucleo', 'jugadores', 'eventos', 'publicidad')
+GROUP BY s.name
+ORDER BY s.name;
+GO
+
+PRINT 'Base MundialFutbol lista.';
 GO
