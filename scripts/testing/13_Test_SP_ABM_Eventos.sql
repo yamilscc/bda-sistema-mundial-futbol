@@ -1,7 +1,7 @@
 /*
 Universidad: Universidad Nacional de La Matanza
 Materia: Bases de Datos Aplicadas - Grupo 05
-Autor: Chungara Tenorio, Denis Abner
+Autor: Casella, Mateo Ezequiel
 Fecha: 2026-11-15
 Integrantes:
 - Casella, Mateo Ezequiel
