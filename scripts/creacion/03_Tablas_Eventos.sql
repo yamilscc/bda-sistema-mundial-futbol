@@ -2,12 +2,19 @@
 Universidad: Universidad Nacional de La Matanza
 Materia: Bases de Datos Aplicadas - Grupo 05
 Autor: Casella, Mateo Ezequiel
+Fecha: 2026-11-14
 Integrantes:
 - Casella, Mateo Ezequiel
+- Chungara Tenorio, Denis Abner
 - Torczuk, Elías Alexei
 - Canseco Carrizo, Yamil Simón
-Objetivo: Creación de tablas de eventos de partido, reglas de suspensión e infraestructura de importación.
+Objetivo: Crear las tablas de eventos de partido y la regla de suspensión: ReglaSuspension,
+          TipoGol, Periodo, Gol, Tarjeta y Amonestacion. Las FK hacia el núcleo se agregan
+          en 06_FK_Cruzadas.sql.
 */
+
+USE MundialFutbol;
+GO
 
 -- Creación de tablas de eventos de partido e importación.
 
@@ -98,5 +105,3 @@ CREATE TABLE eventos.Amonestacion (
     -- , CONSTRAINT FK_Amonestacion_Partido FOREIGN KEY (IdPartido)      REFERENCES <esquema>.Partido (IdPartido)
 );
 GO
-
-);

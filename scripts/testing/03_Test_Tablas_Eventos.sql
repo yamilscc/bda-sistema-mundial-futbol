@@ -2,16 +2,26 @@
 Universidad: Universidad Nacional de La Matanza
 Materia: Bases de Datos Aplicadas - Grupo 05
 Autor: Casella, Mateo Ezequiel
+Fecha: 2026-11-14
 Integrantes:
 - Casella, Mateo Ezequiel
+- Chungara Tenorio, Denis Abner
 - Torczuk, Elías Alexei
 - Canseco Carrizo, Yamil Simón
 Objetivo: Pruebas de casos límite y restricciones DDL sobre las tablas del módulo de eventos.
+          Requiere ejecutados los scripts 01 a 09 (usa SP_ABM_Sede y SP_ABM_Partido).
 */
+
+USE MundialFutbol;
+GO
 
 -- =========================================================================
 -- PREPARACIÓN DE DATOS MÍNIMOS PARA PRUEBAS DE INTEGRIDAD
+-- Todo corre dentro de una transacción que se deshace al final (ROLLBACK), por lo que
+-- los DELETE de abajo no afectan los datos reales y no queda basura de prueba.
 -- =========================================================================
+BEGIN TRANSACTION;
+
 DELETE FROM eventos.Amonestacion;
 DELETE FROM eventos.Gol;
 DELETE FROM eventos.Tarjeta;
@@ -34,6 +44,31 @@ INSERT INTO eventos.Tarjeta (Tipo) VALUES ('Amarilla'), ('Roja por doble amarill
 DECLARE @idTipoJugada INT = (SELECT IdTipoGol FROM eventos.TipoGol WHERE Descripcion = 'Jugada');
 DECLARE @idPeriodoPT  INT = (SELECT IdPeriodo FROM eventos.Periodo WHERE Descripcion = 'Primer Tiempo');
 DECLARE @idTarjetaAm  INT = (SELECT IdTarjeta FROM eventos.Tarjeta WHERE Tipo = 'Amarilla');
+
+-- Escenario mínimo para respetar las FK de 06 (partido y staff técnico existentes).
+INSERT INTO nucleo.Confederacion (Nombre, Sigla) VALUES ('TEST EV3 Confederacion', 'TE3');
+DECLARE @idConf INT = (SELECT IdConfederacion FROM nucleo.Confederacion WHERE Sigla = 'TE3');
+
+INSERT INTO nucleo.Pais (Nombre, CodigoISO2, CodigoISO3, IdConfederacion, ZonaHoraria)
+VALUES ('TEST EV3 Pais', 'Y1', 'YE1', @idConf, 'Argentina Standard Time');
+DECLARE @idPais INT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'YE1');
+
+INSERT INTO nucleo.Seleccion (IdPais) VALUES (@idPais);
+DECLARE @idSel INT = (SELECT IdSeleccion FROM nucleo.Seleccion WHERE IdPais = @idPais);
+
+INSERT INTO nucleo.Ciudad (Nombre, IdPais) VALUES ('TEST EV3 Ciudad', @idPais);
+DECLARE @idCiudad INT = (SELECT IdCiudad FROM nucleo.Ciudad WHERE Nombre = 'TEST EV3 Ciudad');
+
+DECLARE @idSede INT, @idPartido INT;
+EXEC nucleo.SP_ABM_Sede @operacion = 'ALTA', @idSede = @idSede OUTPUT, @nombreEstadio = 'TEST EV3 Estadio',
+     @idCiudad = @idCiudad, @capacidad = 50000, @zonaHoraria = 'Argentina Standard Time';
+
+DECLARE @idFase INT = (SELECT IdFase FROM nucleo.Fase WHERE Descripcion = 'Octavos');
+EXEC nucleo.SP_ABM_Partido 'ALTA', @idPartido OUTPUT, 9301, @idFase, @idSede, '2026-06-12 20:00', NULL, NULL;
+
+INSERT INTO nucleo.StaffTecnico (IdSeleccion, Nombre, Apellido, Documento, Rol)
+VALUES (@idSel, 'Staff', 'Uno', 'TEST_EV3_STAFF', 'Ayudante');
+DECLARE @idStaff INT = (SELECT IdStaffTecnico FROM nucleo.StaffTecnico WHERE Documento = 'TEST_EV3_STAFF');
 
 -- =========================================================================
 -- TEST 1: ReglaSuspension - Consistencia entre Criterio y CantidadAmarillas
@@ -74,14 +109,14 @@ END CATCH;
 -- 2.A Caso límite exitoso: Minutos en los bordes exactos permitidos (1 y 135) con y sin asistencia.
 -- Resultado esperado: Inserción exitosa de 2 goles.
 INSERT INTO eventos.Gol (IdPartido, IdJugadorAutor, IdJugadorAsistencia, IdTipoGol, IdPeriodo, Minuto)
-VALUES (1, @idJug1, @idJug2, @idTipoJugada, @idPeriodoPT, 1),
-       (1, @idJug1, NULL,    @idTipoJugada, @idPeriodoPT, 135);
+VALUES (@idPartido, @idJug1, @idJug2, @idTipoJugada, @idPeriodoPT, 1),
+       (@idPartido, @idJug1, NULL,    @idTipoJugada, @idPeriodoPT, 135);
 
 -- 2.B Caso límite fallido: Minuto = 0 (fuera de borde inferior).
 -- Resultado esperado: Error por restricción CHECK CK_Gol_Minuto.
 BEGIN TRY
     INSERT INTO eventos.Gol (IdPartido, IdJugadorAutor, IdJugadorAsistencia, IdTipoGol, IdPeriodo, Minuto)
-    VALUES (1, @idJug1, NULL, @idTipoJugada, @idPeriodoPT, 0);
+    VALUES (@idPartido, @idJug1, NULL, @idTipoJugada, @idPeriodoPT, 0);
     PRINT 'TEST 2.B FALLÓ: Permitió gol en minuto 0.';
 END TRY
 BEGIN CATCH
@@ -92,7 +127,7 @@ END CATCH;
 -- Resultado esperado: Error por restricción CHECK CK_Gol_Minuto.
 BEGIN TRY
     INSERT INTO eventos.Gol (IdPartido, IdJugadorAutor, IdJugadorAsistencia, IdTipoGol, IdPeriodo, Minuto)
-    VALUES (1, @idJug1, NULL, @idTipoJugada, @idPeriodoPT, 136);
+    VALUES (@idPartido, @idJug1, NULL, @idTipoJugada, @idPeriodoPT, 136);
     PRINT 'TEST 2.C FALLÓ: Permitió gol en minuto 136.';
 END TRY
 BEGIN CATCH
@@ -103,7 +138,7 @@ END CATCH;
 -- Resultado esperado: Error por restricción CHECK CK_Gol_AutorDistintoAsistente.
 BEGIN TRY
     INSERT INTO eventos.Gol (IdPartido, IdJugadorAutor, IdJugadorAsistencia, IdTipoGol, IdPeriodo, Minuto)
-    VALUES (1, @idJug1, @idJug1, @idTipoJugada, @idPeriodoPT, 45);
+    VALUES (@idPartido, @idJug1, @idJug1, @idTipoJugada, @idPeriodoPT, 45);
     PRINT 'TEST 2.D FALLÓ: Permitió que el autor sea su propio asistente.';
 END TRY
 BEGIN CATCH
@@ -117,14 +152,14 @@ END CATCH;
 -- 3.A Caso exitoso: Amonestación solo a jugador y otra solo a staff técnico.
 -- Resultado esperado: Inserción exitosa de 2 filas.
 INSERT INTO eventos.Amonestacion (IdPartido, IdTarjeta, IdJugador, IdStaffTecnico, Minuto, Motivo, PartidosSuspension)
-VALUES (1, @idTarjetaAm, @idJug1, NULL, 30, 'Falta táctica', 0),
-       (1, @idTarjetaAm, NULL,    10,   65, 'Protestar fallos', 1);
+VALUES (@idPartido, @idTarjetaAm, @idJug1, NULL, 30, 'Falta táctica', 0),
+       (@idPartido, @idTarjetaAm, NULL,    @idStaff, 65, 'Protestar fallos', 1);
 
 -- 3.B Caso límite fallido: Amonestación asignada a Jugador y Staff al mismo tiempo.
 -- Resultado esperado: Error por restricción CHECK CK_Amonestacion_SancionadoExclusivo.
 BEGIN TRY
     INSERT INTO eventos.Amonestacion (IdPartido, IdTarjeta, IdJugador, IdStaffTecnico, Minuto, Motivo)
-    VALUES (1, @idTarjetaAm, @idJug1, 10, 50, 'Ambos sancionados en misma fila');
+    VALUES (@idPartido, @idTarjetaAm, @idJug1, @idStaff, 50, 'Ambos sancionados en misma fila');
     PRINT 'TEST 3.B FALLÓ: Permitió amonestar a jugador y staff simultáneamente.';
 END TRY
 BEGIN CATCH
@@ -135,7 +170,7 @@ END CATCH;
 -- Resultado esperado: Error por restricción CHECK CK_Amonestacion_SancionadoExclusivo.
 BEGIN TRY
     INSERT INTO eventos.Amonestacion (IdPartido, IdTarjeta, IdJugador, IdStaffTecnico, Minuto, Motivo)
-    VALUES (1, @idTarjetaAm, NULL, NULL, 50, 'Sin destinatario');
+    VALUES (@idPartido, @idTarjetaAm, NULL, NULL, 50, 'Sin destinatario');
     PRINT 'TEST 3.C FALLÓ: Permitió amonestación huérfana de sancionado.';
 END TRY
 BEGIN CATCH
@@ -146,10 +181,15 @@ END CATCH;
 -- Resultado esperado: Error por restricción CHECK CK_Amonestacion_Partidos.
 BEGIN TRY
     INSERT INTO eventos.Amonestacion (IdPartido, IdTarjeta, IdJugador, IdStaffTecnico, Minuto, Motivo, PartidosSuspension)
-    VALUES (1, @idTarjetaAm, @idJug1, NULL, 80, 'Conducta violenta', -1);
+    VALUES (@idPartido, @idTarjetaAm, @idJug1, NULL, 80, 'Conducta violenta', -1);
     PRINT 'TEST 3.D FALLÓ: Permitió cantidad negativa de partidos de suspensión.';
 END TRY
 BEGIN CATCH
     PRINT 'TEST 3.D OK (Bloqueado): ' + ERROR_MESSAGE();
 END CATCH;
+
+-- =========================================================================
+-- FIN: se deshacen todos los cambios de la prueba.
+-- =========================================================================
+ROLLBACK TRANSACTION;
 GO

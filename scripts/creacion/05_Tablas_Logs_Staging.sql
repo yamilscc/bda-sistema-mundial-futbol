@@ -2,12 +2,18 @@
 Universidad: Universidad Nacional de La Matanza
 Materia: Bases de Datos Aplicadas - Grupo 05
 Autor: Casella, Mateo Ezequiel
+Fecha: 2026-11-14
 Integrantes:
 - Casella, Mateo Ezequiel
+- Chungara Tenorio, Denis Abner
 - Torczuk, Elías Alexei
 - Canseco Carrizo, Yamil Simón
-Objetivo: Creación de las tablas de Staging y Log para los procesos de importación de datos.
+Objetivo: Crear las tablas de staging (eventos.StagingEvento) y de log (eventos.LogImportacion)
+          para los procesos de importación de datos.
 */
+
+USE MundialFutbol;
+GO
 
 -- =========================================================================
 -- CREACIÓN DE TABLAS
