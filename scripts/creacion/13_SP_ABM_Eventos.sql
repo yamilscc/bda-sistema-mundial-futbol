@@ -1,7 +1,7 @@
 /*
 Universidad: Universidad Nacional de La Matanza
 Materia: Bases de Datos Aplicadas - Grupo 05
-Autor: Chungara Tenorio, Denis Abner
+Autor: Casella, Mateo Ezequiel
 Fecha: 2026-11-15
 Integrantes:
 - Casella, Mateo Ezequiel
@@ -592,10 +592,6 @@ GO
 
 -- =========================================================================
 -- 6. SP_ABM_Amonestacion
--- En ALTA delega en eventos.SP_REGISTRAR_AMONESTACION.
--- En MODIFICACION recalcula tipo de tarjeta y PartidosSuspension excluyendo
--- la fila actual; en BAJA impide borrar la 1ra amarilla si ya existe una
--- roja por doble amarilla en el mismo partido.
 -- =========================================================================
 CREATE OR ALTER PROCEDURE eventos.SP_ABM_Amonestacion
     @operacion           VARCHAR(12),
@@ -616,7 +612,6 @@ BEGIN
     IF @operacion IS NULL OR @operacion NOT IN ('ALTA', 'MODIFICACION', 'BAJA')
         THROW 52001, 'Operación inválida. Valores permitidos: ALTA, MODIFICACION, BAJA.', 1;
 
-    -- En ALTA se reutiliza íntegramente SP_REGISTRAR_AMONESTACION.
     IF @operacion = 'ALTA'
     BEGIN
         EXEC eventos.SP_REGISTRAR_AMONESTACION
@@ -668,7 +663,6 @@ BEGIN
     ELSE IF @estadoActual = 'Finalizado'
         SET @errores += N'- El partido de la amonestación ya está finalizado: no se puede modificar ni eliminar.' + @salto;
 
-    -- En BAJA no se permite dejar huérfana una Roja por doble amarilla en el mismo partido.
     IF @operacion = 'BAJA'
        AND @idPartidoActual IS NOT NULL
        AND @tipoActual = 'Amarilla'
@@ -776,7 +770,7 @@ BEGIN
                                 WHERE a.IdPartido = @idPartido
                                   AND a.IdStaffTecnico = @idStaffTecnico
                                   AND a.IdAmonestacion <> @idAmonestacion
-                                  AND t.Tipo = 'Roja directa'
+                                  AND t.Tipo IN ('Roja por doble amarilla', 'Roja directa')
                                   AND a.Minuto <= @minuto)
                 SET @errores += N'- El miembro del staff técnico ya estaba expulsado en ese minuto.' + @salto;
         END;
@@ -815,9 +809,11 @@ BEGIN
                     SELECT @amarillasPrevias = COUNT(*)
                     FROM eventos.Amonestacion AS a
                     INNER JOIN eventos.Tarjeta AS t ON t.IdTarjeta = a.IdTarjeta
+                    INNER JOIN nucleo.Partido AS po ON po.IdPartido = a.IdPartido
                     WHERE a.IdJugador = @idJugador
                       AND a.IdAmonestacion <> @idAmonestacion
                       AND t.Tipo = 'Amarilla'
+                      AND po.FechaHoraUTC < @fechaHoraUTC
                       AND NOT EXISTS (SELECT 1
                                       FROM eventos.Amonestacion AS r
                                       INNER JOIN eventos.Tarjeta AS tr ON tr.IdTarjeta = r.IdTarjeta
@@ -829,6 +825,18 @@ BEGIN
                     IF (@amarillasPrevias + 1) % @cantAcum = 0
                         SET @partidosSuspension = @susAcum;
                 END;
+            END
+            ELSE IF @idStaffTecnico IS NOT NULL
+                    AND @tipoTarjeta = 'Amarilla'
+                    AND EXISTS (SELECT 1
+                                FROM eventos.Amonestacion AS a
+                                INNER JOIN eventos.Tarjeta AS t ON t.IdTarjeta = a.IdTarjeta
+                                WHERE a.IdPartido = @idPartido
+                                  AND a.IdStaffTecnico = @idStaffTecnico
+                                  AND a.IdAmonestacion <> @idAmonestacion
+                                  AND t.Tipo = 'Amarilla')
+            BEGIN
+                SET @tipoFinal = 'Roja por doble amarilla';
             END;
 
             SELECT @idTarjetaFinal = t.IdTarjeta FROM eventos.Tarjeta AS t WHERE t.Tipo = @tipoFinal;
