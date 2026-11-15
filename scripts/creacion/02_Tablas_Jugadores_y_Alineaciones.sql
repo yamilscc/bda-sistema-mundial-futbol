@@ -2,7 +2,7 @@
 Universidad: Universidad Nacional de La Matanza
 Materia: Bases de Datos Aplicadas - Grupo 05
 Autor: Casella, Mateo Ezequiel
-Fecha: 2026-11-14
+Fecha: 2026-11-15
 Integrantes:
 - Casella, Mateo Ezequiel
 - Chungara Tenorio, Denis Abner
@@ -50,6 +50,7 @@ CREATE TABLE jugadores.Jugador (
     Nombre VARCHAR(60) NOT NULL,
     Apellido VARCHAR(60) NOT NULL,
     Documento VARCHAR(20) NOT NULL CONSTRAINT UQ_Jugador_Documento UNIQUE,
+    FechaNacimiento DATE NULL CONSTRAINT CK_Jugador_FechaNacimiento CHECK (FechaNacimiento <= CAST(GETDATE() AS DATE)),
     Sexo CHAR(1) NOT NULL CONSTRAINT CK_Jugador_Sexo CHECK (Sexo IN ('M', 'F')),
     Posicion VARCHAR(20) NOT NULL
         CONSTRAINT CK_Jugador_Posicion CHECK (Posicion IN ('Arquero', 'Defensor', 'Mediocampista', 'Delantero')),
