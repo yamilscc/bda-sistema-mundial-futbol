@@ -44,143 +44,24 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
-    DECLARE @errores NVARCHAR(MAX) = N'',
-            @mensaje NVARCHAR(2048),
-            @salto   NVARCHAR(2)   = CHAR(13) + CHAR(10),
-            @existe          BIT = 0,
-            @estado          VARCHAR(10),
-            @esEliminatoria  BIT,
-            @idLocal         INT,
-            @idVisitante     INT,
-            @fechaHoraUTC    DATETIME2(0),
-            @fechaLocal      DATE,
-            @idTipoGol       INT,
-            @idPeriodo       INT,
-            @idSelAutor      INT,
-            @idSelAsistente  INT;
+    DECLARE @errores   NVARCHAR(MAX),
+            @mensaje   NVARCHAR(2048),
+            @salto     NVARCHAR(2) = CHAR(13) + CHAR(10),
+            @idTipoGol INT,
+            @idPeriodo INT;
 
-    SELECT @existe         = 1,
-           @estado         = p.Estado,
-           @esEliminatoria = f.EsEliminatoria,
-           @idLocal        = p.IdSeleccionLocal,
-           @idVisitante    = p.IdSeleccionVisitante,
-           @fechaHoraUTC   = p.FechaHoraUTC,
-           @fechaLocal     = CAST(p.FechaHoraLocal AS DATE)
-    FROM nucleo.Partido AS p
-    INNER JOIN nucleo.Fase AS f ON f.IdFase = p.IdFase
-    WHERE p.IdPartido = @idPartido;
-
-    SELECT @idTipoGol = t.IdTipoGol FROM eventos.TipoGol AS t WHERE t.Descripcion = @tipoGol;
-    SELECT @idPeriodo = pe.IdPeriodo FROM eventos.Periodo AS pe WHERE pe.Descripcion = @periodo;
-    SELECT @idSelAutor     = c.IdSeleccion FROM jugadores.Convocatoria AS c WHERE c.IdJugador = @idJugadorAutor;
-    SELECT @idSelAsistente = c.IdSeleccion FROM jugadores.Convocatoria AS c WHERE c.IdJugador = @idJugadorAsistencia;
-
-    -- ---- Validaciones ----------------------------------------------------
-    IF @existe = 0
-        SET @errores += N'- El partido indicado no existe.' + @salto;
-    ELSE
-    BEGIN
-        IF @idLocal IS NULL OR @idVisitante IS NULL
-            SET @errores += N'- El partido no tiene definidas ambas selecciones.' + @salto;
-
-        IF @estado = 'Finalizado'
-            SET @errores += N'- El partido ya está finalizado: no se pueden registrar más goles.' + @salto;
-
-        IF @permitirFechaFutura = 0 AND @fechaHoraUTC > SYSUTCDATETIME()
-            SET @errores += N'- No se pueden registrar goles de un partido que todavía no se jugó.' + @salto;
-    END;
-
-    IF @idTipoGol IS NULL
-        SET @errores += N'- El tipo de gol indicado no existe.' + @salto;
-
-    IF @idPeriodo IS NULL
-        SET @errores += N'- El período indicado no existe.' + @salto;
-
-    IF @minuto IS NULL OR @minuto NOT BETWEEN 1 AND 135
-        SET @errores += N'- El minuto debe estar entre 1 y 135.' + @salto;
-
-    IF @periodo = 'Definicion por Penales'
-    BEGIN
-        IF @tipoGol <> 'Penal'
-            SET @errores += N'- En la definición por penales solo se pueden registrar goles de tipo Penal.' + @salto;
-
-        IF @existe = 1 AND @esEliminatoria = 0
-            SET @errores += N'- En fase de grupos no hay definición por penales.' + @salto;
-    END;
-
-    IF @idJugadorAsistencia IS NOT NULL
-       AND (@tipoGol IN ('En contra', 'Penal') OR @periodo = 'Definicion por Penales')
-        SET @errores += N'- Este tipo de gol no admite asistencia.' + @salto;
-
-    -- Autor
-    IF @idJugadorAutor IS NULL
-       OR NOT EXISTS (SELECT 1 FROM jugadores.Jugador AS j WHERE j.IdJugador = @idJugadorAutor)
-        SET @errores += N'- El jugador autor del gol no existe.' + @salto;
-    ELSE IF @idSelAutor IS NULL
-        SET @errores += N'- El jugador autor del gol no está convocado.' + @salto;
-    ELSE IF @existe = 1 AND @idSelAutor NOT IN (ISNULL(@idLocal, -1), ISNULL(@idVisitante, -1))
-        SET @errores += N'- El jugador autor del gol no pertenece a ninguna de las selecciones del partido.' + @salto;
-    ELSE IF @existe = 1
-    BEGIN
-        IF EXISTS (SELECT 1
-                   FROM jugadores.Convocatoria AS c
-                   INNER JOIN jugadores.Baja AS b ON b.IdConvocatoria = c.IdConvocatoria
-                   WHERE c.IdJugador = @idJugadorAutor AND b.FechaBaja <= @fechaLocal)
-            SET @errores += N'- El jugador autor del gol está dado de baja de la convocatoria.' + @salto;
-
-        IF eventos.fn_EstaSuspendido(@idJugadorAutor, @idPartido) = 1
-            SET @errores += N'- El jugador autor del gol está suspendido para este partido.' + @salto;
-
-        IF @minuto IS NOT NULL
-           AND EXISTS (SELECT 1
-                       FROM eventos.Amonestacion AS a
-                       INNER JOIN eventos.Tarjeta AS t ON t.IdTarjeta = a.IdTarjeta
-                       WHERE a.IdPartido = @idPartido AND a.IdJugador = @idJugadorAutor
-                         AND t.Tipo IN ('Roja por doble amarilla', 'Roja directa')
-                         AND a.Minuto <= @minuto)
-            SET @errores += N'- El jugador autor del gol ya estaba expulsado en ese minuto.' + @salto;
-    END;
-
-    -- Asistente (opcional)
-    IF @idJugadorAsistencia IS NOT NULL
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM jugadores.Jugador AS j WHERE j.IdJugador = @idJugadorAsistencia)
-            SET @errores += N'- El jugador que asiste no existe.' + @salto;
-        ELSE IF @idJugadorAsistencia = @idJugadorAutor
-            SET @errores += N'- El autor del gol no puede ser también quien asiste.' + @salto;
-        ELSE IF @idSelAsistente IS NULL
-            SET @errores += N'- El jugador que asiste no está convocado.' + @salto;
-        ELSE IF @idSelAutor IS NOT NULL AND @idSelAsistente <> @idSelAutor
-            SET @errores += N'- El jugador que asiste debe ser de la misma selección que el autor.' + @salto;
-        ELSE IF @existe = 1 AND @idSelAsistente NOT IN (ISNULL(@idLocal, -1), ISNULL(@idVisitante, -1))
-            SET @errores += N'- El jugador que asiste no pertenece a ninguna de las selecciones del partido.' + @salto;
-        ELSE IF @existe = 1
-        BEGIN
-            IF EXISTS (SELECT 1
-                       FROM jugadores.Convocatoria AS c
-                       INNER JOIN jugadores.Baja AS b ON b.IdConvocatoria = c.IdConvocatoria
-                       WHERE c.IdJugador = @idJugadorAsistencia AND b.FechaBaja <= @fechaLocal)
-                SET @errores += N'- El jugador que asiste está dado de baja de la convocatoria.' + @salto;
-
-            IF eventos.fn_EstaSuspendido(@idJugadorAsistencia, @idPartido) = 1
-                SET @errores += N'- El jugador que asiste está suspendido para este partido.' + @salto;
-
-            IF @minuto IS NOT NULL
-               AND EXISTS (SELECT 1
-                           FROM eventos.Amonestacion AS a
-                           INNER JOIN eventos.Tarjeta AS t ON t.IdTarjeta = a.IdTarjeta
-                           WHERE a.IdPartido = @idPartido AND a.IdJugador = @idJugadorAsistencia
-                             AND t.Tipo IN ('Roja por doble amarilla', 'Roja directa')
-                             AND a.Minuto <= @minuto)
-                SET @errores += N'- El jugador que asiste ya estaba expulsado en ese minuto.' + @salto;
-        END;
-    END;
+    -- Todas las validaciones están en eventos.fn_ValidarGol (la comparte SP_ABM_Gol).
+    SET @errores = eventos.fn_ValidarGol(@idPartido, @idJugadorAutor, @tipoGol, @periodo, @minuto,
+                                         @idJugadorAsistencia, @permitirFechaFutura);
 
     IF LEN(@errores) > 0
     BEGIN
         SET @mensaje = LEFT(N'SP_REGISTRAR_GOL - No se pudo registrar el gol:' + @salto + @errores, 2048);
         THROW 52000, @mensaje, 1;
     END;
+
+    SELECT @idTipoGol = t.IdTipoGol FROM eventos.TipoGol AS t WHERE t.Descripcion = @tipoGol;
+    SELECT @idPeriodo = pe.IdPeriodo FROM eventos.Periodo AS pe WHERE pe.Descripcion = @periodo;
 
     -- ---- Operación -------------------------------------------------------
     BEGIN TRY

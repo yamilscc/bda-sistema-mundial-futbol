@@ -64,39 +64,33 @@ GO
 
 -- =========================================================================
 -- 3. SCHEMAS
--- CREATE SCHEMA no admite variables ni IF dentro de su batch, por eso es uno de los pocos
--- casos donde el SQL dinámico es estrictamente necesario. La lista se recorre con un cursor.
--- Para agregar un schema nuevo, sumarlo a la lista de abajo.
+-- CREATE SCHEMA tiene que ir solo en su batch, por eso se ejecuta con EXEC con texto fijo
+-- (único uso de SQL dinámico del proyecto, estrictamente necesario). Para agregar un schema
+-- nuevo, sumar un bloque igual.
 -- =========================================================================
-DECLARE @schemas TABLE (Nombre SYSNAME PRIMARY KEY);
-
-INSERT INTO @schemas (Nombre)
-VALUES ('nucleo'),       -- países, sedes, partidos, árbitros
-       ('jugadores'),    -- jugadores, convocatoria, formaciones, sustituciones
-       ('eventos'),      -- goles, tarjetas, suspensiones, staging y logs de importación
-       ('publicidad');   -- anunciantes, campañas, espacios y asignaciones
-
-DECLARE @nombreSchema SYSNAME;
-
-DECLARE cSchemas CURSOR LOCAL FAST_FORWARD FOR
-    SELECT Nombre FROM @schemas ORDER BY Nombre;
-
-OPEN cSchemas;
-FETCH NEXT FROM cSchemas INTO @nombreSchema;
-
-WHILE @@FETCH_STATUS = 0
+IF SCHEMA_ID('nucleo') IS NULL            -- países, sedes, partidos, árbitros
 BEGIN
-    IF SCHEMA_ID(@nombreSchema) IS NULL
-    BEGIN
-        EXEC('CREATE SCHEMA ' + @nombreSchema);
-        PRINT 'Schema creado: ' + @nombreSchema;
-    END;
-
-    FETCH NEXT FROM cSchemas INTO @nombreSchema;
+    EXEC('CREATE SCHEMA nucleo');
+    PRINT 'Schema creado: nucleo';
 END;
 
-CLOSE cSchemas;
-DEALLOCATE cSchemas;
+IF SCHEMA_ID('jugadores') IS NULL         -- jugadores, convocatoria, formaciones, sustituciones
+BEGIN
+    EXEC('CREATE SCHEMA jugadores');
+    PRINT 'Schema creado: jugadores';
+END;
+
+IF SCHEMA_ID('eventos') IS NULL           -- goles, tarjetas, suspensiones, staging y logs de importación
+BEGIN
+    EXEC('CREATE SCHEMA eventos');
+    PRINT 'Schema creado: eventos';
+END;
+
+IF SCHEMA_ID('publicidad') IS NULL        -- anunciantes, piezas, espacios y asignaciones
+BEGIN
+    EXEC('CREATE SCHEMA publicidad');
+    PRINT 'Schema creado: publicidad';
+END;
 GO
 
 -- =========================================================================

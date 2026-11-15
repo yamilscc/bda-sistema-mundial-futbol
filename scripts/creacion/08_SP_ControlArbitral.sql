@@ -22,16 +22,8 @@ USE MundialFutbol;
 GO
 
 /*
-SUPUESTOS (nombres tomados del DER; ajustar a lo que implemente cada módulo):
-  nucleo.Partido(IdPartido, IdFase)
-  nucleo.Fase(IdFase, Descripcion)
-  nucleo.Arbitro(IdArbitro, IdPais)                 -- "Árbitro pertenece a País"
-  nucleo.Seleccion(IdSeleccion, IdPais)             -- "Selección es representada por País"
-  nucleo.DesignacionArbitral(IdPartido, IdArbitro, Rol)   -- relación "Partido Tiene Árbitro" con Rol
-  jugadores.fn_SeleccionesDelPartido(@idPartido)    -- devuelve una tabla con IdSeleccion
 Roles válidos: 'Principal', 'Asistente' (hasta 2), 'Cuarto', 'VAR'.
-Descripciones de fase eliminatoria: 'Dieciseisavos', 'Octavos', 'Cuartos',
-                                    'Semifinal', 'Tercer puesto', 'Final'.
+Fases eliminatorias: 'Dieciseisavos', 'Octavos', 'Cuartos', 'Semifinal', 'Tercer puesto', 'Final'.
 
 CRITERIO DE ADVERTENCIA ("puede cruzarse"):
   Desde dieciseisavos se advierte si el país del árbitro tiene una selección que
