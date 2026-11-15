@@ -323,18 +323,41 @@ BEGIN CATCH
     PRINT 'A19: OK (Bloqueado) - ' + REPLACE(ERROR_MESSAGE(), CHAR(13) + CHAR(10), ' | ');
 END CATCH;
 
+-- A20 Primera amarilla al staff S1 en el partido 9502.
+-- Resultado esperado: OK, se registra como Amarilla con PartidosSuspension = 0.
+BEGIN TRY
+    EXEC eventos.SP_REGISTRAR_AMONESTACION @idPartido = @p9502, @tipoTarjeta = 'Amarilla', @minuto = 30,
+         @motivo = 'Protestas desde el banco', @idStaffTecnico = @idS1, @idAmonestacion = @idAmon OUTPUT;
+    PRINT 'A20: OK - primera amarilla al staff registrada (suspensión esperada: 0).';
+END TRY
+BEGIN CATCH
+    PRINT 'A20: FALLÓ - ' + ERROR_MESSAGE();
+END CATCH;
+
+-- A21 Segunda amarilla al mismo miembro del staff en el mismo partido.
+-- Resultado esperado: OK, se registra como 'Roja por doble amarilla' con PartidosSuspension = 0
+-- (el staff no se suspende).
+BEGIN TRY
+    EXEC eventos.SP_REGISTRAR_AMONESTACION @idPartido = @p9502, @tipoTarjeta = 'Amarilla', @minuto = 70,
+         @motivo = 'Reclamos reiterados', @idStaffTecnico = @idS1, @idAmonestacion = @idAmon OUTPUT;
+    PRINT 'A21: OK - segunda amarilla al staff convertida en roja por doble amarilla (suspensión esperada: 0).';
+END TRY
+BEGIN CATCH
+    PRINT 'A21: FALLÓ - ' + ERROR_MESSAGE();
+END CATCH;
+
 -- =========================================================================
 -- CONTROLES FINALES
 -- =========================================================================
 PRINT '--- CONTROLES ---';
 
--- Amonestaciones esperadas: 7 (A1, A2, A4, A11, A12, A15 y A16).
-SELECT 'Amonestaciones registradas (esperado: 7)' AS Control, COUNT(*) AS Cantidad
+-- Amonestaciones esperadas: 9 (A1, A2, A4, A11, A12, A15, A16, A20 y A21).
+SELECT 'Amonestaciones registradas (esperado: 9)' AS Control, COUNT(*) AS Cantidad
 FROM eventos.Amonestacion
 WHERE IdPartido IN (@p9501, @p9502, @p9503, @p9504);
 
 -- Suspensiones esperadas: J1 doble amarilla = 1, J2 roja directa = 2, J3 en 9502 (2da amarilla) = 1,
--- el resto 0.
+-- el staff (A11, A12, A20 y A21) 0 y el resto 0.
 SELECT p.NumeroPartido, t.Tipo AS Tarjeta, a.IdJugador, a.IdStaffTecnico, a.Minuto, a.PartidosSuspension
 FROM eventos.Amonestacion AS a
 INNER JOIN eventos.Tarjeta AS t ON t.IdTarjeta = a.IdTarjeta
