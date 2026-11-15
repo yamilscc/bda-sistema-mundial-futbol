@@ -2,7 +2,7 @@
 Universidad: Universidad Nacional de La Matanza
 Materia: Bases de Datos Aplicadas - Grupo 05
 Autor: Torczuk, Elías Alexei
-Fecha: 2026-11-14
+Fecha: 2026-11-15
 Integrantes:
 - Casella, Mateo Ezequiel
 - Chungara Tenorio, Denis Abner
@@ -63,7 +63,7 @@ DECLARE @idSede INT = (SELECT IdSede FROM nucleo.Sede WHERE NombreEstadio = 'TES
 DECLARE @idFaseGrupos INT = (SELECT IdFase FROM nucleo.Fase WHERE Descripcion = 'Grupos');
 
 -- =========================================================================
--- TEST 1: Pais - códigos ISO únicos
+-- TEST 1: Pais - códigos ISO únicos y PBI per cápita
 -- =========================================================================
 -- 1.A Resultado esperado: error por UNIQUE UQ_Pais_CodigoISO3 (TS1 repetido).
 BEGIN TRY
@@ -74,6 +74,21 @@ END TRY
 BEGIN CATCH
     PRINT 'TEST 1.A OK (Bloqueado): ' + ERROR_MESSAGE();
 END CATCH;
+
+-- 1.B Resultado esperado: error por CHECK CK_Pais_PBIPerCapita (PBI negativo).
+BEGIN TRY
+    INSERT INTO nucleo.Pais (Nombre, CodigoISO2, CodigoISO3, IdConfederacion, ZonaHoraria, PBIPerCapita)
+    VALUES ('TEST Pais PBI', 'T8', 'TS8', @idConf, 'Tokyo Standard Time', -1);
+    PRINT 'TEST 1.B FALLÓ: permitió un PBI per cápita negativo.';
+END TRY
+BEGIN CATCH
+    PRINT 'TEST 1.B OK (Bloqueado): ' + ERROR_MESSAGE();
+END CATCH;
+
+-- 1.C Resultado esperado: inserción exitosa con PBI 13650.50 (y TEST Pais 1 queda con PBI NULL).
+INSERT INTO nucleo.Pais (Nombre, CodigoISO2, CodigoISO3, IdConfederacion, ZonaHoraria, PBIPerCapita)
+VALUES ('TEST Pais PBI', 'T8', 'TS8', @idConf, 'Tokyo Standard Time', 13650.50);
+SELECT '1.C' AS Test, Nombre, PBIPerCapita FROM nucleo.Pais WHERE Nombre IN ('TEST Pais 1', 'TEST Pais PBI') ORDER BY Nombre;
 
 -- =========================================================================
 -- TEST 2: Sede - capacidad y coordenadas

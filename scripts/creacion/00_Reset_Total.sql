@@ -2,7 +2,7 @@
 Universidad: Universidad Nacional de La Matanza
 Materia: Bases de Datos Aplicadas - Grupo 05
 Autor: Canseco Carrizo, Yamil Simón (versión original); ampliado por Torczuk, Elías Alexei
-Fecha: 2026-11-14
+Fecha: 2026-11-15
 Integrantes:
 - Casella, Mateo Ezequiel
 - Chungara Tenorio, Denis Abner
@@ -105,7 +105,6 @@ GO
 -- Si alguno falla, :on error exit corta toda la ejecución en ese punto.
 -- Cada PRINT lleva su GO para que el primer comando del archivo incluido (ej: CREATE OR ALTER
 -- PROCEDURE, que exige ir primero en su batch) no comparta batch con el PRINT.
--- Los scripts que todavía no existen en la rama están comentados: descomentar al sumarlos.
 -- =========================================================================
 
 PRINT '--- 01 Tablas del núcleo';
@@ -120,8 +119,9 @@ PRINT '--- 03 Tablas de eventos';
 GO
 :r "$(RUTA)\03_Tablas_Eventos.sql"
 
--- PRINT '--- 04 Tablas de publicidad';
--- :r "$(RUTA)\04_Tablas_Publicidad.sql"
+PRINT '--- 04 Tablas de publicidad';
+GO
+:r "$(RUTA)\04_Tablas_Publicidad.sql"
 
 PRINT '--- 05 Tablas de logs y staging';
 GO
@@ -142,6 +142,22 @@ GO
 PRINT '--- 09 SP de sedes, partidos, resultados y clasificadas';
 GO
 :r "$(RUTA)\09_SP_Sedes_Partidos.sql"
+
+PRINT '--- 10 Funciones de eventos';
+GO
+:r "$(RUTA)\10_Funciones_Eventos.sql"
+
+PRINT '--- 11 SP registrar gol';
+GO
+:r "$(RUTA)\11_SP_RegistrarGol.sql"
+
+PRINT '--- 12 SP registrar amonestación';
+GO
+:r "$(RUTA)\12_SP_RegistrarAmonestacion.sql"
+
+PRINT '--- 13 SP ABM de eventos';
+GO
+:r "$(RUTA)\13_SP_ABM_Eventos.sql"
 
 -- Los próximos SP, vistas y funciones se suman acá, siempre en orden numérico.
 

@@ -2,14 +2,20 @@
 Universidad: Universidad Nacional de La Matanza
 Materia: Bases de Datos Aplicadas - Grupo 05
 Autor: Torczuk, Elías Alexei
+Fecha: 2026-11-15
 Integrantes:
 - Casella, Mateo Ezequiel
+- Chungara Tenorio, Denis Abner
 - Torczuk, Elías Alexei
 - Canseco Carrizo, Yamil Simón
 Objetivo: Crear las tablas del módulo de publicidad: monedas, anunciantes,
           piezas publicitarias, países de orientación de cada pieza y los
-          cuatro espacios publicitarios por partido.
+          cuatro espacios publicitarios por partido. Las FK hacia el núcleo
+          (Idioma, Pais, Partido) se agregan en 06_FK_Cruzadas.sql.
 */
+
+USE MundialFutbol;
+GO
 
 -- Monedas en las que se factura la pauta (código ISO 4217, ej. USD, ARS, EUR).
 -- La regla del código se compara con collation binaria para que distinga mayúsculas.
@@ -23,11 +29,14 @@ CREATE TABLE publicidad.Moneda (
 );
 GO
 
--- Anunciantes que contratan la pauta.
+-- Anunciantes que contratan la pauta. IdPais es el país de origen del anunciante
+-- (los criterios de aceptación piden anunciantes de al menos 6 países distintos).
+-- La FK a Pais se agrega en 06_FK_Cruzadas.sql.
 IF OBJECT_ID('publicidad.Anunciante', 'U') IS NULL
 CREATE TABLE publicidad.Anunciante (
     IdAnunciante INT IDENTITY(1,1) CONSTRAINT PK_Anunciante PRIMARY KEY,
-    Nombre VARCHAR(100) NOT NULL CONSTRAINT UQ_Anunciante_Nombre UNIQUE
+    Nombre VARCHAR(100) NOT NULL CONSTRAINT UQ_Anunciante_Nombre UNIQUE,
+    IdPais INT NOT NULL
 );
 GO
 
@@ -43,8 +52,7 @@ CREATE TABLE publicidad.Pieza (
     CONSTRAINT UQ_Pieza_Anunciante_Titulo_Idioma UNIQUE (IdAnunciante, Titulo, IdIdioma),
 
     CONSTRAINT FK_Pieza_Anunciante FOREIGN KEY (IdAnunciante) REFERENCES publicidad.Anunciante (IdAnunciante)
-    -- FK a Idioma: se agrega en el script maestro con ALTER TABLE, una vez creada Idioma.
-    -- , CONSTRAINT FK_Pieza_Idioma FOREIGN KEY (IdIdioma) REFERENCES <esquema>.Idioma (IdIdioma)
+    -- FK a Idioma (nucleo.Idioma): se agrega en 06_FK_Cruzadas.sql (FK_Pieza_Idioma).
 );
 GO
 
@@ -57,8 +65,7 @@ CREATE TABLE publicidad.OrientacionPais (
     CONSTRAINT PK_OrientacionPais PRIMARY KEY (IdPieza, IdPais),
 
     CONSTRAINT FK_OrientacionPais_Pieza FOREIGN KEY (IdPieza) REFERENCES publicidad.Pieza (IdPieza)
-    -- FK a Pais: se agrega en el script maestro con ALTER TABLE, una vez creada Pais.
-    -- , CONSTRAINT FK_OrientacionPais_Pais FOREIGN KEY (IdPais) REFERENCES <esquema>.Pais (IdPais)
+    -- FK a Pais (nucleo.Pais): se agrega en 06_FK_Cruzadas.sql (FK_OrientacionPais_Pais).
 );
 GO
 
@@ -80,7 +87,6 @@ CREATE TABLE publicidad.EspacioPublicitario (
 
     CONSTRAINT FK_EspacioPublicitario_Pieza  FOREIGN KEY (IdPieza)  REFERENCES publicidad.Pieza (IdPieza),
     CONSTRAINT FK_EspacioPublicitario_Moneda FOREIGN KEY (IdMoneda) REFERENCES publicidad.Moneda (IdMoneda)
-    -- FK a Partido: se agrega en el script maestro con ALTER TABLE, una vez creada Partido.
-    -- , CONSTRAINT FK_EspacioPublicitario_Partido FOREIGN KEY (IdPartido) REFERENCES <esquema>.Partido (IdPartido)
+    -- FK a Partido (nucleo.Partido): se agrega en 06_FK_Cruzadas.sql (FK_EspacioPublicitario_Partido).
 );
 GO

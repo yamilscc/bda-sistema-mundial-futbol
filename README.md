@@ -30,34 +30,73 @@ Base de datos en **SQL Server (T-SQL)** para gestionar la operación de los part
 
 ## Estructura del repositorio
 
-> TO DO: Agregar
+```
+.
+├── README.md
+├── doc/
+│   └── nomenclaturas.md          # encabezado de scripts, commits, ramas y convenciones de nombres
+└── scripts/
+    ├── creacion/                 # scripts de creación (base, tablas, FK, funciones y SP)
+    │   ├── 00_Reset_Total.sql    # maestro: borra y recrea la base, crea schemas y ejecuta el resto
+    │   └── 01_… a 13_…           # un archivo por módulo, con prefijo numérico de orden de ejecución
+    ├── testing/                  # scripts de testing (uno por cada script de creación probado)
+    └── importacion/              # procesos de importación de datos externos (CSV/XML/API/scraping)
+```
+
+- Cada script empieza con dos dígitos que indican el orden de ejecución y con el encabezado definido en `doc/nomenclaturas.md`.
+- Los scripts de `testing/` llevan el mismo número que el script de `creacion/` que prueban y tienen en comentarios el resultado esperado de cada caso.
+- Schemas de la base `MundialFutbol`: `nucleo` (países, sedes, partidos, árbitros), `jugadores` (convocatoria, alineaciones, sustituciones), `eventos` (goles, tarjetas, suspensiones, staging y logs) y `publicidad` (anunciantes, piezas y espacios).
 
 ---
 
 ## Cómo ejecutar (corrida desde cero)
 
-1. Abrir la solución en SSMS.
-2. Ejecutar `00_Maestro.sql`, que elimina y recrea la base y corre los scripts numerados en orden.
-3. Ejecutar los scripts de carga de datos (seed data).
-4. Ejecutar los scripts de `test/` para validar el comportamiento.
+1. Abrir SSMS y activar el **modo SQLCMD** (menú *Consulta → Modo SQLCMD*).
+2. Abrir `scripts/creacion/00_Reset_Total.sql` y editar la línea `:setvar RUTA "..."` con la ruta de la carpeta `scripts\creacion` de la copia local del repositorio (sin barra final).
+3. Ejecutarlo. El script elimina la base `MundialFutbol` si existe, la recrea, crea los schemas y ejecuta en orden los scripts `01` a `13`. Si alguno falla, se corta en ese punto. Al final muestra un resumen de tablas, SP y funciones por schema.
+4. Ejecutar los scripts de carga de datos (seed data), cuando estén disponibles.
+5. Ejecutar los scripts de `scripts/testing/` para validar el comportamiento.
 
 Todos los scripts verifican la existencia de los objetos antes de crearlos o borrarlos, por lo que se pueden volver a ejecutar sin errores.
 
 ### Orden de ejecución
 
-> Completar a medida que se cierren los scripts. Cada archivo empieza con dos dígitos que marcan su orden.
+Cada archivo empieza con dos dígitos que marcan su orden. Los números 01 a 13 los ejecuta `00_Reset_Total.sql` en ese orden. El responsable es el autor indicado en el encabezado de cada script.
 
 | N.º | Script | Contenido | Responsable |
 |---|---|---|---|
-| 01 | <...> | Base de datos y esquemas | Yamil |
-| 02 | `02_Tablas_Jugadores.sql` | Tablas de jugadores, convocatoria y alineaciones | Mateo |
-| <...> | <...> | Tablas del núcleo | Yamil |
-| <...> | <...> | Tablas de eventos | Denis |
-| <...> | <...> | Tablas de publicidad | Elías |
-| <...> | <...> | Stored procedures | Todos |
-| <...> | <...> | Funciones y vistas | Todos |
+| 00 | `00_Reset_Total.sql` | Borra y recrea la base, crea los schemas y ejecuta los scripts 01 a 13 | Yamil / Elías |
+| 01 | `01_Tablas_Nucleo.sql` | Tablas del núcleo: países, confederaciones, ciudades, sedes, fases, grupos, selecciones, staff técnico, árbitros, partidos, designaciones y sanciones | Elías (cubre a Yamil) |
+| 02 | `02_Tablas_Jugadores_y_Alineaciones.sql` | Tablas de jugadores, convocatoria, formaciones y sustituciones | Mateo |
+| 03 | `03_Tablas_Eventos.sql` | Tablas de reglas de suspensión, tipos de gol, períodos, goles, tarjetas y amonestaciones | Mateo |
+| 04 | `04_Tablas_Publicidad.sql` | Tablas de monedas, anunciantes, piezas, orientación por país y espacios publicitarios | Elías |
+| 05 | `05_Tablas_Logs_Staging.sql` | Tablas de staging y log de importación | Mateo |
+| 06 | `06_FK_Cruzadas.sql` | Claves foráneas que cruzan módulos (jugadores, eventos y publicidad hacia el núcleo) | Elías |
+| 07 | `07_Funciones_Nucleo.sql` | `fn_SeleccionesDelPartido` y `fn_MercadosEnPrimeTime` | Elías |
+| 08 | `08_SP_ControlArbitral.sql` | `SP_CONTROL_ARBITRAL`: designación de árbitros con validación de nacionalidad y advertencia de cruce | Elías |
+| 09 | `09_SP_Sedes_Partidos.sql` | ABM de sedes y partidos, registro de resultados y cálculo de selecciones clasificadas | Elías |
+| 10 | `10_Funciones_Eventos.sql` | `fn_ResultadoPartido` y `fn_EstaSuspendido` | Mateo |
+| 11 | `11_SP_RegistrarGol.sql` | `SP_REGISTRAR_GOL` | Mateo |
+| 12 | `12_SP_RegistrarAmonestacion.sql` | `SP_REGISTRAR_AMONESTACION` con cálculo de suspensión | Mateo |
+| 13 | `13_SP_ABM_Eventos.sql` | ABM de reglas de suspensión, tipos de gol, períodos, tarjetas y goles | Mateo |
 
-> Las claves foráneas que cruzan módulos (por ejemplo, de `Convocatoria` hacia `Seleccion`) se agregan con `ALTER TABLE` una vez creadas todas las tablas.
+Scripts de testing (en `scripts/testing/`):
+
+| Script | Prueba |
+|---|---|
+| `01_Test_Tablas_Nucleo.sql` | Restricciones de las tablas del núcleo |
+| `03_Test_Tablas_Eventos.sql` | Restricciones de las tablas de eventos |
+| `07_Test_Funciones_Nucleo.sql` | `fn_SeleccionesDelPartido` y `fn_MercadosEnPrimeTime` |
+| `08_Test_SP_ControlArbitral.sql` | `SP_CONTROL_ARBITRAL` |
+| `09_Test_SP_Sedes_Partidos.sql` | SP de sedes, partidos, resultados y clasificadas |
+| `10_Test_Funciones_Eventos.sql` | Funciones de eventos |
+| `11_Test_SP_RegistrarGol.sql` | `SP_REGISTRAR_GOL` |
+| `12_Test_SP_RegistrarAmonestacion.sql` | `SP_REGISTRAR_AMONESTACION` |
+| `13_Test_SP_ABM_Eventos.sql` | SP ABM de eventos |
+
+Pendientes: ABM del resto de las tablas del núcleo, asignación de publicidad, importación de datos (`scripts/importacion/`), reportes, seguridad y respaldo.
+
+> Las claves foráneas que cruzan módulos (por ejemplo, de `Convocatoria` hacia `Seleccion` o de `EspacioPublicitario` hacia `Partido`) se agregan con `ALTER TABLE` en `06_FK_Cruzadas.sql`, una vez creadas todas las tablas.
 
 ---
 
