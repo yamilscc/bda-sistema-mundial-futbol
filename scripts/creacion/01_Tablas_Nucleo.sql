@@ -2,7 +2,7 @@
 Universidad: Universidad Nacional de La Matanza
 Materia: Bases de Datos Aplicadas - Grupo 05
 Autor: Torczuk, Elías Alexei
-Fecha: 2026-11-14
+Fecha: 2026-11-15
 Integrantes:
 - Casella, Mateo Ezequiel
 - Chungara Tenorio, Denis Abner
@@ -14,7 +14,8 @@ Objetivo: Crear las tablas del núcleo del sistema (requiere 00_Reset_Total.sql 
           Las FK que cruzan módulos (Convocatoria, Formacion, Gol, etc.) están en 06_FK_Cruzadas.sql.
 */
 
--- La base y los schemas los crea 00_Reset_Total.sql (ejecutar siempre primero).
+-- La base y los schemas (nucleo, jugadores, eventos, publicidad) los crea 00_Reset_Total.sql,
+-- que se ejecuta siempre primero.
 USE MundialFutbol;
 GO
 
@@ -40,6 +41,9 @@ CREATE TABLE nucleo.Pais (
     CodigoISO3      CHAR(3)     NOT NULL CONSTRAINT UQ_Pais_CodigoISO3 UNIQUE,
     IdConfederacion INT         NOT NULL,
     ZonaHoraria     VARCHAR(60) NOT NULL,
+    -- PBI per cápita en USD corrientes (indicador NY.GDP.PCAP.CD del Banco Mundial).
+    -- Se usa como proxy de poder adquisitivo para priorizar publicidad. NULL = aún no importado.
+    PBIPerCapita    DECIMAL(12,2) NULL CONSTRAINT CK_Pais_PBIPerCapita CHECK (PBIPerCapita >= 0),
 
     CONSTRAINT FK_Pais_Confederacion FOREIGN KEY (IdConfederacion) REFERENCES nucleo.Confederacion (IdConfederacion)
 );
