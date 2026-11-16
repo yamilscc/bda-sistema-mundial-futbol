@@ -153,6 +153,31 @@ PRINT '--- 13 SP ABM de eventos';
 GO
 :r "$(RUTA)\13_SP_ABM_Eventos.sql"
 
+PRINT '--- 14 Funciones de jugadores';
+GO
+:r "$(RUTA)\14_Funciones_Jugadores.sql"
+GO
+
+PRINT '--- 15 SP de convocatoria y bajas';
+GO
+:r "$(RUTA)\15_SP_Convocatoria_Baja.sql"
+GO
+
+PRINT '--- 16 SP registrar formación y titulares/suplentes';
+GO
+:r "$(RUTA)\16_SP_RegistrarFormacion.sql"
+GO
+
+PRINT '--- 17 SP registrar sustitución';
+GO
+:r "$(RUTA)\17_SP_RegistrarSustitucion.sql"
+GO
+
+PRINT '--- 18 SP ABM de jugadores';
+GO
+:r "$(RUTA)\18_SP_ABM_Jugadores.sql"
+GO
+
 -- Los próximos SP, vistas y funciones se suman acá, siempre en orden numérico.
 
 -- =========================================================================
