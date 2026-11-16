@@ -1,0 +1,151 @@
+/*
+Universidad: Universidad Nacional de La Matanza
+Materia: Bases de Datos Aplicadas - Grupo 05
+Autor: Casella, Mateo Ezequiel
+Fecha: 2026-11-15
+Integrantes:
+- Casella, Mateo Ezequiel
+- Chungara Tenorio, Denis Abner
+- Torczuk, Elías Alexei
+- Canseco Carrizo, Yamil Simón
+Objetivo: Probar las funciones de 14_Funciones_Jugadores.sql:
+          - jugadores.fn_EsquemaValido
+          - jugadores.fn_JugadorEnCancha y jugadores.fn_JugadoresEnCancha
+          - jugadores.fn_ValidarConvocatoria, jugadores.fn_ValidarFormacionJugador
+            y jugadores.fn_ValidarSustitucion
+          Requiere ejecutados los scripts 01 a 14.
+          Todo corre dentro de una transacción que se deshace al final (ROLLBACK).
+*/
+
+USE MundialFutbol;
+GO
+
+BEGIN TRANSACTION;
+
+-- =========================================================================
+-- PREPARACIÓN DE ESCENARIO DE PRUEBA
+-- =========================================================================
+DELETE FROM jugadores.Sustitucion;
+DELETE FROM jugadores.FormacionJugador;
+DELETE FROM jugadores.Formacion;
+DELETE FROM jugadores.ReglaConvocados;
+DELETE FROM jugadores.ReglaCambios;
+
+INSERT INTO jugadores.ReglaConvocados (Minimo, Maximo) VALUES (2, 3);
+INSERT INTO jugadores.ReglaCambios (MaxCambiosRegular, MaxVentanasRegular, MaxCambiosSuplementario, MaxVentanasSuplementario)
+VALUES (2, 2, 1, 1);
+
+INSERT INTO eventos.Tarjeta (Tipo)
+SELECT v.d FROM (VALUES ('Amarilla'), ('Roja por doble amarilla'), ('Roja directa')) AS v(d)
+WHERE NOT EXISTS (SELECT 1 FROM eventos.Tarjeta AS t WHERE t.Tipo = v.d);
+
+INSERT INTO nucleo.Confederacion (Nombre, Sigla) VALUES ('TEST FJ Confederacion', 'TFJ');
+DECLARE @idConf INT = (SELECT IdConfederacion FROM nucleo.Confederacion WHERE Sigla = 'TFJ');
+
+INSERT INTO nucleo.Pais (Nombre, CodigoISO2, CodigoISO3, IdConfederacion, ZonaHoraria)
+VALUES ('TEST FJ Pais 1', 'F1', 'TF1', @idConf, 'Argentina Standard Time'),
+       ('TEST FJ Pais 2', 'F2', 'TF2', @idConf, 'Argentina Standard Time');
+
+DECLARE @idPais1 INT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'TF1');
+DECLARE @idPais2 INT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'TF2');
+
+INSERT INTO nucleo.Seleccion (IdPais) VALUES (@idPais1), (@idPais2);
+DECLARE @idSel1 INT = (SELECT IdSeleccion FROM nucleo.Seleccion WHERE IdPais = @idPais1);
+DECLARE @idSel2 INT = (SELECT IdSeleccion FROM nucleo.Seleccion WHERE IdPais = @idPais2);
+
+INSERT INTO nucleo.Ciudad (Nombre, IdPais) VALUES ('TEST FJ Ciudad', @idPais1);
+DECLARE @idCiudad INT = (SELECT IdCiudad FROM nucleo.Ciudad WHERE Nombre = 'TEST FJ Ciudad');
+
+DECLARE @idSede INT, @idPartido INT;
+EXEC nucleo.SP_ABM_Sede @operacion = 'ALTA', @idSede = @idSede OUTPUT, @nombreEstadio = 'TEST FJ Estadio',
+     @idCiudad = @idCiudad, @capacidad = 50000, @zonaHoraria = 'Argentina Standard Time';
+
+DECLARE @idFase INT = (SELECT IdFase FROM nucleo.Fase WHERE Descripcion = 'Octavos');
+EXEC nucleo.SP_ABM_Partido 'ALTA', @idPartido OUTPUT, 9710, @idFase, @idSede, '2026-06-12 20:00', @idSel1, @idSel2;
+
+INSERT INTO jugadores.Jugador (Nombre, Apellido, Documento, Sexo, Posicion)
+VALUES ('Titular',  'SaleMin45', 'TEST_FJ_1', 'M', 'Delantero'),
+       ('Titular',  'ExpMin60',  'TEST_FJ_2', 'M', 'Defensor'),
+       ('Suplente', 'EntraMin45','TEST_FJ_3', 'M', 'Delantero'),
+       ('Extra',    'Cuarto',    'TEST_FJ_4', 'M', 'Arquero');
+
+DECLARE @idJ1 INT = (SELECT IdJugador FROM jugadores.Jugador WHERE Documento = 'TEST_FJ_1');
+DECLARE @idJ2 INT = (SELECT IdJugador FROM jugadores.Jugador WHERE Documento = 'TEST_FJ_2');
+DECLARE @idJ3 INT = (SELECT IdJugador FROM jugadores.Jugador WHERE Documento = 'TEST_FJ_3');
+DECLARE @idJ4 INT = (SELECT IdJugador FROM jugadores.Jugador WHERE Documento = 'TEST_FJ_4');
+
+INSERT INTO jugadores.Convocatoria (IdSeleccion, IdJugador, Dorsal, FechaAlta)
+VALUES (@idSel1, @idJ1, 9,  '2026-06-01'),
+       (@idSel1, @idJ2, 4,  '2026-06-01'),
+       (@idSel1, @idJ3, 19, '2026-06-01');
+
+INSERT INTO jugadores.Formacion (IdPartido, Localia, EsquemaTactico)
+VALUES (@idPartido, 'Local', '4-3-3');
+DECLARE @idForm INT = (SELECT IdFormacion FROM jugadores.Formacion WHERE IdPartido = @idPartido AND Localia = 'Local');
+
+INSERT INTO jugadores.FormacionJugador (IdFormacion, IdJugador, EstadoTitularidad, PosicionEnCampo, Dorsal)
+VALUES (@idForm, @idJ1, 'Titular',  'Delantero', 9),
+       (@idForm, @idJ2, 'Titular',  'Defensor',  4),
+       (@idForm, @idJ3, 'Suplente', NULL,        19);
+
+-- J3 reemplaza a J1 en el minuto 45
+INSERT INTO jugadores.Sustitucion (IdPartido, IdJugadorSaliente, IdJugadorEntrante, Minuto, Periodo, Motivo)
+VALUES (@idPartido, @idJ1, @idJ3, 45, 'Regular', 'Tactico');
+
+-- J2 es expulsado con roja directa en el minuto 60
+INSERT INTO eventos.Amonestacion (IdPartido, IdTarjeta, IdJugador, IdStaffTecnico, Minuto, Motivo, PartidosSuspension)
+VALUES (@idPartido, (SELECT IdTarjeta FROM eventos.Tarjeta WHERE Tipo = 'Roja directa'), @idJ2, NULL, 60, 'TEST FJ Roja', 2);
+
+-- =========================================================================
+-- TEST 1: jugadores.fn_EsquemaValido
+-- =========================================================================
+-- Resultado esperado: '4-3-3' = 1, '4-2-3-1' = 1, '5-5-5' = 0 (suma 15), '433' = 0.
+SELECT '1' AS Test,
+       jugadores.fn_EsquemaValido('4-3-3')   AS [Esquema_4_3_3_Esperado_1],
+       jugadores.fn_EsquemaValido('4-2-3-1') AS [Esquema_4_2_3_1_Esperado_1],
+       jugadores.fn_EsquemaValido('5-5-5')   AS [Esquema_5_5_5_Esperado_0],
+       jugadores.fn_EsquemaValido('433')     AS [Esquema_433_Esperado_0];
+
+-- =========================================================================
+-- TEST 2: jugadores.fn_JugadorEnCancha y jugadores.fn_JugadoresEnCancha
+-- =========================================================================
+-- 2.A Minuto 30: J1=1 (titular), J2=1 (titular), J3=0 (suplente aún no ingresó).
+SELECT '2.A (Min 30)' AS Test,
+       jugadores.fn_JugadorEnCancha(@idPartido, @idJ1, 30) AS J1_Esperado_1,
+       jugadores.fn_JugadorEnCancha(@idPartido, @idJ2, 30) AS J2_Esperado_1,
+       jugadores.fn_JugadorEnCancha(@idPartido, @idJ3, 30) AS J3_Esperado_0;
+
+-- 2.B Minuto 50 (tras cambio del min 45): J1=0 (salió), J2=1 (sigue), J3=1 (entró).
+SELECT '2.B (Min 50)' AS Test,
+       jugadores.fn_JugadorEnCancha(@idPartido, @idJ1, 50) AS J1_Esperado_0,
+       jugadores.fn_JugadorEnCancha(@idPartido, @idJ2, 50) AS J2_Esperado_1,
+       jugadores.fn_JugadorEnCancha(@idPartido, @idJ3, 50) AS J3_Esperado_1;
+
+-- 2.C Minuto 70 (tras expulsión de J2 en el min 60): J1=0, J2=0 (expulsado), J3=1.
+SELECT '2.C (Min 70)' AS Test,
+       jugadores.fn_JugadorEnCancha(@idPartido, @idJ1, 70) AS J1_Esperado_0,
+       jugadores.fn_JugadorEnCancha(@idPartido, @idJ2, 70) AS J2_Esperado_0,
+       jugadores.fn_JugadorEnCancha(@idPartido, @idJ3, 70) AS J3_Esperado_1;
+
+-- 2.D fn_JugadoresEnCancha en el minuto 70: debe devolver solo a J3.
+SELECT '2.D' AS Test, IdJugador, Apellido, Dorsal, CondicionInicial
+FROM jugadores.fn_JugadoresEnCancha(@idPartido, 70);
+
+-- =========================================================================
+-- TEST 3: Funciones de validación (fn_ValidarConvocatoria, FormacionJugador, Sustitucion)
+-- =========================================================================
+-- 3.A fn_ValidarConvocatoria: J4 en Sel1 cuando ya hay 3 convocados activos (tope = 3) y dorsal 9 repetido.
+-- Resultado esperado: texto no vacío con 2 errores (dorsal ocupado + máximo de convocados alcanzado).
+SELECT '3.A' AS Test,
+       REPLACE(jugadores.fn_ValidarConvocatoria(@idSel1, @idJ4, 9, '2026-06-01', NULL), CHAR(13) + CHAR(10), ' | ') AS Errores_Esperados;
+
+-- 3.B fn_ValidarFormacionJugador: suplente con PosicionEnCampo informada y dorsal repetido.
+SELECT '3.B' AS Test,
+       REPLACE(jugadores.fn_ValidarFormacionJugador(@idForm, @idJ4, 'Suplente', 'Arquero', 9, 0), CHAR(13) + CHAR(10), ' | ') AS Errores_Esperados;
+
+-- 3.C fn_ValidarSustitucion: intento de sacar a J2 en minuto 75 (ya expulsado en el 60).
+SELECT '3.C' AS Test,
+       REPLACE(jugadores.fn_ValidarSustitucion(@idPartido, @idJ2, @idJ3, 75, 'Regular', 'Tactico', 1, NULL), CHAR(13) + CHAR(10), ' | ') AS Errores_Esperados;
+
+ROLLBACK TRANSACTION;
+GO
