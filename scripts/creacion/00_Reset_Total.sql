@@ -178,6 +178,16 @@ GO
 :r "$(RUTA)\18_SP_ABM_Jugadores.sql"
 GO
 
+PRINT '--- 19 SP ABM restantes del nucleo';
+GO
+:r "$(RUTA)\19_SP_ABM_Nucleo.sql"
+GO
+
+PRINT '--- 20 SP ABM de publicidad';
+GO
+:r "$(RUTA)\20_SP_ABM_Publicidad.sql"
+GO
+
 -- Los próximos SP, vistas y funciones se suman acá, siempre en orden numérico.
 
 -- =========================================================================
