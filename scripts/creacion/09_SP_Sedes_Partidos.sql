@@ -463,10 +463,7 @@ BEGIN
 
     DECLARE @errores NVARCHAR(MAX) = N'',
             @mensaje NVARCHAR(2048),
-            @salto   NVARCHAR(2)   = CHAR(13) + CHAR(10),
-            @idGrupo     INT,
-            @nombreGrupo VARCHAR(10),
-            @pendientes  INT;
+            @salto   NVARCHAR(2)   = CHAR(13) + CHAR(10);
 
     -- ---- Validaciones ----------------------------------------------------
     IF @clasificadosPorGrupo IS NULL OR @clasificadosPorGrupo < 1
@@ -485,7 +482,7 @@ BEGIN
         THROW 52000, @mensaje, 1;
     END;
 
-    -- ---- Cálculo ---------------------------------------------------------
+        -- ---- Cálculo ---------------------------------------------------------
     CREATE TABLE #Posiciones (
         IdGrupo                 INT,
         NombreGrupo             VARCHAR(10),
@@ -504,70 +501,58 @@ BEGIN
         ClasificaComo           VARCHAR(20) NULL
     );
 
-    -- Un grupo por vuelta del cursor.
-    DECLARE cGrupos CURSOR LOCAL FAST_FORWARD FOR
-        SELECT g.IdGrupo, g.Nombre
-        FROM nucleo.Grupo AS g
-        WHERE EXISTS (SELECT 1 FROM nucleo.Seleccion AS s WHERE s.IdGrupo = g.IdGrupo)
-        ORDER BY g.Nombre;
-
-    OPEN cGrupos;
-    FETCH NEXT FROM cGrupos INTO @idGrupo, @nombreGrupo;
-
-    WHILE @@FETCH_STATUS = 0
-    BEGIN
-        -- Partidos de grupos todavía sin jugar entre selecciones de este grupo.
-        SELECT @pendientes = COUNT(*)
+    -- Todos los grupos en una sola sentencia (set-based).
+    INSERT INTO #Posiciones (IdGrupo, NombreGrupo, Posicion, IdSeleccion, Pais, PartidosJugados,
+                             Ganados, Empatados, Perdidos, GolesFavor, GolesContra, Diferencia,
+                             Puntos, PartidosPendientesGrupo)
+    SELECT x.IdGrupo,
+           x.NombreGrupo,
+           ROW_NUMBER() OVER (PARTITION BY x.IdGrupo
+                              ORDER BY x.G * 3 + x.E DESC, x.GF - x.GC DESC, x.GF DESC, x.IdSeleccion),
+           x.IdSeleccion,
+           x.Pais,
+           x.PJ, x.G, x.E, x.P, x.GF, x.GC,
+           x.GF - x.GC,
+           x.G * 3 + x.E,
+           ISNULL(pen.Pendientes, 0)
+    FROM (
+        SELECT g.IdGrupo,
+               g.Nombre AS NombreGrupo,
+               s.IdSeleccion,
+               pa.Nombre AS Pais,
+               COUNT(r.IdSeleccion)                                      AS PJ,
+               ISNULL(SUM(CASE WHEN r.GF >  r.GC THEN 1 ELSE 0 END), 0)  AS G,
+               ISNULL(SUM(CASE WHEN r.GF =  r.GC THEN 1 ELSE 0 END), 0)  AS E,
+               ISNULL(SUM(CASE WHEN r.GF <  r.GC THEN 1 ELSE 0 END), 0)  AS P,
+               ISNULL(SUM(r.GF), 0)                                      AS GF,
+               ISNULL(SUM(r.GC), 0)                                      AS GC
+        FROM nucleo.Seleccion AS s
+        INNER JOIN nucleo.Grupo AS g  ON g.IdGrupo = s.IdGrupo
+        INNER JOIN nucleo.Pais  AS pa ON pa.IdPais = s.IdPais
+        LEFT JOIN (
+            SELECT p.IdSeleccionLocal AS IdSeleccion, p.GolesLocal AS GF, p.GolesVisitante AS GC
+            FROM nucleo.Partido AS p
+            INNER JOIN nucleo.Fase AS f ON f.IdFase = p.IdFase
+            WHERE f.Descripcion = 'Grupos' AND p.Estado = 'Finalizado'
+            UNION ALL
+            SELECT p.IdSeleccionVisitante, p.GolesVisitante, p.GolesLocal
+            FROM nucleo.Partido AS p
+            INNER JOIN nucleo.Fase AS f ON f.IdFase = p.IdFase
+            WHERE f.Descripcion = 'Grupos' AND p.Estado = 'Finalizado'
+        ) AS r ON r.IdSeleccion = s.IdSeleccion
+        GROUP BY g.IdGrupo, g.Nombre, s.IdSeleccion, pa.Nombre
+    ) AS x
+    LEFT JOIN (
+        -- Partidos de grupos todavía sin jugar, por grupo.
+        SELECT s.IdGrupo, COUNT(*) AS Pendientes
         FROM nucleo.Partido AS p
         INNER JOIN nucleo.Fase AS f ON f.IdFase = p.IdFase
         INNER JOIN nucleo.Seleccion AS s ON s.IdSeleccion = p.IdSeleccionLocal
         WHERE f.Descripcion = 'Grupos'
-          AND s.IdGrupo = @idGrupo
-          AND p.Estado <> 'Finalizado';
-
-        INSERT INTO #Posiciones (IdGrupo, NombreGrupo, Posicion, IdSeleccion, Pais, PartidosJugados,
-                                 Ganados, Empatados, Perdidos, GolesFavor, GolesContra, Diferencia,
-                                 Puntos, PartidosPendientesGrupo)
-        SELECT @idGrupo,
-               @nombreGrupo,
-               ROW_NUMBER() OVER (ORDER BY x.G * 3 + x.E DESC, x.GF - x.GC DESC, x.GF DESC, x.IdSeleccion),
-               x.IdSeleccion,
-               x.Pais,
-               x.PJ, x.G, x.E, x.P, x.GF, x.GC,
-               x.GF - x.GC,
-               x.G * 3 + x.E,
-               @pendientes
-        FROM (
-            SELECT s.IdSeleccion,
-                   pa.Nombre AS Pais,
-                   COUNT(r.IdSeleccion)                                      AS PJ,
-                   ISNULL(SUM(CASE WHEN r.GF >  r.GC THEN 1 ELSE 0 END), 0)  AS G,
-                   ISNULL(SUM(CASE WHEN r.GF =  r.GC THEN 1 ELSE 0 END), 0)  AS E,
-                   ISNULL(SUM(CASE WHEN r.GF <  r.GC THEN 1 ELSE 0 END), 0)  AS P,
-                   ISNULL(SUM(r.GF), 0)                                      AS GF,
-                   ISNULL(SUM(r.GC), 0)                                      AS GC
-            FROM nucleo.Seleccion AS s
-            INNER JOIN nucleo.Pais AS pa ON pa.IdPais = s.IdPais
-            LEFT JOIN (
-                SELECT p.IdSeleccionLocal AS IdSeleccion, p.GolesLocal AS GF, p.GolesVisitante AS GC
-                FROM nucleo.Partido AS p
-                INNER JOIN nucleo.Fase AS f ON f.IdFase = p.IdFase
-                WHERE f.Descripcion = 'Grupos' AND p.Estado = 'Finalizado'
-                UNION ALL
-                SELECT p.IdSeleccionVisitante, p.GolesVisitante, p.GolesLocal
-                FROM nucleo.Partido AS p
-                INNER JOIN nucleo.Fase AS f ON f.IdFase = p.IdFase
-                WHERE f.Descripcion = 'Grupos' AND p.Estado = 'Finalizado'
-            ) AS r ON r.IdSeleccion = s.IdSeleccion
-            WHERE s.IdGrupo = @idGrupo
-            GROUP BY s.IdSeleccion, pa.Nombre
-        ) AS x;
-
-        FETCH NEXT FROM cGrupos INTO @idGrupo, @nombreGrupo;
-    END;
-
-    CLOSE cGrupos;
-    DEALLOCATE cGrupos;
+          AND s.IdGrupo IS NOT NULL
+          AND p.Estado <> 'Finalizado'
+        GROUP BY s.IdGrupo
+    ) AS pen ON pen.IdGrupo = x.IdGrupo;
 
     -- Clasificados directos.
     UPDATE #Posiciones
