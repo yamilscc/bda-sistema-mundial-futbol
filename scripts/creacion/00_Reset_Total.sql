@@ -188,6 +188,11 @@ GO
 :r "$(RUTA)\20_SP_ABM_Publicidad.sql"
 GO
 
+PRINT '--- 21 SP asignar publicidad';
+GO
+:r "$(RUTA)\21_SP_AsignarPublicidad.sql"
+GO
+
 -- Los próximos SP, vistas y funciones se suman acá, siempre en orden numérico.
 
 -- =========================================================================

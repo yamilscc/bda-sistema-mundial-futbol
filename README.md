@@ -38,7 +38,7 @@ Base de datos en **SQL Server (T-SQL)** para gestionar la operación de los part
 └── scripts/
     ├── creacion/                 # scripts de creación (base, tablas, FK, funciones y SP)
     │   ├── 00_Reset_Total.sql    # maestro: borra y recrea la base, crea schemas y ejecuta el resto
-    │   └── 01_… a 13_…           # un archivo por módulo, con prefijo numérico de orden de ejecución
+    │   └── 01_… a 21_…           # un archivo por módulo, con prefijo numérico de orden de ejecución
     ├── testing/                  # scripts de testing (uno por cada script de creación probado)
     └── importacion/              # procesos de importación de datos externos (CSV/XML/API/scraping)
 ```
@@ -53,7 +53,7 @@ Base de datos en **SQL Server (T-SQL)** para gestionar la operación de los part
 
 1. Abrir SSMS y activar el **modo SQLCMD** (menú *Consulta → Modo SQLCMD*).
 2. Abrir `scripts/creacion/00_Reset_Total.sql` y editar la línea `:setvar RUTA "..."` con la ruta de la carpeta `scripts\creacion` de la copia local del repositorio (sin barra final).
-3. Ejecutarlo. El script elimina la base `MundialFutbol` si existe, la recrea, crea los schemas y ejecuta en orden los scripts `01` a `13`. Si alguno falla, se corta en ese punto. Al final muestra un resumen de tablas, SP y funciones por schema.
+3. Ejecutarlo. El script elimina la base `MundialFutbol` si existe, la recrea, crea los schemas y ejecuta en orden los scripts `01` a `21`. Si alguno falla, se corta en ese punto. Al final muestra un resumen de tablas, SP y funciones por schema.
 4. Ejecutar los scripts de carga de datos (seed data), cuando estén disponibles.
 5. Ejecutar los scripts de `scripts/testing/` para validar el comportamiento.
 
@@ -61,11 +61,11 @@ Todos los scripts verifican la existencia de los objetos antes de crearlos o bor
 
 ### Orden de ejecución
 
-Cada archivo empieza con dos dígitos que marcan su orden. Los números 01 a 13 los ejecuta `00_Reset_Total.sql` en ese orden. El responsable es el autor indicado en el encabezado de cada script.
+Cada archivo empieza con dos dígitos que marcan su orden. Los números 01 a 21 los ejecuta `00_Reset_Total.sql` en ese orden. El responsable es el autor indicado en el encabezado de cada script.
 
 | N.º | Script | Contenido | Responsable |
 |---|---|---|---|
-| 00 | `00_Reset_Total.sql` | Borra y recrea la base, crea los schemas y ejecuta los scripts 01 a 13 | Yamil / Elías |
+| 00 | `00_Reset_Total.sql` | Borra y recrea la base, crea los schemas y ejecuta los scripts 01 a 21 | Yamil / Elías |
 | 01 | `01_Tablas_Nucleo.sql` | Tablas del núcleo: países, confederaciones, ciudades, sedes, fases, grupos, selecciones, staff técnico, árbitros, partidos, designaciones y sanciones | Elías (cubre a Yamil) |
 | 02 | `02_Tablas_Jugadores_y_Alineaciones.sql` | Tablas de jugadores, convocatoria, formaciones y sustituciones | Mateo |
 | 03 | `03_Tablas_Eventos.sql` | Tablas de reglas de suspensión, tipos de gol, períodos, goles, tarjetas y amonestaciones | Mateo |
@@ -79,13 +79,23 @@ Cada archivo empieza con dos dígitos que marcan su orden. Los números 01 a 13 
 | 11 | `11_SP_RegistrarGol.sql` | `SP_REGISTRAR_GOL` | Mateo |
 | 12 | `12_SP_RegistrarAmonestacion.sql` | `SP_REGISTRAR_AMONESTACION` con cálculo de suspensión | Mateo |
 | 13 | `13_SP_ABM_Eventos.sql` | ABM de reglas de suspensión, tipos de gol, períodos, tarjetas y goles | Mateo |
+| 14 | `14_Funciones_Jugadores.sql` | `fn_EsquemaValido`, `fn_JugadorEnCancha`, `fn_JugadoresEnCancha` y funciones de validación de convocatoria, formación y sustitución | Mateo |
+| 15 | `15_SP_Convocatoria_Baja.sql` | `SP_CONVOCAR_JUGADOR` y `SP_REGISTRAR_BAJA_CONVOCATORIA` (con reemplazo opcional en la misma transacción) | Mateo |
+| 16 | `16_SP_RegistrarFormacion.sql` | `SP_REGISTRAR_FORMACION` y `SP_AGREGAR_JUGADOR_FORMACION` (titulares y suplentes) | Mateo |
+| 17 | `17_SP_RegistrarSustitucion.sql` | `SP_REGISTRAR_SUSTITUCION` con control de ventanas y cantidad de cambios | Mateo |
+| 18 | `18_SP_ABM_Jugadores.sql` | ABM del módulo de jugadores (reglas, clubes, jugadores, convocatoria, bajas, formaciones y sustituciones) | Mateo |
+| 19 | `19_SP_ABM_Nucleo.sql` | ABM restantes del núcleo: confederaciones, países, ciudades, fases, grupos, selecciones, staff técnico, idiomas, categorías, árbitros, designaciones y sanciones | Denis |
+| 20 | `20_SP_ABM_Publicidad.sql` | ABM de monedas, anunciantes, piezas, orientación por país y espacios publicitarios | Denis |
+| 21 | `21_SP_AsignarPublicidad.sql` | `SP_ASIGNAR_PUBLICIDAD`: asigna las piezas a los espacios libres de un partido según país de las selecciones, PBI y prime time | Elías |
 
 Scripts de testing (en `scripts/testing/`):
 
 | Script | Prueba |
 |---|---|
 | `01_Test_Tablas_Nucleo.sql` | Restricciones de las tablas del núcleo |
+| `02_Test_Tablas_Jugadores.sql` | Restricciones de las tablas de jugadores, convocatoria, formaciones y sustituciones |
 | `03_Test_Tablas_Eventos.sql` | Restricciones de las tablas de eventos |
+| `04_Test_Tablas_Publicidad.sql` | Restricciones de las tablas de publicidad |
 | `07_Test_Funciones_Nucleo.sql` | `fn_SeleccionesDelPartido` y `fn_MercadosEnPrimeTime` |
 | `08_Test_SP_ControlArbitral.sql` | `SP_CONTROL_ARBITRAL` |
 | `09_Test_SP_Sedes_Partidos.sql` | SP de sedes, partidos, resultados y clasificadas |
@@ -93,8 +103,16 @@ Scripts de testing (en `scripts/testing/`):
 | `11_Test_SP_RegistrarGol.sql` | `SP_REGISTRAR_GOL` |
 | `12_Test_SP_RegistrarAmonestacion.sql` | `SP_REGISTRAR_AMONESTACION` |
 | `13_Test_SP_ABM_Eventos.sql` | SP ABM de eventos |
+| `14_Test_Funciones_Jugadores.sql` | Funciones de jugadores |
+| `15_Test_SP_Convocatoria_Baja.sql` | `SP_CONVOCAR_JUGADOR` y `SP_REGISTRAR_BAJA_CONVOCATORIA` |
+| `16_Test_SP_RegistrarFormacion.sql` | `SP_REGISTRAR_FORMACION` y `SP_AGREGAR_JUGADOR_FORMACION` |
+| `17_Test_SP_RegistrarSustitucion.sql` | `SP_REGISTRAR_SUSTITUCION` |
+| `18_Test_SP_ABM_Jugadores.sql` | SP ABM de jugadores |
+| `19_Test_SP_ABM_Nucleo.sql` | SP ABM restantes del núcleo |
+| `20_Test_SP_ABM_Publicidad.sql` | SP ABM de publicidad |
+| `21_Test_SP_AsignarPublicidad.sql` | `SP_ASIGNAR_PUBLICIDAD` (prime time en más de cuatro mercados, criterios de prioridad y validaciones) |
 
-Pendientes: ABM del resto de las tablas del núcleo, asignación de publicidad, importación de datos (`scripts/importacion/`), reportes, seguridad y respaldo.
+Pendientes: importación de datos (`scripts/importacion/`), datos de prueba (seed), reportes, seguridad y respaldo.
 
 > Las claves foráneas que cruzan módulos (por ejemplo, de `Convocatoria` hacia `Seleccion` o de `EspacioPublicitario` hacia `Partido`) se agregan con `ALTER TABLE` en `06_FK_Cruzadas.sql`, una vez creadas todas las tablas.
 
