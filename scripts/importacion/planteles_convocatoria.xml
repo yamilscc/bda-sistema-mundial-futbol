@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Convocatorias>
+  <Seleccion CodigoISO3="ARG">
+    <Jugador>
+      <Nombre>Emiliano</Nombre>
+      <Apellido>Martinez</Apellido>
+      <Documento>ARG-01</Documento>
+      <FechaNacimiento>1992-09-02</FechaNacimiento>
+      <Sexo>M</Sexo>
+      <Posicion>Arquero</Posicion>
+      <Club>Aston Villa</Club>
+      <Dorsal>23</Dorsal>
+      <FechaAlta>2026-05-25</FechaAlta>
+    </Jugador>
+    <Jugador>
+      <Nombre>Cristian</Nombre>
+      <Apellido>Romero</Apellido>
+      <Documento>ARG-02</Documento>
+      <FechaNacimiento>1998-04-27</FechaNacimiento>
+      <Sexo>M</Sexo>
+      <Posicion>Defensor</Posicion>
+      <Club>Tottenham Hotspur</Club>
+      <Dorsal>13</Dorsal>
+      <FechaAlta>2026-05-25</FechaAlta>
+    </Jugador>
+    <Jugador>
+      <Nombre>Rodrigo</Nombre>
+      <Apellido>De Paul</Apellido>
+      <Documento>ARG-03</Documento>
+      <FechaNacimiento>1994-05-24</FechaNacimiento>
+      <Sexo>M</Sexo>
+      <Posicion>Mediocampista</Posicion>
+      <Club>Atletico de Madrid</Club>
+      <Dorsal>7</Dorsal>
+      <FechaAlta>2026-05-25</FechaAlta>
+    </Jugador>
+    <Jugador>
+      <Nombre>Lionel</Nombre>
+      <Apellido>Messi</Apellido>
+      <Documento>ARG-04</Documento>
+      <FechaNacimiento>1987-06-24</FechaNacimiento>
+      <Sexo>M</Sexo>
+      <Posicion>Delantero</Posicion>
+      <Club>Inter Miami</Club>
+      <Dorsal>10</Dorsal>
+      <FechaAlta>2026-05-25</FechaAlta>
+    </Jugador>
+  </Seleccion>
+  <Seleccion CodigoISO3="BRA">
+    <Jugador>
+      <Nombre>Alisson</Nombre>
+      <Apellido>Becker</Apellido>
+      <Documento>BRA-01</Documento>
+      <FechaNacimiento>1992-10-02</FechaNacimiento>
+      <Sexo>M</Sexo>
+      <Posicion>Arquero</Posicion>
+      <Club>Liverpool</Club>
+      <Dorsal>1</Dorsal>
+      <FechaAlta>2026-05-25</FechaAlta>
+    </Jugador>
+    <Jugador>
+      <Nombre>Marquinhos</Nombre>
+      <Apellido>Correa</Apellido>
+      <Documento>BRA-02</Documento>
+      <FechaNacimiento>1994-05-14</FechaNacimiento>
+      <Sexo>M</Sexo>
+      <Posicion>Defensor</Posicion>
+      <Club>Paris Saint-Germain</Club>
+      <Dorsal>4</Dorsal>
+      <FechaAlta>2026-05-25</FechaAlta>
+    </Jugador>
+    <Jugador>
+      <Nombre>Bruno</Nombre>
+      <Apellido>Guimaraes</Apellido>
+      <Documento>BRA-03</Documento>
+      <FechaNacimiento>1997-11-16</FechaNacimiento>
+      <Sexo>M</Sexo>
+      <Posicion>Mediocampista</Posicion>
+      <Club>Newcastle United</Club>
+      <Dorsal>5</Dorsal>
+      <FechaAlta>2026-05-25</FechaAlta>
+    </Jugador>
+    <Jugador>
+      <Nombre>Vinicius</Nombre>
+      <Apellido>Junior</Apellido>
+      <Documento>BRA-04</Documento>
+      <FechaNacimiento>2000-07-12</FechaNacimiento>
+      <Sexo>M</Sexo>
+      <Posicion>Delantero</Posicion>
+      <Club>Real Madrid</Club>
+      <Dorsal>7</Dorsal>
+      <FechaAlta>2026-05-25</FechaAlta>
+    </Jugador>
+  </Seleccion>
+</Convocatorias>
