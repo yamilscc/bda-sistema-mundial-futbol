@@ -76,19 +76,5 @@ BEGIN
             ROLLBACK TRANSACTION;
         THROW;
     END CATCH;
-
-    SELECT s.IdSustitucion,
-           s.IdPartido,
-           s.IdJugadorSaliente,
-           jSal.Apellido AS ApellidoSaliente,
-           s.IdJugadorEntrante,
-           jEnt.Apellido AS ApellidoEntrante,
-           s.Minuto,
-           s.Periodo,
-           s.Motivo
-    FROM jugadores.Sustitucion AS s
-    INNER JOIN jugadores.Jugador AS jSal ON jSal.IdJugador = s.IdJugadorSaliente
-    INNER JOIN jugadores.Jugador AS jEnt ON jEnt.IdJugador = s.IdJugadorEntrante
-    WHERE s.IdSustitucion = @idSustitucion;
 END;
 GO
