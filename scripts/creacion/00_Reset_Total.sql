@@ -193,6 +193,11 @@ GO
 :r "$(RUTA)\21_SP_AsignarPublicidad.sql"
 GO
 
+PRINT '--- 23 SP importación XML de jugadores';
+GO
+:r "$(RUTA)\23_SP_Importacion_Jugadores.sql"
+GO
+
 -- Los próximos SP, vistas y funciones se suman acá, siempre en orden numérico.
 
 -- =========================================================================
