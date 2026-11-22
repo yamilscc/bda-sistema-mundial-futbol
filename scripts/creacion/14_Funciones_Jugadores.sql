@@ -96,7 +96,7 @@ BEGIN
                   FROM jugadores.Sustitucion AS sOut
                   WHERE sOut.IdPartido = @idPartido
                     AND sOut.IdJugadorSaliente = @idJugador
-                    AND sOut.Minuto <= @minuto
+                    AND sOut.Minuto < @minuto
               )
               AND NOT EXISTS (
                   SELECT 1

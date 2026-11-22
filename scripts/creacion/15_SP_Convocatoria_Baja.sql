@@ -63,10 +63,6 @@ BEGIN
         THROW;
     END CATCH;
 
-    SELECT c.IdConvocatoria, c.IdSeleccion, c.IdJugador, j.Nombre, j.Apellido, c.Dorsal, c.FechaAlta
-    FROM jugadores.Convocatoria AS c
-    INNER JOIN jugadores.Jugador AS j ON j.IdJugador = c.IdJugador
-    WHERE c.IdConvocatoria = @idConvocatoria;
 END;
 GO
 
@@ -188,11 +184,5 @@ BEGIN
             ROLLBACK TRANSACTION;
         THROW;
     END CATCH;
-
-    SELECT b.IdBaja, b.IdConvocatoria, c.IdSeleccion, c.IdJugador AS IdJugadorBaja,
-           b.FechaBaja, b.Motivo, @idConvocatoriaReemplazo AS IdConvocatoriaReemplazo
-    FROM jugadores.Baja AS b
-    INNER JOIN jugadores.Convocatoria AS c ON c.IdConvocatoria = b.IdConvocatoria
-    WHERE b.IdBaja = @idBaja;
 END;
 GO

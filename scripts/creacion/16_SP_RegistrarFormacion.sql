@@ -113,10 +113,6 @@ BEGIN
             ROLLBACK TRANSACTION;
         THROW;
     END CATCH;
-
-    SELECT f.IdFormacion, f.IdPartido, f.Localia, f.EsquemaTactico
-    FROM jugadores.Formacion AS f
-    WHERE f.IdFormacion = @idFormacion;
 END;
 GO
 
@@ -177,12 +173,5 @@ BEGIN
             ROLLBACK TRANSACTION;
         THROW;
     END CATCH;
-
-    SELECT fj.IdFormacion, fj.IdJugador, j.Nombre, j.Apellido,
-           fj.EstadoTitularidad, fj.PosicionEnCampo, fj.Dorsal
-    FROM jugadores.FormacionJugador AS fj
-    INNER JOIN jugadores.Jugador AS j ON j.IdJugador = fj.IdJugador
-    WHERE fj.IdFormacion = @idFormacion
-      AND fj.IdJugador   = @idJugador;
 END;
 GO
