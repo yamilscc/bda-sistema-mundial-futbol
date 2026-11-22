@@ -1,588 +1,747 @@
 /*
 Universidad: Universidad Nacional de La Matanza
 Materia: Bases de Datos Aplicadas - Grupo 05
-Autor: Torczuk, Elías Alexei
-Fecha: 2026-11-14
+Autor: Canseco Carrizo, Yamil Simón
 Integrantes:
-- Casella, Mateo Ezequiel
-- Chungara Tenorio, Denis Abner
-- Torczuk, Elías Alexei
-- Canseco Carrizo, Yamil Simón
-Objetivo: Stored procedures de registro de sedes, partidos y resultados, y cálculo de
-          selecciones clasificadas:
-          - nucleo.SP_ABM_Sede
-          - nucleo.SP_ABM_Partido
-          - nucleo.SP_REGISTRAR_RESULTADO_PARTIDO
-          - nucleo.SP_CALCULO_DE_SELECCIONES_CLASIFICADAS
+Casella, Mateo Ezequiel
+Chungara Tenorio, Denis Abner
+Torczuk, Elías Alexei
+Canseco Carrizo, Yamil Simón
+Objetivo:
+	- Generar los stored procedures de alta, modificación y baja de sedes y partidos:
+		  nucleo.SP_ALTA_Sede, nucleo.SP_MODIFICACION_Sede, nucleo.SP_BAJA_Sede,
+		  nucleo.SP_ALTA_Partido, nucleo.SP_MODIFICACION_Partido, nucleo.SP_BAJA_Partido
 
 Convenciones de estos SP:
-  - @operacion = 'ALTA' | 'MODIFICACION' | 'BAJA'.
-  - Todas las validaciones se acumulan y se informan en UN solo mensaje (THROW 52000).
-    Una operación inválida o un parámetro mal formado de entrada corta antes (THROW 52001).
-  - MODIFICACION reemplaza todos los campos con los parámetros recibidos.
+	- Cada SP acumula todas las condiciones incumplidas y las informa en UN solo mensaje
+	  (THROW 52000). La operación corre dentro de una transacción explícita.
+	- Los parámetros de ids y de número de partido son INT: así un valor fuera de rango
+	  se informa dentro del mensaje consolidado y no como error de conversión al invocar.
+	- Las validaciones comunes de Alta y Modificación están repetidas en ambos SP, en el mismo
+	  orden y con el mismo texto, entre las marcas ">>> VALIDACIONES COMUNES" y
+	  "<<< FIN VALIDACIONES COMUNES". Si se modifica una, hay que modificar la otra.
+	- MODIFICACION reemplaza todos los campos: un NULL en un parámetro opcional es un valor
+	  válido (cruce sin definir, sede sin capacidad o sin coordenadas).
+	- Sede no guarda huso horario: lo hereda de Ciudad.HusoHorario.
+	- Partido recibe la hora LOCAL de la sede y guarda solo FechaHoraUTC. El Alta siempre
+	  crea el partido en estado 'Programado'. Estos SP no cargan resultado, Asistencia
+	  ni Concurrencia (eso ocurre al finalizar el partido).
+	- Reglas de agenda (constantes declaradas al inicio de SP_ALTA_Partido y SP_MODIFICACION_Partido):
+	  180 minutos mínimos entre dos partidos de la misma sede y 48 horas mínimas entre los
+	  inicios de dos partidos de una selección.
+	- En fases eliminatorias el cruce queda sin definir (NULL/NULL): las selecciones las
+	  asigna nucleo.SP_DEFINIR_CRUCE_ELIMINATORIO.
+	- Se rechazan las horas locales inexistentes (salto de horario de verano) o ambiguas
+	  (retroceso), porque el SP no recibe el offset para desambiguarlas.
 */
 
 USE MundialFutbol;
 GO
 
 -- =========================================================================
--- SP_ABM_Sede
+-- nucleo.SP_ALTA_Sede
+-- Parámetros: @nombreEstadio, @idCiudad (obligatorios); @capacidad, @latitud y @longitud
+--             (opcionales; latitud y longitud van juntas o ninguna);
+--             @idSede (OUTPUT: id generado).
 -- =========================================================================
-CREATE OR ALTER PROCEDURE nucleo.SP_ABM_Sede
-    @operacion     VARCHAR(12),
-    @idSede        INT          = NULL OUTPUT,
-    @nombreEstadio VARCHAR(100) = NULL,
-    @idCiudad      INT          = NULL,
-    @capacidad     INT          = NULL,
-    @zonaHoraria   VARCHAR(60)  = NULL,
-    @latitud       DECIMAL(9,6) = NULL,
-    @longitud      DECIMAL(9,6) = NULL
+CREATE OR ALTER PROCEDURE nucleo.SP_ALTA_Sede
+	@nombreEstadio VARCHAR(200),
+	@idCiudad      INT,
+	@capacidad     INT          = NULL,
+	@latitud       DECIMAL(9,6) = NULL,
+	@longitud      DECIMAL(9,6) = NULL,
+	@idSede        TINYINT      = NULL OUTPUT
 AS
 BEGIN
-    SET NOCOUNT ON;
+	SET NOCOUNT ON;
 
-    DECLARE @errores NVARCHAR(MAX) = N'',
-            @mensaje NVARCHAR(2048),
-            @salto   NVARCHAR(2)   = CHAR(13) + CHAR(10);
+	DECLARE @errores NVARCHAR(MAX) = N'',
+	        @mensaje NVARCHAR(2048),
+	        @salto   NVARCHAR(2) = CHAR(13) + CHAR(10);
 
-    SET @operacion = UPPER(LTRIM(RTRIM(@operacion)));
-    SET @nombreEstadio = LTRIM(RTRIM(@nombreEstadio));
+	BEGIN TRY
+		SET @nombreEstadio = TRIM(@nombreEstadio);
 
-    IF @operacion IS NULL OR @operacion NOT IN ('ALTA', 'MODIFICACION', 'BAJA')
-        THROW 52001, 'Operación inválida. Valores permitidos: ALTA, MODIFICACION, BAJA.', 1;
+		-- >>> VALIDACIONES COMUNES (mantener sincronizadas con SP_MODIFICACION_Sede)
+		IF @nombreEstadio IS NULL OR @nombreEstadio = ''
+			SET @errores += N'- El nombre del estadio es obligatorio.' + @salto;
+		ELSE IF LEN(@nombreEstadio) > 100
+			SET @errores += N'- El nombre del estadio no puede superar los 100 caracteres.' + @salto;
 
-    -- ---- Validaciones ----------------------------------------------------
-    IF @operacion IN ('MODIFICACION', 'BAJA')
-    BEGIN
-        IF @idSede IS NULL OR NOT EXISTS (SELECT 1 FROM nucleo.Sede WHERE IdSede = @idSede)
-            SET @errores += N'- La sede indicada no existe.' + @salto;
-    END;
+		IF @idCiudad IS NULL OR NOT EXISTS (SELECT 1 FROM nucleo.Ciudad WHERE IdCiudad = @idCiudad)
+			SET @errores += N'- La ciudad indicada no existe.' + @salto;
 
-    IF @operacion IN ('ALTA', 'MODIFICACION')
-    BEGIN
-        IF @nombreEstadio IS NULL OR @nombreEstadio = ''
-            SET @errores += N'- El nombre del estadio es obligatorio.' + @salto;
-        ELSE IF EXISTS (SELECT 1 FROM nucleo.Sede
-                        WHERE NombreEstadio = @nombreEstadio
-                          AND (@operacion = 'ALTA' OR IdSede <> @idSede))
-            SET @errores += N'- Ya existe otra sede con ese nombre de estadio.' + @salto;
+		IF @nombreEstadio <> '' AND @idCiudad IS NOT NULL
+		   AND EXISTS (SELECT 1
+		               FROM nucleo.Sede
+		               WHERE NombreEstadio = @nombreEstadio
+		                 AND IdCiudad = @idCiudad)
+			SET @errores += N'- Ya existe una sede con ese nombre de estadio en esa ciudad.' + @salto;
 
-        IF @idCiudad IS NULL OR NOT EXISTS (SELECT 1 FROM nucleo.Ciudad WHERE IdCiudad = @idCiudad)
-            SET @errores += N'- La ciudad indicada no existe.' + @salto;
+		IF @capacidad IS NOT NULL AND @capacidad <= 0
+			SET @errores += N'- La capacidad, si se informa, debe ser mayor a cero.' + @salto;
 
-        IF @capacidad IS NULL OR @capacidad <= 0
-            SET @errores += N'- La capacidad debe ser mayor a cero.' + @salto;
+		IF (@latitud IS NULL AND @longitud IS NOT NULL) OR (@latitud IS NOT NULL AND @longitud IS NULL)
+			SET @errores += N'- Latitud y longitud deben informarse juntas o ninguna.' + @salto;
 
-        IF @zonaHoraria IS NULL
-           OR NOT EXISTS (SELECT 1 FROM sys.time_zone_info WHERE name = @zonaHoraria)
-            SET @errores += N'- La zona horaria no es válida (debe ser un nombre de sys.time_zone_info).' + @salto;
+		IF @latitud IS NOT NULL AND @latitud NOT BETWEEN -90 AND 90
+			SET @errores += N'- La latitud debe estar entre -90 y 90.' + @salto;
 
-        IF (@latitud IS NULL AND @longitud IS NOT NULL) OR (@latitud IS NOT NULL AND @longitud IS NULL)
-            SET @errores += N'- Latitud y longitud deben informarse juntas.' + @salto;
+		IF @longitud IS NOT NULL AND @longitud NOT BETWEEN -180 AND 180
+			SET @errores += N'- La longitud debe estar entre -180 y 180.' + @salto;
+		-- <<< FIN VALIDACIONES COMUNES
 
-        IF @latitud IS NOT NULL AND @latitud NOT BETWEEN -90 AND 90
-            SET @errores += N'- La latitud debe estar entre -90 y 90.' + @salto;
+		IF LEN(@errores) > 0
+		BEGIN
+			SET @mensaje = LEFT(N'SP_ALTA_Sede - No se pudo completar la operación:' + @salto + @errores, 2048);
+			THROW 52000, @mensaje, 1;
+		END;
 
-        IF @longitud IS NOT NULL AND @longitud NOT BETWEEN -180 AND 180
-            SET @errores += N'- La longitud debe estar entre -180 y 180.' + @salto;
-    END;
+		BEGIN TRANSACTION;
 
-    IF @operacion = 'MODIFICACION'
-       AND @capacidad IS NOT NULL
-       AND EXISTS (SELECT 1 FROM nucleo.Partido WHERE IdSede = @idSede AND Asistencia > @capacidad)
-        SET @errores += N'- La nueva capacidad es menor a la asistencia ya registrada en partidos de la sede.' + @salto;
+			INSERT INTO nucleo.Sede (NombreEstadio, Capacidad, Latitud, Longitud, IdCiudad)
+			VALUES (@nombreEstadio, @capacidad, @latitud, @longitud, @idCiudad);
 
-    IF @operacion = 'BAJA'
-       AND EXISTS (SELECT 1 FROM nucleo.Partido WHERE IdSede = @idSede)
-        SET @errores += N'- La sede tiene partidos asociados y no puede eliminarse.' + @salto;
+			SET @idSede = SCOPE_IDENTITY();
 
-    IF LEN(@errores) > 0
-    BEGIN
-        SET @mensaje = LEFT(N'SP_ABM_Sede (' + @operacion + N') - No se pudo completar la operación:'
-                            + @salto + @errores, 2048);
-        THROW 52000, @mensaje, 1;
-    END;
-
-    -- ---- Operación -------------------------------------------------------
-    BEGIN TRY
-        BEGIN TRANSACTION;
-
-        IF @operacion = 'ALTA'
-        BEGIN
-            INSERT INTO nucleo.Sede (NombreEstadio, IdCiudad, Capacidad, ZonaHoraria, Latitud, Longitud)
-            VALUES (@nombreEstadio, @idCiudad, @capacidad, @zonaHoraria, @latitud, @longitud);
-
-            SET @idSede = SCOPE_IDENTITY();
-        END
-        ELSE IF @operacion = 'MODIFICACION'
-        BEGIN
-            UPDATE nucleo.Sede
-            SET NombreEstadio = @nombreEstadio,
-                IdCiudad      = @idCiudad,
-                Capacidad     = @capacidad,
-                ZonaHoraria   = @zonaHoraria,
-                Latitud       = @latitud,
-                Longitud      = @longitud
-            WHERE IdSede = @idSede;
-        END
-        ELSE
-        BEGIN
-            DELETE FROM nucleo.Sede WHERE IdSede = @idSede;
-        END;
-
-        COMMIT TRANSACTION;
-    END TRY
-    BEGIN CATCH
-        IF @@TRANCOUNT > 0
-            ROLLBACK TRANSACTION;
-        THROW;
-    END CATCH;
+		COMMIT TRANSACTION;
+	END TRY
+	BEGIN CATCH
+		IF @@TRANCOUNT > 0
+			ROLLBACK TRANSACTION;
+		THROW;
+	END CATCH;
 END;
 GO
 
 -- =========================================================================
--- SP_ABM_Partido
--- El horario se informa en hora local de la sede; el SP calcula FechaHoraUTC.
--- No registra el resultado (eso lo hace SP_REGISTRAR_RESULTADO_PARTIDO).
+-- nucleo.SP_MODIFICACION_Sede
+-- Parámetros: @idSede (sede a modificar) y los mismos campos que el alta, que reemplazan
+--             los valores actuales.
+-- Reglas propias: la nueva capacidad no puede ser menor a la Concurrencia ya registrada en
+--                 partidos de la sede; si la sede tiene partidos, no se puede mover a una
+--                 ciudad con otro huso horario (cambiaría en silencio la hora local de sus
+--                 partidos, que se guardan en UTC).
 -- =========================================================================
-CREATE OR ALTER PROCEDURE nucleo.SP_ABM_Partido
-    @operacion            VARCHAR(12),
-    @idPartido            INT          = NULL OUTPUT,
-    @numeroPartido        INT          = NULL,
-    @idFase               INT          = NULL,
-    @idSede               INT          = NULL,
-    @fechaHoraLocal       DATETIME2(0) = NULL,
-    @idSeleccionLocal     INT          = NULL,
-    @idSeleccionVisitante INT          = NULL
+CREATE OR ALTER PROCEDURE nucleo.SP_MODIFICACION_Sede
+	@idSede        INT,
+	@nombreEstadio VARCHAR(200),
+	@idCiudad      INT,
+	@capacidad     INT          = NULL,
+	@latitud       DECIMAL(9,6) = NULL,
+	@longitud      DECIMAL(9,6) = NULL
 AS
 BEGIN
-    SET NOCOUNT ON;
+	SET NOCOUNT ON;
 
-    DECLARE @errores NVARCHAR(MAX) = N'',
-            @mensaje NVARCHAR(2048),
-            @salto   NVARCHAR(2)   = CHAR(13) + CHAR(10),
-            @estadoActual    VARCHAR(10),
-            @descripcionFase VARCHAR(30),
-            @zonaSede        VARCHAR(60),
-            @fechaHoraUTC    DATETIME2(0),
-            @grupoLocal      INT,
-            @grupoVisitante  INT,
-            @idExcluido      INT,
-            -- Reglas de agenda (ajustar acá si cambia el criterio).
-            @minutosMinimosEntreSede INT = 180,       -- 3 h entre dos partidos de la misma sede
-            @minutosDescansoSeleccion INT = 72 * 60;  -- 72 h de descanso entre partidos de una selección
+	DECLARE @errores NVARCHAR(MAX) = N'',
+	        @mensaje NVARCHAR(2048),
+	        @salto   NVARCHAR(2) = CHAR(13) + CHAR(10);
 
-    SET @operacion = UPPER(LTRIM(RTRIM(@operacion)));
+	BEGIN TRY
+		SET @nombreEstadio = TRIM(@nombreEstadio);
 
-    IF @operacion IS NULL OR @operacion NOT IN ('ALTA', 'MODIFICACION', 'BAJA')
-        THROW 52001, 'Operación inválida. Valores permitidos: ALTA, MODIFICACION, BAJA.', 1;
+		IF @idSede IS NULL OR NOT EXISTS (SELECT 1 FROM nucleo.Sede WHERE IdSede = @idSede)
+			SET @errores += N'- La sede indicada no existe.' + @salto;
 
-    -- ---- Validaciones ----------------------------------------------------
-    IF @operacion IN ('MODIFICACION', 'BAJA')
-    BEGIN
-        SELECT @estadoActual = Estado FROM nucleo.Partido WHERE IdPartido = @idPartido;
+		-- >>> VALIDACIONES COMUNES (mantener sincronizadas con SP_ALTA_Sede)
+		IF @nombreEstadio IS NULL OR @nombreEstadio = ''
+			SET @errores += N'- El nombre del estadio es obligatorio.' + @salto;
+		ELSE IF LEN(@nombreEstadio) > 100
+			SET @errores += N'- El nombre del estadio no puede superar los 100 caracteres.' + @salto;
 
-        IF @estadoActual IS NULL
-            SET @errores += N'- El partido indicado no existe.' + @salto;
-        ELSE IF @estadoActual = 'Finalizado'
-            SET @errores += N'- El partido ya está finalizado y no puede modificarse ni eliminarse.' + @salto;
-    END;
+		IF @idCiudad IS NULL OR NOT EXISTS (SELECT 1 FROM nucleo.Ciudad WHERE IdCiudad = @idCiudad)
+			SET @errores += N'- La ciudad indicada no existe.' + @salto;
 
-    IF @operacion IN ('ALTA', 'MODIFICACION')
-    BEGIN
-        SET @idExcluido = ISNULL(@idPartido, 0);   -- en ALTA no hay partido propio que excluir
+		IF @nombreEstadio <> '' AND @idCiudad IS NOT NULL
+		   AND EXISTS (SELECT 1
+		               FROM nucleo.Sede
+		               WHERE NombreEstadio = @nombreEstadio
+		                 AND IdCiudad = @idCiudad
+		                 AND IdSede <> @idSede) -- [solo MODIFICACION] excluye la propia sede
+			SET @errores += N'- Ya existe una sede con ese nombre de estadio en esa ciudad.' + @salto;
 
-        SELECT @descripcionFase = Descripcion FROM nucleo.Fase WHERE IdFase = @idFase;
-        SELECT @zonaSede        = ZonaHoraria FROM nucleo.Sede WHERE IdSede = @idSede;
-        SELECT @grupoLocal      = IdGrupo     FROM nucleo.Seleccion WHERE IdSeleccion = @idSeleccionLocal;
-        SELECT @grupoVisitante  = IdGrupo     FROM nucleo.Seleccion WHERE IdSeleccion = @idSeleccionVisitante;
+		IF @capacidad IS NOT NULL AND @capacidad <= 0
+			SET @errores += N'- La capacidad, si se informa, debe ser mayor a cero.' + @salto;
 
-        IF @numeroPartido IS NULL OR @numeroPartido <= 0
-            SET @errores += N'- El número de partido es obligatorio y debe ser mayor a cero.' + @salto;
-        ELSE IF EXISTS (SELECT 1 FROM nucleo.Partido
-                        WHERE NumeroPartido = @numeroPartido AND IdPartido <> @idExcluido)
-            SET @errores += N'- Ya existe otro partido con ese número.' + @salto;
+		IF (@latitud IS NULL AND @longitud IS NOT NULL) OR (@latitud IS NOT NULL AND @longitud IS NULL)
+			SET @errores += N'- Latitud y longitud deben informarse juntas o ninguna.' + @salto;
 
-        IF @descripcionFase IS NULL
-            SET @errores += N'- La fase indicada no existe.' + @salto;
+		IF @latitud IS NOT NULL AND @latitud NOT BETWEEN -90 AND 90
+			SET @errores += N'- La latitud debe estar entre -90 y 90.' + @salto;
 
-        IF @zonaSede IS NULL
-            SET @errores += N'- La sede indicada no existe.' + @salto;
+		IF @longitud IS NOT NULL AND @longitud NOT BETWEEN -180 AND 180
+			SET @errores += N'- La longitud debe estar entre -180 y 180.' + @salto;
+		-- <<< FIN VALIDACIONES COMUNES
 
-        IF @fechaHoraLocal IS NULL
-            SET @errores += N'- La fecha y hora local del partido es obligatoria.' + @salto;
+		-- Reglas propias de la modificación (solo si la sede existe).
+		IF EXISTS (SELECT 1 FROM nucleo.Sede WHERE IdSede = @idSede)
+		BEGIN
+			IF @capacidad IS NOT NULL
+			   AND EXISTS (SELECT 1
+			               FROM nucleo.Partido
+			               WHERE IdSede = @idSede
+			                 AND Concurrencia > @capacidad)
+				SET @errores += N'- La nueva capacidad es menor a la concurrencia ya registrada en partidos de la sede.' + @salto;
 
-        IF @idSeleccionLocal IS NOT NULL
-           AND NOT EXISTS (SELECT 1 FROM nucleo.Seleccion WHERE IdSeleccion = @idSeleccionLocal)
-            SET @errores += N'- La selección local indicada no existe.' + @salto;
+			IF @idCiudad IS NOT NULL
+			   AND EXISTS (SELECT 1 FROM nucleo.Partido WHERE IdSede = @idSede)
+			   AND EXISTS (SELECT 1
+			               FROM nucleo.Sede AS s
+			               INNER JOIN nucleo.Ciudad AS actual ON actual.IdCiudad = s.IdCiudad
+			               INNER JOIN nucleo.Ciudad AS nueva  ON nueva.IdCiudad  = @idCiudad
+			               WHERE s.IdSede = @idSede
+			                 AND actual.HusoHorario <> nueva.HusoHorario)
+				SET @errores += N'- La sede tiene partidos y la nueva ciudad tiene otro huso horario: cambiaría la hora local de esos partidos.' + @salto;
+		END;
 
-        IF @idSeleccionVisitante IS NOT NULL
-           AND NOT EXISTS (SELECT 1 FROM nucleo.Seleccion WHERE IdSeleccion = @idSeleccionVisitante)
-            SET @errores += N'- La selección visitante indicada no existe.' + @salto;
+		IF LEN(@errores) > 0
+		BEGIN
+			SET @mensaje = LEFT(N'SP_MODIFICACION_Sede - No se pudo completar la operación:' + @salto + @errores, 2048);
+			THROW 52000, @mensaje, 1;
+		END;
 
-        IF (@idSeleccionLocal IS NULL AND @idSeleccionVisitante IS NOT NULL)
-           OR (@idSeleccionLocal IS NOT NULL AND @idSeleccionVisitante IS NULL)
-            SET @errores += N'- Deben informarse ambas selecciones o ninguna (cruce a definir).' + @salto;
+		BEGIN TRANSACTION;
 
-        IF @idSeleccionLocal IS NOT NULL AND @idSeleccionLocal = @idSeleccionVisitante
-            SET @errores += N'- Una selección no puede enfrentarse a sí misma.' + @salto;
+			UPDATE nucleo.Sede
+			SET NombreEstadio = @nombreEstadio,
+			    Capacidad     = @capacidad,
+			    Latitud       = @latitud,
+			    Longitud      = @longitud,
+			    IdCiudad      = @idCiudad
+			WHERE IdSede = @idSede;
 
-        -- Fase de grupos: ambas selecciones, del mismo grupo y sin repetir el cruce.
-        IF @descripcionFase = 'Grupos'
-        BEGIN
-            IF @idSeleccionLocal IS NULL OR @idSeleccionVisitante IS NULL
-                SET @errores += N'- En fase de grupos ambas selecciones son obligatorias.' + @salto;
-            ELSE IF @idSeleccionLocal <> @idSeleccionVisitante
-            BEGIN
-                IF @grupoLocal IS NULL OR @grupoVisitante IS NULL OR @grupoLocal <> @grupoVisitante
-                    SET @errores += N'- En fase de grupos ambas selecciones deben pertenecer al mismo grupo.' + @salto;
-
-                IF EXISTS (SELECT 1 FROM nucleo.Partido
-                           WHERE IdFase = @idFase
-                             AND IdPartido <> @idExcluido
-                             AND ((IdSeleccionLocal = @idSeleccionLocal AND IdSeleccionVisitante = @idSeleccionVisitante)
-                               OR (IdSeleccionLocal = @idSeleccionVisitante AND IdSeleccionVisitante = @idSeleccionLocal)))
-                    SET @errores += N'- Ese cruce ya está programado en la fase de grupos.' + @salto;
-            END;
-        END;
-
-        -- Agenda: se evalúa solo si se puede calcular el instante UTC.
-        IF @zonaSede IS NOT NULL AND @fechaHoraLocal IS NOT NULL
-        BEGIN
-            SET @fechaHoraUTC = CAST((@fechaHoraLocal AT TIME ZONE @zonaSede) AT TIME ZONE 'UTC' AS DATETIME2(0));
-
-            IF EXISTS (SELECT 1 FROM nucleo.Partido
-                       WHERE IdSede = @idSede
-                         AND IdPartido <> @idExcluido
-                         AND ABS(DATEDIFF(MINUTE, FechaHoraUTC, @fechaHoraUTC)) < @minutosMinimosEntreSede)
-                SET @errores += N'- La sede ya tiene otro partido a menos de 3 horas de ese horario.' + @salto;
-
-            IF (@idSeleccionLocal IS NOT NULL OR @idSeleccionVisitante IS NOT NULL)
-               AND EXISTS (SELECT 1 FROM nucleo.Partido
-                           WHERE IdPartido <> @idExcluido
-                             AND (IdSeleccionLocal IN (@idSeleccionLocal, @idSeleccionVisitante)
-                               OR IdSeleccionVisitante IN (@idSeleccionLocal, @idSeleccionVisitante))
-                             AND ABS(DATEDIFF(MINUTE, FechaHoraUTC, @fechaHoraUTC)) < @minutosDescansoSeleccion)
-                SET @errores += N'- Alguna de las selecciones tiene otro partido a menos de 72 horas de descanso.' + @salto;
-        END;
-    END;
-
-    IF @operacion = 'BAJA' AND @estadoActual = 'Programado'
-    BEGIN
-        IF EXISTS (SELECT 1 FROM nucleo.DesignacionArbitral WHERE IdPartido = @idPartido)
-            SET @errores += N'- El partido tiene designaciones arbitrales asociadas.' + @salto;
-        IF EXISTS (SELECT 1 FROM jugadores.Formacion WHERE IdPartido = @idPartido)
-            SET @errores += N'- El partido tiene formaciones cargadas.' + @salto;
-        IF EXISTS (SELECT 1 FROM jugadores.Sustitucion WHERE IdPartido = @idPartido)
-            SET @errores += N'- El partido tiene sustituciones cargadas.' + @salto;
-        IF EXISTS (SELECT 1 FROM eventos.Gol WHERE IdPartido = @idPartido)
-            SET @errores += N'- El partido tiene goles cargados.' + @salto;
-        IF EXISTS (SELECT 1 FROM eventos.Amonestacion WHERE IdPartido = @idPartido)
-            SET @errores += N'- El partido tiene amonestaciones cargadas.' + @salto;
-    END;
-
-    IF LEN(@errores) > 0
-    BEGIN
-        SET @mensaje = LEFT(N'SP_ABM_Partido (' + @operacion + N') - No se pudo completar la operación:'
-                            + @salto + @errores, 2048);
-        THROW 52000, @mensaje, 1;
-    END;
-
-    -- ---- Operación -------------------------------------------------------
-    BEGIN TRY
-        BEGIN TRANSACTION;
-
-        IF @operacion = 'ALTA'
-        BEGIN
-            INSERT INTO nucleo.Partido (NumeroPartido, IdFase, IdSede, FechaHoraLocal, FechaHoraUTC,
-                                        IdSeleccionLocal, IdSeleccionVisitante)
-            VALUES (@numeroPartido, @idFase, @idSede, @fechaHoraLocal, @fechaHoraUTC,
-                    @idSeleccionLocal, @idSeleccionVisitante);
-
-            SET @idPartido = SCOPE_IDENTITY();
-        END
-        ELSE IF @operacion = 'MODIFICACION'
-        BEGIN
-            UPDATE nucleo.Partido
-            SET NumeroPartido        = @numeroPartido,
-                IdFase               = @idFase,
-                IdSede               = @idSede,
-                FechaHoraLocal       = @fechaHoraLocal,
-                FechaHoraUTC         = @fechaHoraUTC,
-                IdSeleccionLocal     = @idSeleccionLocal,
-                IdSeleccionVisitante = @idSeleccionVisitante
-            WHERE IdPartido = @idPartido;
-        END
-        ELSE
-        BEGIN
-            DELETE FROM nucleo.Partido WHERE IdPartido = @idPartido;
-        END;
-
-        COMMIT TRANSACTION;
-    END TRY
-    BEGIN CATCH
-        IF @@TRANCOUNT > 0
-            ROLLBACK TRANSACTION;
-        THROW;
-    END CATCH;
+		COMMIT TRANSACTION;
+	END TRY
+	BEGIN CATCH
+		IF @@TRANCOUNT > 0
+			ROLLBACK TRANSACTION;
+		THROW;
+	END CATCH;
 END;
 GO
 
 -- =========================================================================
--- SP_REGISTRAR_RESULTADO_PARTIDO
--- Cierra el partido (Estado = 'Finalizado') con goles, penales y asistencia.
--- Se puede volver a llamar para corregir un resultado ya cargado.
+-- nucleo.SP_BAJA_Sede
+-- Parámetros: @idSede (sede a eliminar).
+-- Regla: la sede no puede tener partidos asociados.
 -- =========================================================================
-CREATE OR ALTER PROCEDURE nucleo.SP_REGISTRAR_RESULTADO_PARTIDO
-    @idPartido           INT,
-    @golesLocal          INT,
-    @golesVisitante      INT,
-    @penalesLocal        INT = NULL,
-    @penalesVisitante    INT = NULL,
-    @asistencia          INT = NULL,
-    @permitirFechaFutura BIT = 0
+CREATE OR ALTER PROCEDURE nucleo.SP_BAJA_Sede
+	@idSede INT
 AS
 BEGIN
-    SET NOCOUNT ON;
+	SET NOCOUNT ON;
 
-    DECLARE @errores NVARCHAR(MAX) = N'',
-            @mensaje NVARCHAR(2048),
-            @salto   NVARCHAR(2)   = CHAR(13) + CHAR(10),
-            @existe          BIT = 0,
-            @esEliminatoria  BIT,
-            @idLocal         INT,
-            @idVisitante     INT,
-            @fechaHoraUTC    DATETIME2(0),
-            @capacidad       INT;
+	DECLARE @errores NVARCHAR(MAX) = N'',
+	        @mensaje NVARCHAR(2048),
+	        @salto   NVARCHAR(2) = CHAR(13) + CHAR(10);
 
-    SELECT @existe         = 1,
-           @esEliminatoria = f.EsEliminatoria,
-           @idLocal        = p.IdSeleccionLocal,
-           @idVisitante    = p.IdSeleccionVisitante,
-           @fechaHoraUTC   = p.FechaHoraUTC,
-           @capacidad      = s.Capacidad
-    FROM nucleo.Partido AS p
-    INNER JOIN nucleo.Fase AS f ON f.IdFase = p.IdFase
-    INNER JOIN nucleo.Sede AS s ON s.IdSede = p.IdSede
-    WHERE p.IdPartido = @idPartido;
+	BEGIN TRY
+		IF @idSede IS NULL OR NOT EXISTS (SELECT 1 FROM nucleo.Sede WHERE IdSede = @idSede)
+			SET @errores += N'- La sede indicada no existe.' + @salto;
+		ELSE IF EXISTS (SELECT 1 FROM nucleo.Partido WHERE IdSede = @idSede)
+			SET @errores += N'- La sede tiene partidos asociados y no puede eliminarse.' + @salto;
 
-    -- ---- Validaciones ----------------------------------------------------
-    IF @existe = 0
-        SET @errores += N'- El partido indicado no existe.' + @salto;
-    ELSE
-    BEGIN
-        IF @idLocal IS NULL OR @idVisitante IS NULL
-            SET @errores += N'- El partido no tiene definidas ambas selecciones.' + @salto;
+		IF LEN(@errores) > 0
+		BEGIN
+			SET @mensaje = LEFT(N'SP_BAJA_Sede - No se pudo completar la operación:' + @salto + @errores, 2048);
+			THROW 52000, @mensaje, 1;
+		END;
 
-        IF @permitirFechaFutura = 0 AND @fechaHoraUTC > SYSUTCDATETIME()
-            SET @errores += N'- No se puede registrar el resultado de un partido que todavía no se jugó.' + @salto;
+		BEGIN TRANSACTION;
 
-        IF @asistencia IS NOT NULL AND (@asistencia < 0 OR @asistencia > @capacidad)
-            SET @errores += N'- La asistencia debe estar entre 0 y la capacidad de la sede ('
-                            + CAST(@capacidad AS NVARCHAR(12)) + N').' + @salto;
+			DELETE FROM nucleo.Sede WHERE IdSede = @idSede;
 
-        IF (@penalesLocal IS NULL AND @penalesVisitante IS NOT NULL)
-           OR (@penalesLocal IS NOT NULL AND @penalesVisitante IS NULL)
-            SET @errores += N'- Los penales deben informarse para ambas selecciones o ninguna.' + @salto;
-
-        IF @esEliminatoria = 0 AND (@penalesLocal IS NOT NULL OR @penalesVisitante IS NOT NULL)
-            SET @errores += N'- En fase de grupos no hay definición por penales.' + @salto;
-
-        IF @esEliminatoria = 1 AND @golesLocal IS NOT NULL AND @golesVisitante IS NOT NULL
-        BEGIN
-            IF @golesLocal = @golesVisitante AND (@penalesLocal IS NULL OR @penalesVisitante IS NULL)
-                SET @errores += N'- En eliminación directa un empate requiere definición por penales.' + @salto;
-
-            IF @golesLocal = @golesVisitante AND @penalesLocal IS NOT NULL AND @penalesLocal = @penalesVisitante
-                SET @errores += N'- La definición por penales no puede terminar empatada.' + @salto;
-
-            IF @golesLocal <> @golesVisitante AND (@penalesLocal IS NOT NULL OR @penalesVisitante IS NOT NULL)
-                SET @errores += N'- No corresponde informar penales si el partido no terminó empatado.' + @salto;
-        END;
-    END;
-
-    -- Los goles se validan siempre (también si el partido no existe).
-    IF @golesLocal IS NULL OR @golesVisitante IS NULL OR @golesLocal < 0 OR @golesVisitante < 0
-        SET @errores += N'- Los goles de ambas selecciones son obligatorios y no pueden ser negativos.' + @salto;
-
-    IF (@penalesLocal IS NOT NULL AND @penalesLocal < 0) OR (@penalesVisitante IS NOT NULL AND @penalesVisitante < 0)
-        SET @errores += N'- Los penales no pueden ser negativos.' + @salto;
-
-    IF LEN(@errores) > 0
-    BEGIN
-        SET @mensaje = LEFT(N'SP_REGISTRAR_RESULTADO_PARTIDO - No se pudo registrar el resultado:'
-                            + @salto + @errores, 2048);
-        THROW 52000, @mensaje, 1;
-    END;
-
-    -- ---- Operación -------------------------------------------------------
-    BEGIN TRY
-        BEGIN TRANSACTION;
-
-        UPDATE nucleo.Partido
-        SET Estado           = 'Finalizado',
-            GolesLocal       = @golesLocal,
-            GolesVisitante   = @golesVisitante,
-            PenalesLocal     = @penalesLocal,
-            PenalesVisitante = @penalesVisitante,
-            Asistencia       = @asistencia
-        WHERE IdPartido = @idPartido;
-
-        COMMIT TRANSACTION;
-    END TRY
-    BEGIN CATCH
-        IF @@TRANCOUNT > 0
-            ROLLBACK TRANSACTION;
-        THROW;
-    END CATCH;
-
-    SELECT p.IdPartido, p.NumeroPartido, p.Estado, p.GolesLocal, p.GolesVisitante,
-           p.PenalesLocal, p.PenalesVisitante, p.Asistencia
-    FROM nucleo.Partido AS p
-    WHERE p.IdPartido = @idPartido;
+		COMMIT TRANSACTION;
+	END TRY
+	BEGIN CATCH
+		IF @@TRANCOUNT > 0
+			ROLLBACK TRANSACTION;
+		THROW;
+	END CATCH;
 END;
 GO
 
 -- =========================================================================
--- SP_CALCULO_DE_SELECCIONES_CLASIFICADAS
--- Arma la tabla de posiciones de cada grupo con los partidos finalizados de la fase
--- de grupos (3 pts victoria, 1 empate) y marca quién clasifica:
---   @clasificadosPorGrupo: los N primeros de cada grupo clasifican directo.
---   @mejoresTerceros: cantidad de mejores ubicados en la posición N+1 que también pasan
---                     (formato 48 selecciones: 2 y 8; formato de 16 selecciones: 2 y 0).
--- Desempate dentro del grupo: puntos, diferencia de gol, goles a favor y, por último,
--- IdSeleccion (determinístico). No aplica enfrentamiento directo ni fair play.
--- Es de solo lectura: devuelve el resultado, no modifica tablas.
+-- nucleo.SP_ALTA_Partido
+-- Parámetros: @numeroPartido, @idFase, @idSede y @fechaHoraLocal (hora local de la sede),
+--             obligatorios; @idSeleccionLocal y @idSeleccionVisitante (obligatorias en fase
+--             de grupos; NULL en fases eliminatorias); @idPartido (OUTPUT: id generado).
+-- Crea el partido en estado 'Programado' y guarda solo FechaHoraUTC.
 -- =========================================================================
-CREATE OR ALTER PROCEDURE nucleo.SP_CALCULO_DE_SELECCIONES_CLASIFICADAS
-    @clasificadosPorGrupo INT = 2,
-    @mejoresTerceros      INT = 0
+CREATE OR ALTER PROCEDURE nucleo.SP_ALTA_Partido
+	@numeroPartido        INT,
+	@idFase               INT,
+	@idSede               INT,
+	@fechaHoraLocal       DATETIME2(0),
+	@idSeleccionLocal     INT      = NULL,
+	@idSeleccionVisitante INT      = NULL,
+	@idPartido            SMALLINT = NULL OUTPUT
 AS
 BEGIN
-    SET NOCOUNT ON;
+	SET NOCOUNT ON;
 
-    DECLARE @errores NVARCHAR(MAX) = N'',
-            @mensaje NVARCHAR(2048),
-            @salto   NVARCHAR(2)   = CHAR(13) + CHAR(10);
+	DECLARE @errores NVARCHAR(MAX) = N'',
+	        @mensaje NVARCHAR(2048),
+	        @salto   NVARCHAR(2) = CHAR(13) + CHAR(10),
+	        @esEliminatoria   BIT,
+	        @huso             VARCHAR(50),
+	        @fechaHoraUTC     DATETIME2(0),
+	        @horaValida       BIT = 0,
+	        @idGrupoLocal     TINYINT,
+	        @idGrupoVisitante TINYINT,
+	        -- Reglas de agenda (si cambian, ajustar también en SP_MODIFICACION_Partido).
+	        @minutosEntrePartidosSede INT = 180, -- mínimo entre dos partidos de la misma sede
+	        @horasDescansoSeleccion   INT = 48;  -- mínimo entre los inicios de dos partidos de una selección
 
-    -- ---- Validaciones ----------------------------------------------------
-    IF @clasificadosPorGrupo IS NULL OR @clasificadosPorGrupo < 1
-        SET @errores += N'- La cantidad de clasificados por grupo debe ser al menos 1.' + @salto;
+	BEGIN TRY
+		SELECT @esEliminatoria = EsEliminatoria FROM nucleo.Fase WHERE IdFase = @idFase;
 
-    IF @mejoresTerceros IS NULL OR @mejoresTerceros < 0
-        SET @errores += N'- La cantidad de mejores terceros no puede ser negativa.' + @salto;
+		SELECT @huso = c.HusoHorario
+		FROM nucleo.Sede AS s
+		INNER JOIN nucleo.Ciudad AS c ON c.IdCiudad = s.IdCiudad
+		WHERE s.IdSede = @idSede;
 
-    IF NOT EXISTS (SELECT 1 FROM nucleo.Seleccion WHERE IdGrupo IS NOT NULL)
-        SET @errores += N'- No hay selecciones asignadas a grupos.' + @salto;
+		SELECT @idGrupoLocal     = IdGrupo FROM nucleo.Seleccion WHERE IdSeleccion = @idSeleccionLocal;
+		SELECT @idGrupoVisitante = IdGrupo FROM nucleo.Seleccion WHERE IdSeleccion = @idSeleccionVisitante;
 
-    IF LEN(@errores) > 0
-    BEGIN
-        SET @mensaje = LEFT(N'SP_CALCULO_DE_SELECCIONES_CLASIFICADAS - Parámetros inválidos:'
-                            + @salto + @errores, 2048);
-        THROW 52000, @mensaje, 1;
-    END;
+		-- >>> VALIDACIONES COMUNES (mantener sincronizadas con SP_MODIFICACION_Partido)
+		-- Número de partido
+		IF @numeroPartido IS NULL OR @numeroPartido NOT BETWEEN 1 AND 255
+			SET @errores += N'- El número de partido es obligatorio y debe estar entre 1 y 255.' + @salto;
+		ELSE IF EXISTS (SELECT 1
+		                FROM nucleo.Partido AS p
+		                WHERE p.NumeroPartido = @numeroPartido)
+			SET @errores += N'- Ya existe otro partido con ese número.' + @salto;
 
-        -- ---- Cálculo ---------------------------------------------------------
-    CREATE TABLE #Posiciones (
-        IdGrupo                 INT,
-        NombreGrupo             VARCHAR(10),
-        Posicion                INT,
-        IdSeleccion             INT,
-        Pais                    VARCHAR(80),
-        PartidosJugados         INT,
-        Ganados                 INT,
-        Empatados               INT,
-        Perdidos                INT,
-        GolesFavor              INT,
-        GolesContra             INT,
-        Diferencia              INT,
-        Puntos                  INT,
-        PartidosPendientesGrupo INT,
-        ClasificaComo           VARCHAR(20) NULL
-    );
+		-- Fase, sede y horario
+		IF @esEliminatoria IS NULL
+			SET @errores += N'- La fase indicada no existe.' + @salto;
 
-    -- Todos los grupos en una sola sentencia (set-based).
-    INSERT INTO #Posiciones (IdGrupo, NombreGrupo, Posicion, IdSeleccion, Pais, PartidosJugados,
-                             Ganados, Empatados, Perdidos, GolesFavor, GolesContra, Diferencia,
-                             Puntos, PartidosPendientesGrupo)
-    SELECT x.IdGrupo,
-           x.NombreGrupo,
-           ROW_NUMBER() OVER (PARTITION BY x.IdGrupo
-                              ORDER BY x.G * 3 + x.E DESC, x.GF - x.GC DESC, x.GF DESC, x.IdSeleccion),
-           x.IdSeleccion,
-           x.Pais,
-           x.PJ, x.G, x.E, x.P, x.GF, x.GC,
-           x.GF - x.GC,
-           x.G * 3 + x.E,
-           ISNULL(pen.Pendientes, 0)
-    FROM (
-        SELECT g.IdGrupo,
-               g.Nombre AS NombreGrupo,
-               s.IdSeleccion,
-               pa.Nombre AS Pais,
-               COUNT(r.IdSeleccion)                                      AS PJ,
-               ISNULL(SUM(CASE WHEN r.GF >  r.GC THEN 1 ELSE 0 END), 0)  AS G,
-               ISNULL(SUM(CASE WHEN r.GF =  r.GC THEN 1 ELSE 0 END), 0)  AS E,
-               ISNULL(SUM(CASE WHEN r.GF <  r.GC THEN 1 ELSE 0 END), 0)  AS P,
-               ISNULL(SUM(r.GF), 0)                                      AS GF,
-               ISNULL(SUM(r.GC), 0)                                      AS GC
-        FROM nucleo.Seleccion AS s
-        INNER JOIN nucleo.Grupo AS g  ON g.IdGrupo = s.IdGrupo
-        INNER JOIN nucleo.Pais  AS pa ON pa.IdPais = s.IdPais
-        LEFT JOIN (
-            SELECT p.IdSeleccionLocal AS IdSeleccion, p.GolesLocal AS GF, p.GolesVisitante AS GC
-            FROM nucleo.Partido AS p
-            INNER JOIN nucleo.Fase AS f ON f.IdFase = p.IdFase
-            WHERE f.Descripcion = 'Grupos' AND p.Estado = 'Finalizado'
-            UNION ALL
-            SELECT p.IdSeleccionVisitante, p.GolesVisitante, p.GolesLocal
-            FROM nucleo.Partido AS p
-            INNER JOIN nucleo.Fase AS f ON f.IdFase = p.IdFase
-            WHERE f.Descripcion = 'Grupos' AND p.Estado = 'Finalizado'
-        ) AS r ON r.IdSeleccion = s.IdSeleccion
-        GROUP BY g.IdGrupo, g.Nombre, s.IdSeleccion, pa.Nombre
-    ) AS x
-    LEFT JOIN (
-        -- Partidos de grupos todavía sin jugar, por grupo.
-        SELECT s.IdGrupo, COUNT(*) AS Pendientes
-        FROM nucleo.Partido AS p
-        INNER JOIN nucleo.Fase AS f ON f.IdFase = p.IdFase
-        INNER JOIN nucleo.Seleccion AS s ON s.IdSeleccion = p.IdSeleccionLocal
-        WHERE f.Descripcion = 'Grupos'
-          AND s.IdGrupo IS NOT NULL
-          AND p.Estado <> 'Finalizado'
-        GROUP BY s.IdGrupo
-    ) AS pen ON pen.IdGrupo = x.IdGrupo;
+		IF @idSede IS NULL OR NOT EXISTS (SELECT 1 FROM nucleo.Sede WHERE IdSede = @idSede)
+			SET @errores += N'- La sede indicada no existe.' + @salto;
 
-    -- Clasificados directos.
-    UPDATE #Posiciones
-    SET ClasificaComo = 'Directo'
-    WHERE Posicion <= @clasificadosPorGrupo;
+		IF @fechaHoraLocal IS NULL
+			SET @errores += N'- La fecha y hora local del partido es obligatoria.' + @salto;
 
-    -- Mejores ubicados en la posición siguiente (mejores terceros en el formato habitual).
-    IF @mejoresTerceros > 0
-    BEGIN
-        ;WITH Candidatos AS (
-            SELECT IdSeleccion,
-                   ROW_NUMBER() OVER (ORDER BY Puntos DESC, Diferencia DESC, GolesFavor DESC, IdSeleccion) AS Orden
-            FROM #Posiciones
-            WHERE Posicion = @clasificadosPorGrupo + 1
-        )
-        UPDATE p
-        SET ClasificaComo = 'Mejor ' + CAST(@clasificadosPorGrupo + 1 AS VARCHAR(3)) + 'º'
-        FROM #Posiciones AS p
-        INNER JOIN Candidatos AS c ON c.IdSeleccion = p.IdSeleccion
-        WHERE c.Orden <= @mejoresTerceros;
-    END;
+		IF @huso IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.time_zone_info WHERE name = @huso)
+			SET @errores += N'- El huso horario de la ciudad de la sede (' + @huso + N') no es válido: debe corregirse en la ciudad.' + @salto;
 
-    SELECT NombreGrupo, Posicion, IdSeleccion, Pais, PartidosJugados, Ganados, Empatados, Perdidos,
-           GolesFavor, GolesContra, Diferencia, Puntos,
-           CAST(CASE WHEN PartidosPendientesGrupo = 0 THEN 1 ELSE 0 END AS BIT) AS GrupoCompleto,
-           CAST(CASE WHEN ClasificaComo IS NULL THEN 0 ELSE 1 END AS BIT)       AS Clasifica,
-           ClasificaComo
-    FROM #Posiciones
-    ORDER BY NombreGrupo, Posicion;
+		-- Conversión hora local de la sede -> UTC (solo si el huso es válido).
+		IF @fechaHoraLocal IS NOT NULL AND @huso IS NOT NULL
+		   AND EXISTS (SELECT 1 FROM sys.time_zone_info WHERE name = @huso)
+		BEGIN
+			SET @fechaHoraUTC = CAST((@fechaHoraLocal AT TIME ZONE @huso) AT TIME ZONE 'UTC' AS DATETIME2(0));
 
-    DROP TABLE #Posiciones;
+			-- Hora local inexistente (salto de horario de verano): la ida y vuelta no coincide.
+			IF CAST((@fechaHoraUTC AT TIME ZONE 'UTC') AT TIME ZONE @huso AS DATETIME2(0)) <> @fechaHoraLocal
+				SET @errores += N'- La hora local indicada no existe en el huso de la sede (salto de horario de verano).' + @salto;
+			-- Hora local ambigua (retroceso de horario de verano): otra hora UTC cercana vuelve a la misma hora local.
+			ELSE IF CAST((DATEADD(HOUR, 1, @fechaHoraUTC) AT TIME ZONE 'UTC') AT TIME ZONE @huso AS DATETIME2(0)) = @fechaHoraLocal
+			     OR CAST((DATEADD(HOUR, -1, @fechaHoraUTC) AT TIME ZONE 'UTC') AT TIME ZONE @huso AS DATETIME2(0)) = @fechaHoraLocal
+				SET @errores += N'- La hora local indicada es ambigua en el huso de la sede (retroceso de horario de verano).' + @salto;
+			ELSE
+				SET @horaValida = 1;
+		END;
+
+		-- Selecciones
+		IF @idSeleccionLocal IS NOT NULL
+		   AND NOT EXISTS (SELECT 1 FROM nucleo.Seleccion WHERE IdSeleccion = @idSeleccionLocal)
+			SET @errores += N'- La selección local indicada no existe.' + @salto;
+
+		IF @idSeleccionVisitante IS NOT NULL
+		   AND NOT EXISTS (SELECT 1 FROM nucleo.Seleccion WHERE IdSeleccion = @idSeleccionVisitante)
+			SET @errores += N'- La selección visitante indicada no existe.' + @salto;
+
+		IF @idSeleccionLocal IS NOT NULL AND @idSeleccionLocal = @idSeleccionVisitante
+			SET @errores += N'- Una selección no puede enfrentarse a sí misma.' + @salto;
+
+		-- Fase de grupos: ambas selecciones, del mismo grupo y sin repetir el cruce.
+		IF @esEliminatoria = 0
+		BEGIN
+			IF @idSeleccionLocal IS NULL OR @idSeleccionVisitante IS NULL
+				SET @errores += N'- En fase de grupos ambas selecciones son obligatorias.' + @salto;
+			ELSE IF @idSeleccionLocal <> @idSeleccionVisitante
+			BEGIN
+				IF @idGrupoLocal IS NOT NULL AND @idGrupoVisitante IS NOT NULL
+				   AND @idGrupoLocal <> @idGrupoVisitante
+					SET @errores += N'- En fase de grupos ambas selecciones deben pertenecer al mismo grupo.' + @salto;
+
+				IF EXISTS (SELECT 1
+				           FROM nucleo.Partido AS p
+				           WHERE p.IdFase = @idFase
+				             AND ((p.IdSeleccionLocal = @idSeleccionLocal AND p.IdSeleccionVisitante = @idSeleccionVisitante)
+				               OR (p.IdSeleccionLocal = @idSeleccionVisitante AND p.IdSeleccionVisitante = @idSeleccionLocal)))
+					SET @errores += N'- Ese cruce ya está programado en la fase de grupos.' + @salto;
+			END;
+		END;
+
+		-- Fase eliminatoria: el cruce se asigna con SP_DEFINIR_CRUCE_ELIMINATORIO.
+		-- [Alta: no se pueden informar selecciones | Modificación: no pueden diferir de las guardadas]
+		IF @esEliminatoria = 1
+		   AND (@idSeleccionLocal IS NOT NULL OR @idSeleccionVisitante IS NOT NULL)
+			SET @errores += N'- En fases eliminatorias las selecciones no se cargan ni se cambian acá: se asignan con SP_DEFINIR_CRUCE_ELIMINATORIO.' + @salto;
+
+		-- Agenda (solo si se pudo calcular el instante UTC)
+		IF @horaValida = 1
+		BEGIN
+			IF EXISTS (SELECT 1
+			           FROM nucleo.Partido AS p
+			           WHERE p.IdSede = @idSede
+			             AND p.FechaHoraUTC > DATEADD(MINUTE, -@minutosEntrePartidosSede, @fechaHoraUTC)
+			             AND p.FechaHoraUTC < DATEADD(MINUTE,  @minutosEntrePartidosSede, @fechaHoraUTC))
+				SET @errores += N'- La sede ya tiene otro partido a menos de ' + CAST(@minutosEntrePartidosSede AS NVARCHAR(10))
+				              + N' minutos de ese horario.' + @salto;
+
+			IF (@idSeleccionLocal IS NOT NULL OR @idSeleccionVisitante IS NOT NULL)
+			   AND EXISTS (SELECT 1
+			               FROM nucleo.Partido AS p
+			               WHERE (p.IdSeleccionLocal IN (@idSeleccionLocal, @idSeleccionVisitante)
+			                   OR p.IdSeleccionVisitante IN (@idSeleccionLocal, @idSeleccionVisitante))
+			                 AND p.FechaHoraUTC > DATEADD(HOUR, -@horasDescansoSeleccion, @fechaHoraUTC)
+			                 AND p.FechaHoraUTC < DATEADD(HOUR,  @horasDescansoSeleccion, @fechaHoraUTC))
+				SET @errores += N'- Alguna de las selecciones tiene otro partido a menos de ' + CAST(@horasDescansoSeleccion AS NVARCHAR(10))
+				              + N' horas de ese horario.' + @salto;
+		END;
+		-- <<< FIN VALIDACIONES COMUNES
+
+		IF LEN(@errores) > 0
+		BEGIN
+			SET @mensaje = LEFT(N'SP_ALTA_Partido - No se pudo completar la operación:' + @salto + @errores, 2048);
+			THROW 52000, @mensaje, 1;
+		END;
+
+		BEGIN TRANSACTION;
+
+			INSERT INTO nucleo.Partido (NumeroPartido, FechaHoraUTC, Estado, IdFase, IdSede, IdSeleccionLocal, IdSeleccionVisitante)
+			VALUES (@numeroPartido, @fechaHoraUTC, 'Programado', @idFase, @idSede, @idSeleccionLocal, @idSeleccionVisitante);
+
+			SET @idPartido = SCOPE_IDENTITY();
+
+		COMMIT TRANSACTION;
+	END TRY
+	BEGIN CATCH
+		IF @@TRANCOUNT > 0
+			ROLLBACK TRANSACTION;
+		THROW;
+	END CATCH;
+END;
+GO
+
+-- =========================================================================
+-- nucleo.SP_MODIFICACION_Partido
+-- Parámetros: @idPartido (partido a modificar) y los mismos campos que el alta, que
+--             reemplazan los valores actuales.
+-- Reglas propias: solo se modifican partidos 'Programado'. Si el partido tiene formaciones,
+--                 sustituciones, goles, amonestaciones, designaciones arbitrales, sanciones
+--                 o espacios publicitarios, no se pueden cambiar sus selecciones ni su fase;
+--                 y si tiene espacios publicitarios, tampoco su sede ni su horario (el
+--                 prime time se calculó con ese horario). En fases eliminatorias las
+--                 selecciones recibidas deben ser iguales a las guardadas.
+-- =========================================================================
+CREATE OR ALTER PROCEDURE nucleo.SP_MODIFICACION_Partido
+	@idPartido            INT,
+	@numeroPartido        INT,
+	@idFase               INT,
+	@idSede               INT,
+	@fechaHoraLocal       DATETIME2(0),
+	@idSeleccionLocal     INT = NULL,
+	@idSeleccionVisitante INT = NULL
+AS
+BEGIN
+	SET NOCOUNT ON;
+
+	DECLARE @errores NVARCHAR(MAX) = N'',
+	        @mensaje NVARCHAR(2048),
+	        @salto   NVARCHAR(2) = CHAR(13) + CHAR(10),
+	        @esEliminatoria   BIT,
+	        @huso             VARCHAR(50),
+	        @fechaHoraUTC     DATETIME2(0),
+	        @horaValida       BIT = 0,
+	        @idGrupoLocal     TINYINT,
+	        @idGrupoVisitante TINYINT,
+	        -- Datos actuales del partido
+	        @existe              BIT = 0,
+	        @estadoActual        VARCHAR(10),
+	        @faseActual          TINYINT,
+	        @sedeActual          TINYINT,
+	        @fechaHoraUTCActual  DATETIME2(0),
+	        @localActual         TINYINT,
+	        @visitanteActual     TINYINT,
+	        @tieneDependientes   BIT = 0,
+	        @tieneEspacios       BIT = 0,
+	        @seleccionesCambian  BIT = 0,
+	        -- Reglas de agenda (si cambian, ajustar también en SP_ALTA_Partido).
+	        @minutosEntrePartidosSede INT = 180, -- mínimo entre dos partidos de la misma sede
+	        @horasDescansoSeleccion   INT = 48;  -- mínimo entre los inicios de dos partidos de una selección
+
+	BEGIN TRY
+		SELECT @existe             = 1,
+		       @estadoActual       = p.Estado,
+		       @faseActual         = p.IdFase,
+		       @sedeActual         = p.IdSede,
+		       @fechaHoraUTCActual = p.FechaHoraUTC,
+		       @localActual        = p.IdSeleccionLocal,
+		       @visitanteActual    = p.IdSeleccionVisitante
+		FROM nucleo.Partido AS p
+		WHERE p.IdPartido = @idPartido;
+
+		SELECT @esEliminatoria = EsEliminatoria FROM nucleo.Fase WHERE IdFase = @idFase;
+
+		SELECT @huso = c.HusoHorario
+		FROM nucleo.Sede AS s
+		INNER JOIN nucleo.Ciudad AS c ON c.IdCiudad = s.IdCiudad
+		WHERE s.IdSede = @idSede;
+
+		SELECT @idGrupoLocal     = IdGrupo FROM nucleo.Seleccion WHERE IdSeleccion = @idSeleccionLocal;
+		SELECT @idGrupoVisitante = IdGrupo FROM nucleo.Seleccion WHERE IdSeleccion = @idSeleccionVisitante;
+
+		-- Estado del partido
+		IF @existe = 0
+			SET @errores += N'- El partido indicado no existe.' + @salto;
+		ELSE IF @estadoActual <> 'Programado'
+			SET @errores += N'- Solo se pueden modificar partidos en estado Programado.' + @salto;
+
+		-- >>> VALIDACIONES COMUNES (mantener sincronizadas con SP_ALTA_Partido)
+		-- Número de partido
+		IF @numeroPartido IS NULL OR @numeroPartido NOT BETWEEN 1 AND 255
+			SET @errores += N'- El número de partido es obligatorio y debe estar entre 1 y 255.' + @salto;
+		ELSE IF EXISTS (SELECT 1
+		                FROM nucleo.Partido AS p
+		                WHERE p.NumeroPartido = @numeroPartido
+		                  AND p.IdPartido <> @idPartido) -- [solo MODIFICACION] excluye el propio partido
+			SET @errores += N'- Ya existe otro partido con ese número.' + @salto;
+
+		-- Fase, sede y horario
+		IF @esEliminatoria IS NULL
+			SET @errores += N'- La fase indicada no existe.' + @salto;
+
+		IF @idSede IS NULL OR NOT EXISTS (SELECT 1 FROM nucleo.Sede WHERE IdSede = @idSede)
+			SET @errores += N'- La sede indicada no existe.' + @salto;
+
+		IF @fechaHoraLocal IS NULL
+			SET @errores += N'- La fecha y hora local del partido es obligatoria.' + @salto;
+
+		IF @huso IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.time_zone_info WHERE name = @huso)
+			SET @errores += N'- El huso horario de la ciudad de la sede (' + @huso + N') no es válido: debe corregirse en la ciudad.' + @salto;
+
+		-- Conversión hora local de la sede -> UTC (solo si el huso es válido).
+		IF @fechaHoraLocal IS NOT NULL AND @huso IS NOT NULL
+		   AND EXISTS (SELECT 1 FROM sys.time_zone_info WHERE name = @huso)
+		BEGIN
+			SET @fechaHoraUTC = CAST((@fechaHoraLocal AT TIME ZONE @huso) AT TIME ZONE 'UTC' AS DATETIME2(0));
+
+			-- Hora local inexistente (salto de horario de verano): la ida y vuelta no coincide.
+			IF CAST((@fechaHoraUTC AT TIME ZONE 'UTC') AT TIME ZONE @huso AS DATETIME2(0)) <> @fechaHoraLocal
+				SET @errores += N'- La hora local indicada no existe en el huso de la sede (salto de horario de verano).' + @salto;
+			-- Hora local ambigua (retroceso de horario de verano): otra hora UTC cercana vuelve a la misma hora local.
+			ELSE IF CAST((DATEADD(HOUR, 1, @fechaHoraUTC) AT TIME ZONE 'UTC') AT TIME ZONE @huso AS DATETIME2(0)) = @fechaHoraLocal
+			     OR CAST((DATEADD(HOUR, -1, @fechaHoraUTC) AT TIME ZONE 'UTC') AT TIME ZONE @huso AS DATETIME2(0)) = @fechaHoraLocal
+				SET @errores += N'- La hora local indicada es ambigua en el huso de la sede (retroceso de horario de verano).' + @salto;
+			ELSE
+				SET @horaValida = 1;
+		END;
+
+		-- Selecciones
+		IF @idSeleccionLocal IS NOT NULL
+		   AND NOT EXISTS (SELECT 1 FROM nucleo.Seleccion WHERE IdSeleccion = @idSeleccionLocal)
+			SET @errores += N'- La selección local indicada no existe.' + @salto;
+
+		IF @idSeleccionVisitante IS NOT NULL
+		   AND NOT EXISTS (SELECT 1 FROM nucleo.Seleccion WHERE IdSeleccion = @idSeleccionVisitante)
+			SET @errores += N'- La selección visitante indicada no existe.' + @salto;
+
+		IF @idSeleccionLocal IS NOT NULL AND @idSeleccionLocal = @idSeleccionVisitante
+			SET @errores += N'- Una selección no puede enfrentarse a sí misma.' + @salto;
+
+		-- Fase de grupos: ambas selecciones, del mismo grupo y sin repetir el cruce.
+		IF @esEliminatoria = 0
+		BEGIN
+			IF @idSeleccionLocal IS NULL OR @idSeleccionVisitante IS NULL
+				SET @errores += N'- En fase de grupos ambas selecciones son obligatorias.' + @salto;
+			ELSE IF @idSeleccionLocal <> @idSeleccionVisitante
+			BEGIN
+				IF @idGrupoLocal IS NOT NULL AND @idGrupoVisitante IS NOT NULL
+				   AND @idGrupoLocal <> @idGrupoVisitante
+					SET @errores += N'- En fase de grupos ambas selecciones deben pertenecer al mismo grupo.' + @salto;
+
+				IF EXISTS (SELECT 1
+				           FROM nucleo.Partido AS p
+				           WHERE p.IdFase = @idFase
+				             AND p.IdPartido <> @idPartido -- [solo MODIFICACION] excluye el propio partido
+				             AND ((p.IdSeleccionLocal = @idSeleccionLocal AND p.IdSeleccionVisitante = @idSeleccionVisitante)
+				               OR (p.IdSeleccionLocal = @idSeleccionVisitante AND p.IdSeleccionVisitante = @idSeleccionLocal)))
+					SET @errores += N'- Ese cruce ya está programado en la fase de grupos.' + @salto;
+			END;
+		END;
+
+		-- Fase eliminatoria: el cruce se asigna con SP_DEFINIR_CRUCE_ELIMINATORIO.
+		-- [Alta: no se pueden informar selecciones | Modificación: no pueden diferir de las guardadas]
+		IF @esEliminatoria = 1
+		   AND (ISNULL(@idSeleccionLocal, 0) <> ISNULL(@localActual, 0)
+		     OR ISNULL(@idSeleccionVisitante, 0) <> ISNULL(@visitanteActual, 0))
+			SET @errores += N'- En fases eliminatorias las selecciones no se cargan ni se cambian acá: se asignan con SP_DEFINIR_CRUCE_ELIMINATORIO.' + @salto;
+
+		-- Agenda (solo si se pudo calcular el instante UTC)
+		IF @horaValida = 1
+		BEGIN
+			IF EXISTS (SELECT 1
+			           FROM nucleo.Partido AS p
+			           WHERE p.IdSede = @idSede
+			             AND p.IdPartido <> @idPartido -- [solo MODIFICACION] excluye el propio partido
+			             AND p.FechaHoraUTC > DATEADD(MINUTE, -@minutosEntrePartidosSede, @fechaHoraUTC)
+			             AND p.FechaHoraUTC < DATEADD(MINUTE,  @minutosEntrePartidosSede, @fechaHoraUTC))
+				SET @errores += N'- La sede ya tiene otro partido a menos de ' + CAST(@minutosEntrePartidosSede AS NVARCHAR(10))
+				              + N' minutos de ese horario.' + @salto;
+
+			IF (@idSeleccionLocal IS NOT NULL OR @idSeleccionVisitante IS NOT NULL)
+			   AND EXISTS (SELECT 1
+			               FROM nucleo.Partido AS p
+			               WHERE p.IdPartido <> @idPartido -- [solo MODIFICACION] excluye el propio partido
+			                 AND (p.IdSeleccionLocal IN (@idSeleccionLocal, @idSeleccionVisitante)
+			                   OR p.IdSeleccionVisitante IN (@idSeleccionLocal, @idSeleccionVisitante))
+			                 AND p.FechaHoraUTC > DATEADD(HOUR, -@horasDescansoSeleccion, @fechaHoraUTC)
+			                 AND p.FechaHoraUTC < DATEADD(HOUR,  @horasDescansoSeleccion, @fechaHoraUTC))
+				SET @errores += N'- Alguna de las selecciones tiene otro partido a menos de ' + CAST(@horasDescansoSeleccion AS NVARCHAR(10))
+				              + N' horas de ese horario.' + @salto;
+		END;
+		-- <<< FIN VALIDACIONES COMUNES
+
+		-- Reglas propias de la modificación: partidos con registros asociados (solo si el partido existe).
+		IF @existe = 1
+		BEGIN
+			SET @tieneEspacios = CASE WHEN EXISTS (SELECT 1 FROM publicidad.EspacioPublicitario WHERE IdPartido = @idPartido)
+			                          THEN 1 ELSE 0 END;
+
+			SET @tieneDependientes = CASE
+				WHEN @tieneEspacios = 1
+				  OR EXISTS (SELECT 1 FROM jugadores.Formacion WHERE IdPartido = @idPartido)
+				  OR EXISTS (SELECT 1 FROM jugadores.Sustitucion WHERE IdPartido = @idPartido)
+				  OR EXISTS (SELECT 1 FROM eventos.Gol WHERE IdPartido = @idPartido)
+				  OR EXISTS (SELECT 1 FROM eventos.Amonestacion WHERE IdPartido = @idPartido)
+				  OR EXISTS (SELECT 1 FROM nucleo.DesignacionArbitral WHERE IdPartido = @idPartido)
+				  OR EXISTS (SELECT 1
+				             FROM nucleo.Sancion AS sa
+				             INNER JOIN nucleo.DesignacionArbitral AS d ON d.IdDesignacionArbitral = sa.IdDesignacionArbitral
+				             WHERE d.IdPartido = @idPartido)
+				THEN 1 ELSE 0 END;
+
+			SET @seleccionesCambian = CASE
+				WHEN ISNULL(@idSeleccionLocal, 0) <> ISNULL(@localActual, 0)
+				  OR ISNULL(@idSeleccionVisitante, 0) <> ISNULL(@visitanteActual, 0)
+				THEN 1 ELSE 0 END;
+
+			-- En fases eliminatorias el cambio de selecciones ya se informó arriba.
+			IF @tieneDependientes = 1 AND @seleccionesCambian = 1 AND ISNULL(@esEliminatoria, 0) = 0
+				SET @errores += N'- El partido tiene formaciones, sustituciones, goles, amonestaciones, designaciones arbitrales, sanciones o espacios publicitarios: no se pueden cambiar sus selecciones.' + @salto;
+
+			IF @tieneDependientes = 1 AND @idFase IS NOT NULL AND @idFase <> @faseActual
+				SET @errores += N'- El partido tiene registros asociados (formaciones, sustituciones, goles, amonestaciones, designaciones arbitrales, sanciones o espacios publicitarios): no se puede cambiar su fase.' + @salto;
+
+			IF @tieneEspacios = 1
+			   AND ((@idSede IS NOT NULL AND @idSede <> @sedeActual)
+			     OR (@horaValida = 1 AND @fechaHoraUTC <> @fechaHoraUTCActual))
+				SET @errores += N'- El partido tiene espacios publicitarios asignados: no se puede cambiar su sede ni su horario.' + @salto;
+		END;
+
+		IF LEN(@errores) > 0
+		BEGIN
+			SET @mensaje = LEFT(N'SP_MODIFICACION_Partido - No se pudo completar la operación:' + @salto + @errores, 2048);
+			THROW 52000, @mensaje, 1;
+		END;
+
+		BEGIN TRANSACTION;
+
+			UPDATE nucleo.Partido
+			SET NumeroPartido        = @numeroPartido,
+			    FechaHoraUTC         = @fechaHoraUTC,
+			    IdFase               = @idFase,
+			    IdSede               = @idSede,
+			    IdSeleccionLocal     = @idSeleccionLocal,
+			    IdSeleccionVisitante = @idSeleccionVisitante
+			WHERE IdPartido = @idPartido;
+
+		COMMIT TRANSACTION;
+	END TRY
+	BEGIN CATCH
+		IF @@TRANCOUNT > 0
+			ROLLBACK TRANSACTION;
+		THROW;
+	END CATCH;
+END;
+GO
+
+-- =========================================================================
+-- nucleo.SP_BAJA_Partido
+-- Parámetros: @idPartido (partido a eliminar).
+-- Reglas: solo se eliminan partidos 'Programado' que no tengan formaciones, sustituciones,
+--         goles, amonestaciones, designaciones arbitrales, sanciones ni espacios publicitarios.
+-- =========================================================================
+CREATE OR ALTER PROCEDURE nucleo.SP_BAJA_Partido
+	@idPartido INT
+AS
+BEGIN
+	SET NOCOUNT ON;
+
+	DECLARE @errores NVARCHAR(MAX) = N'',
+	        @mensaje NVARCHAR(2048),
+	        @salto   NVARCHAR(2) = CHAR(13) + CHAR(10),
+	        @existe  BIT = 0,
+	        @estadoActual VARCHAR(10);
+
+	BEGIN TRY
+		SELECT @existe = 1, @estadoActual = Estado
+		FROM nucleo.Partido
+		WHERE IdPartido = @idPartido;
+
+		IF @existe = 0
+			SET @errores += N'- El partido indicado no existe.' + @salto;
+		ELSE
+		BEGIN
+			IF @estadoActual <> 'Programado'
+				SET @errores += N'- Solo se pueden eliminar partidos en estado Programado.' + @salto;
+
+			IF EXISTS (SELECT 1 FROM jugadores.Formacion WHERE IdPartido = @idPartido)
+				SET @errores += N'- El partido tiene formaciones cargadas.' + @salto;
+
+			IF EXISTS (SELECT 1 FROM jugadores.Sustitucion WHERE IdPartido = @idPartido)
+				SET @errores += N'- El partido tiene sustituciones cargadas.' + @salto;
+
+			IF EXISTS (SELECT 1 FROM eventos.Gol WHERE IdPartido = @idPartido)
+				SET @errores += N'- El partido tiene goles cargados.' + @salto;
+
+			IF EXISTS (SELECT 1 FROM eventos.Amonestacion WHERE IdPartido = @idPartido)
+				SET @errores += N'- El partido tiene amonestaciones cargadas.' + @salto;
+
+			IF EXISTS (SELECT 1 FROM nucleo.DesignacionArbitral WHERE IdPartido = @idPartido)
+				SET @errores += N'- El partido tiene designaciones arbitrales asociadas.' + @salto;
+
+			IF EXISTS (SELECT 1
+			           FROM nucleo.Sancion AS sa
+			           INNER JOIN nucleo.DesignacionArbitral AS d ON d.IdDesignacionArbitral = sa.IdDesignacionArbitral
+			           WHERE d.IdPartido = @idPartido)
+				SET @errores += N'- El partido tiene sanciones arbitrales asociadas.' + @salto;
+
+			IF EXISTS (SELECT 1 FROM publicidad.EspacioPublicitario WHERE IdPartido = @idPartido)
+				SET @errores += N'- El partido tiene espacios publicitarios asignados.' + @salto;
+		END;
+
+		IF LEN(@errores) > 0
+		BEGIN
+			SET @mensaje = LEFT(N'SP_BAJA_Partido - No se pudo completar la operación:' + @salto + @errores, 2048);
+			THROW 52000, @mensaje, 1;
+		END;
+
+		BEGIN TRANSACTION;
+
+			DELETE FROM nucleo.Partido WHERE IdPartido = @idPartido;
+
+		COMMIT TRANSACTION;
+	END TRY
+	BEGIN CATCH
+		IF @@TRANCOUNT > 0
+			ROLLBACK TRANSACTION;
+		THROW;
+	END CATCH;
 END;
 GO
