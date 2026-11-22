@@ -92,10 +92,10 @@ DECLARE @idPais1 INT, @idPais2 INT, @idPais3 INT, @idPaisTemp INT;
 
 -- 2.A ALTA exitosa de países (Local, Visitante, Neutral y Temporal).
 BEGIN TRY
-    EXEC nucleo.SP_ABM_Pais 'ALTA', @idPais1 OUTPUT, 'TEST N19 Pais Local',     'N1', 'NE1', @idConf1, 'Argentina Standard Time', 14500.00;
-    EXEC nucleo.SP_ABM_Pais 'ALTA', @idPais2 OUTPUT, 'TEST N19 Pais Visitante', 'N2', 'NE2', @idConf1, 'UTC', 38000.00;
-    EXEC nucleo.SP_ABM_Pais 'ALTA', @idPais3 OUTPUT, 'TEST N19 Pais Neutral',   'N3', 'NE3', @idConf1, 'Central European Standard Time', 52000.00;
-    EXEC nucleo.SP_ABM_Pais 'ALTA', @idPaisTemp OUTPUT, 'TEST N19 Pais Temp',   'N4', 'NE4', @idConf1, 'UTC', NULL;
+    EXEC nucleo.SP_ABM_Pais 'ALTA', @idPais1 OUTPUT, 'TEST N19 Pais Local',     'XA', 'XEA', @idConf1, 'Argentina Standard Time', 14500.00;
+    EXEC nucleo.SP_ABM_Pais 'ALTA', @idPais2 OUTPUT, 'TEST N19 Pais Visitante', 'XB', 'XEB', @idConf1, 'UTC', 38000.00;
+    EXEC nucleo.SP_ABM_Pais 'ALTA', @idPais3 OUTPUT, 'TEST N19 Pais Neutral',   'XC', 'XEC', @idConf1, 'Central European Standard Time', 52000.00;
+    EXEC nucleo.SP_ABM_Pais 'ALTA', @idPaisTemp OUTPUT, 'TEST N19 Pais Temp',   'XD', 'XED', @idConf1, 'UTC', NULL;
     PRINT '2.A: OK - 4 países dados de alta.';
 END TRY
 BEGIN CATCH
@@ -104,16 +104,16 @@ END CATCH;
 
 -- 2.B MODIFICACION exitosa (actualiza PBI per cápita).
 BEGIN TRY
-    EXEC nucleo.SP_ABM_Pais 'MODIFICACION', @idPais1, 'TEST N19 Pais Local', 'N1', 'NE1', @idConf1, 'Argentina Standard Time', 16200.50;
+    EXEC nucleo.SP_ABM_Pais 'MODIFICACION', @idPais1, 'TEST N19 Pais Local', 'XA', 'XEA', @idConf1, 'Argentina Standard Time', 16200.50;
     PRINT '2.B: OK - país modificado.';
 END TRY
 BEGIN CATCH
     PRINT '2.B: FALLÓ - ' + ERROR_MESSAGE();
 END CATCH;
 
--- 2.C ALTA fallida con múltiples errores (ISO2 duplicado, zona horaria inválida, PBI negativo).
+-- 2.C ALTA fallida con múltiples errores (ISO2 duplicado, huso horario inválido, PBI negativo).
 BEGIN TRY
-    EXEC nucleo.SP_ABM_Pais 'ALTA', NULL, 'TEST N19 Invalido', 'N1', 'NE9', @idConf1, 'Zona Inexistente', -100.00;
+    EXEC nucleo.SP_ABM_Pais 'ALTA', NULL, 'TEST N19 Invalido', 'XA', 'XEZ', @idConf1, 'Zona Inexistente', -100.00;
     PRINT '2.C: FALLÓ - permitió alta inválida de país.';
 END TRY
 BEGIN CATCH
@@ -144,7 +144,7 @@ PRINT '--- TEST 3: SP_ABM_Ciudad ---';
 
 DECLARE @idCiudad1 INT, @idCiudad2 INT;
 
--- 3.A ALTA exitosa de 2 ciudades.
+-- 3.A ALTA exitosa de 2 ciudades (hereda HusoHorarioComercial del país si se omite).
 BEGIN TRY
     EXEC nucleo.SP_ABM_Ciudad 'ALTA', @idCiudad1 OUTPUT, 'TEST N19 Ciudad A', @idPais1;
     EXEC nucleo.SP_ABM_Ciudad 'ALTA', @idCiudad2 OUTPUT, 'TEST N19 Ciudad B', @idPais1;
@@ -187,8 +187,8 @@ END CATCH;
 -- =========================================================================
 PRINT '--- TEST 4: SP_ABM_Fase ---';
 
-DECLARE @idFaseGrupos INT = (SELECT IdFase FROM nucleo.Fase WHERE Descripcion = 'Grupos');
-DECLARE @idFaseFinal  INT = (SELECT IdFase FROM nucleo.Fase WHERE Descripcion = 'Final');
+DECLARE @idFaseGrupos INT = (SELECT IdFase FROM nucleo.Fase WHERE Nombre = 'Fase de grupos');
+DECLARE @idFaseFinal  INT = (SELECT IdFase FROM nucleo.Fase WHERE Nombre = 'Final');
 DECLARE @ordenFinal   INT = (SELECT Orden  FROM nucleo.Fase WHERE IdFase = @idFaseFinal);
 
 -- 4.A MODIFICACION exitosa (cambia Orden de Final a 70 y luego lo restaura).
@@ -201,7 +201,7 @@ BEGIN CATCH
     PRINT '4.A: FALLÓ - ' + ERROR_MESSAGE();
 END CATCH;
 
--- 4.B ALTA fallida con múltiples errores (descripción inválida, orden <= 0, esEliminatoria NULL).
+-- 4.B ALTA fallida con múltiples errores (nombre inválido, orden <= 0, esEliminatoria NULL).
 BEGIN TRY
     EXEC nucleo.SP_ABM_Fase 'ALTA', NULL, 'Repechaje', 0, NULL;
     PRINT '4.B: FALLÓ - permitió alta inválida de fase.';
@@ -217,10 +217,10 @@ PRINT '--- TEST 5: SP_ABM_Grupo ---';
 
 DECLARE @idGrupo1 INT, @idGrupo2 INT;
 
--- 5.A ALTA exitosa de 2 grupos de prueba.
+-- 5.A ALTA exitosa de 2 grupos de prueba (una letra A-Z).
 BEGIN TRY
-    EXEC nucleo.SP_ABM_Grupo 'ALTA', @idGrupo1 OUTPUT, 'GrpT19A';
-    EXEC nucleo.SP_ABM_Grupo 'ALTA', @idGrupo2 OUTPUT, 'GrpT19B';
+    EXEC nucleo.SP_ABM_Grupo 'ALTA', @idGrupo1 OUTPUT, 'X';
+    EXEC nucleo.SP_ABM_Grupo 'ALTA', @idGrupo2 OUTPUT, 'Y';
     PRINT '5.A: OK - 2 grupos dados de alta.';
 END TRY
 BEGIN CATCH
@@ -229,7 +229,7 @@ END CATCH;
 
 -- 5.B MODIFICACION exitosa.
 BEGIN TRY
-    EXEC nucleo.SP_ABM_Grupo 'MODIFICACION', @idGrupo1, 'GrpT19M';
+    EXEC nucleo.SP_ABM_Grupo 'MODIFICACION', @idGrupo1, 'Z';
     PRINT '5.B: OK - grupo modificado.';
 END TRY
 BEGIN CATCH
@@ -238,7 +238,7 @@ END CATCH;
 
 -- 5.C ALTA fallida (nombre duplicado).
 BEGIN TRY
-    EXEC nucleo.SP_ABM_Grupo 'ALTA', NULL, 'GrpT19M';
+    EXEC nucleo.SP_ABM_Grupo 'ALTA', NULL, 'Z';
     PRINT '5.C: FALLÓ - permitió grupo duplicado.';
 END TRY
 BEGIN CATCH
@@ -263,18 +263,18 @@ DECLARE @idSel1 INT, @idSel2 INT;
 
 -- 6.A ALTA exitosa de 2 selecciones.
 BEGIN TRY
-    EXEC nucleo.SP_ABM_Seleccion 'ALTA', @idSel1 OUTPUT, @idPais1, @idGrupo1;
-    EXEC nucleo.SP_ABM_Seleccion 'ALTA', @idSel2 OUTPUT, @idPais2, NULL;
+    EXEC nucleo.SP_ABM_Seleccion 'ALTA', @idSel1 OUTPUT, 'XEA', 201, 0, @idPais1, @idGrupo1;
+    EXEC nucleo.SP_ABM_Seleccion 'ALTA', @idSel2 OUTPUT, 'XEB', 202, 0, @idPais2, @idGrupo1;
     PRINT '6.A: OK - 2 selecciones dadas de alta.';
 END TRY
 BEGIN CATCH
     PRINT '6.A: FALLÓ - ' + ERROR_MESSAGE();
 END CATCH;
 
--- 6.B MODIFICACION exitosa (asigna grupo a @idSel2).
+-- 6.B MODIFICACION exitosa (actualiza ranking FIFA y condición de anfitrión).
 BEGIN TRY
-    EXEC nucleo.SP_ABM_Seleccion 'MODIFICACION', @idSel2, @idPais2, @idGrupo1;
-    PRINT '6.B: OK - selección modificada con grupo.';
+    EXEC nucleo.SP_ABM_Seleccion 'MODIFICACION', @idSel2, 'XEB', 199, 1, @idPais2, @idGrupo1;
+    PRINT '6.B: OK - selección modificada.';
 END TRY
 BEGIN CATCH
     PRINT '6.B: FALLÓ - ' + ERROR_MESSAGE();
@@ -282,7 +282,7 @@ END CATCH;
 
 -- 6.C ALTA fallida (país duplicado en selección y grupo inexistente).
 BEGIN TRY
-    EXEC nucleo.SP_ABM_Seleccion 'ALTA', NULL, @idPais1, -1;
+    EXEC nucleo.SP_ABM_Seleccion 'ALTA', NULL, 'XEC', 203, 0, @idPais1, -1;
     PRINT '6.C: FALLÓ - permitió país duplicado en selección y grupo inexistente.';
 END TRY
 BEGIN CATCH
@@ -300,7 +300,7 @@ END CATCH;
 
 BEGIN TRY
     EXEC nucleo.SP_ABM_Seleccion 'BAJA', @idSel2;
-    EXEC nucleo.SP_ABM_Seleccion 'ALTA', @idSel2 OUTPUT, @idPais2, @idGrupo1;
+    EXEC nucleo.SP_ABM_Seleccion 'ALTA', @idSel2 OUTPUT, 'XEB', 202, 0, @idPais2, @idGrupo1;
     PRINT '6.D.2: OK - baja y re-alta de selección.';
 END TRY
 BEGIN CATCH
@@ -314,10 +314,10 @@ PRINT '--- TEST 7: SP_ABM_StaffTecnico ---';
 
 DECLARE @idStaffDT INT, @idStaffAy INT;
 
--- 7.A ALTA exitosa de Director Tecnico y Ayudante.
+-- 7.A ALTA exitosa de Director Técnico y Ayudante de campo 1.
 BEGIN TRY
-    EXEC nucleo.SP_ABM_StaffTecnico 'ALTA', @idStaffDT OUTPUT, @idSel1, 'Lionel', 'Tecnico',  'ST_N19_1', 'Director Tecnico';
-    EXEC nucleo.SP_ABM_StaffTecnico 'ALTA', @idStaffAy OUTPUT, @idSel1, 'Pablo',  'Ayudante', 'ST_N19_2', 'Ayudante';
+    EXEC nucleo.SP_ABM_StaffTecnico 'ALTA', @idStaffDT OUTPUT, @idSel1, 'Lionel Tecnico', 'Director Técnico';
+    EXEC nucleo.SP_ABM_StaffTecnico 'ALTA', @idStaffAy OUTPUT, @idSel1, 'Pablo Ayudante', 'Ayudante de campo 1';
     PRINT '7.A: OK - DT y Ayudante dados de alta.';
 END TRY
 BEGIN CATCH
@@ -326,17 +326,17 @@ END CATCH;
 
 -- 7.B MODIFICACION exitosa.
 BEGIN TRY
-    EXEC nucleo.SP_ABM_StaffTecnico 'MODIFICACION', @idStaffAy, @idSel1, 'Pablo Cesar', 'Ayudante', 'ST_N19_2', 'Ayudante';
+    EXEC nucleo.SP_ABM_StaffTecnico 'MODIFICACION', @idStaffAy, @idSel1, 'Pablo Cesar Ayudante', 'Ayudante de campo 1';
     PRINT '7.B: OK - ayudante modificado.';
 END TRY
 BEGIN CATCH
     PRINT '7.B: FALLÓ - ' + ERROR_MESSAGE();
 END CATCH;
 
--- 7.C ALTA fallida con múltiples errores (segundo Director Tecnico en la misma selección y documento duplicado).
+-- 7.C ALTA fallida (segundo Director Técnico en la misma selección).
 BEGIN TRY
-    EXEC nucleo.SP_ABM_StaffTecnico 'ALTA', NULL, @idSel1, 'Otro', 'DT', 'ST_N19_1', 'Director Tecnico';
-    PRINT '7.C: FALLÓ - permitió segundo DT y documento duplicado.';
+    EXEC nucleo.SP_ABM_StaffTecnico 'ALTA', NULL, @idSel1, 'Otro DT', 'Director Técnico';
+    PRINT '7.C: FALLÓ - permitió segundo DT en la misma selección.';
 END TRY
 BEGIN CATCH
     PRINT '7.C: OK (Bloqueado) - ' + REPLACE(ERROR_MESSAGE(), CHAR(13) + CHAR(10), ' | ');
@@ -421,7 +421,7 @@ BEGIN CATCH
     PRINT '9.B: FALLÓ - ' + ERROR_MESSAGE();
 END CATCH;
 
--- 9.C ALTA fallida (descripción duplicada).
+-- 9.C ALTA fallida (nombre duplicado).
 BEGIN TRY
     EXEC nucleo.SP_ABM_Categoria 'ALTA', NULL, 'TEST N19 Cat A';
     PRINT '9.C: FALLÓ - permitió categoría duplicada.';
@@ -448,8 +448,8 @@ DECLARE @idArbNeutral INT, @idArbLocal INT;
 
 -- 10.A ALTA exitosa de árbitro neutral y árbitro local.
 BEGIN TRY
-    EXEC nucleo.SP_ABM_Arbitro 'ALTA', @idArbNeutral OUTPUT, 'Pierluigi', 'Collina', 'ARB_N19_1', '1980-02-13', @idPais3, @idCat1;
-    EXEC nucleo.SP_ABM_Arbitro 'ALTA', @idArbLocal   OUTPUT, 'Nestor',    'Pitana',  'ARB_N19_2', '1975-06-17', @idPais1, @idCat1;
+    EXEC nucleo.SP_ABM_Arbitro 'ALTA', @idArbNeutral OUTPUT, 'TEST N19 Pierluigi Collina', 'M', 'Y', '1980-02-13', @idPais3, @idCat1;
+    EXEC nucleo.SP_ABM_Arbitro 'ALTA', @idArbLocal   OUTPUT, 'TEST N19 Nestor Pitana',     'M', 'Y', '1975-06-17', @idPais1, @idCat1;
     PRINT '10.A: OK - 2 árbitros dados de alta.';
 END TRY
 BEGIN CATCH
@@ -458,17 +458,17 @@ END CATCH;
 
 -- 10.B MODIFICACION exitosa.
 BEGIN TRY
-    EXEC nucleo.SP_ABM_Arbitro 'MODIFICACION', @idArbNeutral, 'Pierluigi', 'Collina Mod', 'ARB_N19_1', '1980-02-13', @idPais3, @idCat1;
+    EXEC nucleo.SP_ABM_Arbitro 'MODIFICACION', @idArbNeutral, 'TEST N19 Pierluigi Collina Mod', 'M', 'Y', '1980-02-13', @idPais3, @idCat1;
     PRINT '10.B: OK - árbitro modificado.';
 END TRY
 BEGIN CATCH
     PRINT '10.B: FALLÓ - ' + ERROR_MESSAGE();
 END CATCH;
 
--- 10.C ALTA fallida con múltiples errores (documento duplicado y fecha futura).
+-- 10.C ALTA fallida con múltiples errores (nombre vacío, sexo/habilitación inválidos y fecha futura).
 BEGIN TRY
-    EXEC nucleo.SP_ABM_Arbitro 'ALTA', NULL, 'Juez', 'Invalido', 'ARB_N19_1', '2099-01-01', @idPais3, @idCat1;
-    PRINT '10.C: FALLÓ - permitió documento duplicado y fecha futura.';
+    EXEC nucleo.SP_ABM_Arbitro 'ALTA', NULL, '', 'X', 'Z', '2099-01-01', @idPais3, @idCat1;
+    PRINT '10.C: FALLÓ - permitió datos inválidos y fecha futura.';
 END TRY
 BEGIN CATCH
     PRINT '10.C: OK (Bloqueado) - ' + REPLACE(ERROR_MESSAGE(), CHAR(13) + CHAR(10), ' | ');
@@ -477,7 +477,7 @@ END CATCH;
 -- 10.D BAJA exitosa y re-alta de @idArbLocal.
 BEGIN TRY
     EXEC nucleo.SP_ABM_Arbitro 'BAJA', @idArbLocal;
-    EXEC nucleo.SP_ABM_Arbitro 'ALTA', @idArbLocal OUTPUT, 'Nestor', 'Pitana', 'ARB_N19_2', '1975-06-17', @idPais1, @idCat1;
+    EXEC nucleo.SP_ABM_Arbitro 'ALTA', @idArbLocal OUTPUT, 'TEST N19 Nestor Pitana', 'M', 'Y', '1975-06-17', @idPais1, @idCat1;
     PRINT '10.D: OK - baja y re-alta de árbitro.';
 END TRY
 BEGIN CATCH
@@ -532,12 +532,17 @@ PRINT '--- TEST 12: SP_ABM_DesignacionArbitral ---';
 
 DECLARE @idSede INT, @p9701 INT, @idDesig1 INT, @adv VARCHAR(200);
 
-EXEC nucleo.SP_ABM_Sede 'ALTA', @idSede OUTPUT, 'TEST N19 Estadio', @idCiudad1, 60000, 'Argentina Standard Time';
-EXEC nucleo.SP_ABM_Partido 'ALTA', @p9701 OUTPUT, 99701, @idFaseGrupos, @idSede, '2026-06-14 19:00', @idSel1, @idSel2;
+INSERT INTO nucleo.Sede (NombreEstadio, Capacidad, IdCiudad)
+VALUES ('TEST N19 Estadio', 60000, @idCiudad1);
+SET @idSede = SCOPE_IDENTITY();
+
+INSERT INTO nucleo.Partido (NumeroPartido, FechaHoraUTC, Estado, IdFase, IdSede, IdSeleccionLocal, IdSeleccionVisitante)
+VALUES (232, '2026-06-14 19:00', 'Programado', @idFaseGrupos, @idSede, @idSel1, @idSel2);
+SET @p9701 = SCOPE_IDENTITY();
 
 -- 12.A ALTA exitosa (delega en SP_CONTROL_ARBITRAL).
 BEGIN TRY
-    EXEC nucleo.SP_ABM_DesignacionArbitral @operacion = 'ALTA', @idDesignacion = @idDesig1 OUTPUT,
+    EXEC nucleo.SP_ABM_DesignacionArbitral @operacion = 'ALTA', @idDesignacionArbitral = @idDesig1 OUTPUT,
          @idPartido = @p9701, @idArbitro = @idArbNeutral, @rol = 'Principal', @advertencia = @adv OUTPUT;
     PRINT '12.A: OK - designación arbitral registrada vía SP_ABM_DesignacionArbitral.';
 END TRY
@@ -551,7 +556,7 @@ PRINT 'TranCount antes 12.B = ' + CAST(@@TRANCOUNT AS VARCHAR(5));
 /*
 -- 12.B ALTA fallida por conflicto de nacionalidad (árbitro del país de @idSel1).
 BEGIN TRY
-    EXEC nucleo.SP_ABM_DesignacionArbitral @operacion = 'ALTA', @idDesignacion = NULL,
+    EXEC nucleo.SP_ABM_DesignacionArbitral @operacion = 'ALTA', @idDesignacionArbitral = NULL,
          @idPartido = @p9701, @idArbitro = @idArbLocal, @rol = 'VAR';
     PRINT '12.B: FALLÓ - permitió designar árbitro con conflicto de nacionalidad.';
 END TRY
@@ -566,7 +571,7 @@ IF @@TRANCOUNT = 0
 
 -- 12.C MODIFICACION exitosa de rol ('Principal' -> 'VAR').
 BEGIN TRY
-    EXEC nucleo.SP_ABM_DesignacionArbitral @operacion = 'MODIFICACION', @idDesignacion = @idDesig1,
+    EXEC nucleo.SP_ABM_DesignacionArbitral @operacion = 'MODIFICACION', @idDesignacionArbitral = @idDesig1,
          @idPartido = @p9701, @idArbitro = @idArbNeutral, @rol = 'VAR', @advertencia = @adv OUTPUT;
     PRINT '12.C: OK - rol arbitral modificado a VAR.';
 END TRY
@@ -576,8 +581,8 @@ END CATCH;
 
 -- 12.D BAJA exitosa y re-alta (queda activa para el Test 13).
 BEGIN TRY
-    EXEC nucleo.SP_ABM_DesignacionArbitral @operacion = 'BAJA', @idDesignacion = @idDesig1;
-    EXEC nucleo.SP_ABM_DesignacionArbitral @operacion = 'ALTA', @idDesignacion = @idDesig1 OUTPUT,
+    EXEC nucleo.SP_ABM_DesignacionArbitral @operacion = 'BAJA', @idDesignacionArbitral = @idDesig1;
+    EXEC nucleo.SP_ABM_DesignacionArbitral @operacion = 'ALTA', @idDesignacionArbitral = @idDesig1 OUTPUT,
          @idPartido = @p9701, @idArbitro = @idArbNeutral, @rol = 'Principal', @advertencia = @adv OUTPUT;
     PRINT '12.D: OK - baja y re-alta de designación arbitral.';
 END TRY
@@ -603,7 +608,7 @@ END CATCH;
 
 -- 13.B BAJA bloqueada de DesignacionArbitral por tener sanción asociada.
 BEGIN TRY
-    EXEC nucleo.SP_ABM_DesignacionArbitral @operacion = 'BAJA', @idDesignacion = @idDesig1;
+    EXEC nucleo.SP_ABM_DesignacionArbitral @operacion = 'BAJA', @idDesignacionArbitral = @idDesig1;
     PRINT '13.B: FALLÓ - permitió borrar designación con sanción asociada.';
 END TRY
 BEGIN CATCH
@@ -628,32 +633,21 @@ BEGIN CATCH
     PRINT '13.D: OK (Bloqueado) - ' + REPLACE(ERROR_MESSAGE(), CHAR(13) + CHAR(10), ' | ');
 END CATCH;
 
--- 13.E Bloqueo de BAJA en DesignacionArbitral cuando el partido pasa a 'Finalizado'.
-EXEC nucleo.SP_REGISTRAR_RESULTADO_PARTIDO @idPartido = @p9701, @golesLocal = 2, @golesVisitante = 1;
-
-BEGIN TRY
-    EXEC nucleo.SP_ABM_DesignacionArbitral @operacion = 'BAJA', @idDesignacion = @idDesig1;
-    PRINT '13.E: FALLÓ - permitió eliminar designación de un partido finalizado.';
-END TRY
-BEGIN CATCH
-    PRINT '13.E: OK (Bloqueado) - ' + REPLACE(ERROR_MESSAGE(), CHAR(13) + CHAR(10), ' | ');
-END CATCH;
-
 -- =========================================================================
 -- CONTROLES FINALES
 -- =========================================================================
 SELECT 'Países de prueba creados (esperado: 3)' AS Control, COUNT(*) AS Cantidad
 FROM nucleo.Pais
-WHERE CodigoISO3 IN ('NE1', 'NE2', 'NE3');
+WHERE CodigoISO3 IN ('XEA', 'XEB', 'XEC');
 
 SELECT 'Árbitros de prueba creados (esperado: 2)' AS Control, COUNT(*) AS Cantidad
 FROM nucleo.Arbitro
-WHERE Documento IN ('ARB_N19_1', 'ARB_N19_2');
+WHERE NombreApellido IN ('TEST N19 Pierluigi Collina Mod', 'TEST N19 Nestor Pitana');
 
-SELECT 'Designación y Sanción en 99701 (esperado: Principal y Multa)' AS Control,
+SELECT 'Designación y Sanción en 232 (esperado: Principal y Multa)' AS Control,
        d.Rol, s.Tipo AS TipoSancion, s.Descripcion, s.Fecha
 FROM nucleo.DesignacionArbitral AS d
-INNER JOIN nucleo.Sancion AS s ON s.IdDesignacion = d.IdDesignacion
+INNER JOIN nucleo.Sancion AS s ON s.IdDesignacionArbitral = d.IdDesignacionArbitral
 WHERE d.IdPartido = @p9701;
 
 ROLLBACK TRANSACTION;

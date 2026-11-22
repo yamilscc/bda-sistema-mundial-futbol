@@ -36,7 +36,7 @@ IF OBJECT_ID('publicidad.Anunciante', 'U') IS NULL
 CREATE TABLE publicidad.Anunciante (
     IdAnunciante INT IDENTITY(1,1) CONSTRAINT PK_Anunciante PRIMARY KEY,
     Nombre VARCHAR(100) NOT NULL CONSTRAINT UQ_Anunciante_Nombre UNIQUE,
-    IdPais INT NOT NULL
+    IdPais SMALLINT NOT NULL
 );
 GO
 
@@ -45,7 +45,7 @@ IF OBJECT_ID('publicidad.Pieza', 'U') IS NULL
 CREATE TABLE publicidad.Pieza (
     IdPieza INT IDENTITY(1,1) CONSTRAINT PK_Pieza PRIMARY KEY,
     IdAnunciante INT NOT NULL,
-    IdIdioma INT NOT NULL,
+    IdIdioma TINYINT NOT NULL,
     Titulo VARCHAR(100) NOT NULL,
     Descripcion VARCHAR(300) NULL,
 
@@ -60,7 +60,7 @@ GO
 IF OBJECT_ID('publicidad.OrientacionPais', 'U') IS NULL
 CREATE TABLE publicidad.OrientacionPais (
     IdPieza INT NOT NULL,
-    IdPais INT NOT NULL,
+    IdPais SMALLINT NOT NULL,
 
     CONSTRAINT PK_OrientacionPais PRIMARY KEY (IdPieza, IdPais),
 
@@ -74,7 +74,7 @@ GO
 -- vigentes al momento de la asignación, para poder facturar.
 IF OBJECT_ID('publicidad.EspacioPublicitario', 'U') IS NULL
 CREATE TABLE publicidad.EspacioPublicitario (
-    IdPartido INT NOT NULL,
+    IdPartido SMALLINT NOT NULL,
     NumeroEspacio TINYINT NOT NULL
         CONSTRAINT CK_EspacioPublicitario_NumeroEspacio CHECK (NumeroEspacio BETWEEN 1 AND 4),
     IdPieza INT NOT NULL,

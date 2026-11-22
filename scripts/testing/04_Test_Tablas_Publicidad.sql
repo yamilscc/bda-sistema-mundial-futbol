@@ -11,7 +11,7 @@ Integrantes:
 Objetivo: Pruebas de casos límite y restricciones DDL sobre las tablas del módulo de publicidad
           (script 04_Tablas_Publicidad.sql y FK de 06_FK_Cruzadas.sql): Moneda, Anunciante,
           Pieza, OrientacionPais y EspacioPublicitario.
-          Requiere ejecutados los scripts 01 a 09 (usa SP_ABM_Sede y SP_ABM_Partido).
+          Requiere ejecutados los scripts 01 a 06.
           Las inserciones se hacen directo sobre las tablas a propósito: se prueban las
           restricciones, no los stored procedures.
 */
@@ -35,21 +35,25 @@ DELETE FROM publicidad.Moneda;
 INSERT INTO nucleo.Confederacion (Nombre, Sigla) VALUES ('TEST PU4 Confederacion', 'TP4');
 DECLARE @idConf INT = (SELECT IdConfederacion FROM nucleo.Confederacion WHERE Sigla = 'TP4');
 
-INSERT INTO nucleo.Pais (Nombre, CodigoISO2, CodigoISO3, IdConfederacion, ZonaHoraria)
-VALUES ('TEST PU4 Pais 1', 'V1', 'VP1', @idConf, 'Argentina Standard Time'),
-       ('TEST PU4 Pais 2', 'V2', 'VP2', @idConf, 'Argentina Standard Time');
-DECLARE @idPais1 INT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'VP1');
-DECLARE @idPais2 INT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'VP2');
+INSERT INTO nucleo.Pais (Nombre, CodigoISO2, CodigoISO3, IdConfederacion, HusoHorarioComercial)
+VALUES ('TEST PU4 Pais 1', 'VA', 'VPA', @idConf, 'Argentina Standard Time'),
+       ('TEST PU4 Pais 2', 'VB', 'VPB', @idConf, 'Argentina Standard Time');
+DECLARE @idPais1 INT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'VPA');
+DECLARE @idPais2 INT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'VPB');
 
-INSERT INTO nucleo.Ciudad (Nombre, IdPais) VALUES ('TEST PU4 Ciudad', @idPais1);
+INSERT INTO nucleo.Ciudad (Nombre, HusoHorario, IdPais)
+VALUES ('TEST PU4 Ciudad', 'Argentina Standard Time', @idPais1);
 DECLARE @idCiudad INT = (SELECT IdCiudad FROM nucleo.Ciudad WHERE Nombre = 'TEST PU4 Ciudad');
 
 DECLARE @idSede INT, @idPartido INT;
-EXEC nucleo.SP_ABM_Sede @operacion = 'ALTA', @idSede = @idSede OUTPUT, @nombreEstadio = 'TEST PU4 Estadio',
-     @idCiudad = @idCiudad, @capacidad = 50000, @zonaHoraria = 'Argentina Standard Time';
+INSERT INTO nucleo.Sede (NombreEstadio, Capacidad, IdCiudad)
+VALUES ('TEST PU4 Estadio', 50000, @idCiudad);
+SET @idSede = SCOPE_IDENTITY();
 
-DECLARE @idFase INT = (SELECT IdFase FROM nucleo.Fase WHERE Descripcion = 'Octavos');
-EXEC nucleo.SP_ABM_Partido 'ALTA', @idPartido OUTPUT, 9401, @idFase, @idSede, '2026-06-12 20:00', NULL, NULL;
+DECLARE @idFase INT = (SELECT IdFase FROM nucleo.Fase WHERE Nombre = 'Octavos de final');
+INSERT INTO nucleo.Partido (NumeroPartido, FechaHoraUTC, Estado, IdFase, IdSede, IdSeleccionLocal, IdSeleccionVisitante)
+VALUES (236, '2026-06-12 20:00', 'Programado', @idFase, @idSede, NULL, NULL);
+SET @idPartido = SCOPE_IDENTITY();
 
 INSERT INTO nucleo.Idioma (Nombre) VALUES ('TEST PU4 Idioma');
 DECLARE @idIdioma INT = (SELECT IdIdioma FROM nucleo.Idioma WHERE Nombre = 'TEST PU4 Idioma');

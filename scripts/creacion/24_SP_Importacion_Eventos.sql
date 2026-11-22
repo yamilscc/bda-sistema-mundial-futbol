@@ -52,7 +52,7 @@ GO
 -- Procesa las filas de eventos.StagingEvento asociadas a @nombreArchivo:
 --   - PartidoRef          -> NumeroPartido (clave natural en nucleo.Partido)
 --   - TipoEvento          -> 'Gol' | 'Amonestacion'
---   - DocumentoSancionado -> Documento del autor del gol o sancionado (jugador/staff)
+--   - DocumentoSancionado -> Documento del autor del gol o sancionado (jugador/staff) o nombre y apellido
 --   - DocumentoAsistente  -> Documento del asistente (solo Gol, opcional)
 --   - MinutoTexto         -> Minuto entero (1..135)
 --   - DetalleTipo         -> TipoGol ('Jugada', 'Penal', ...) o TipoTarjeta ('Amarilla', 'Roja directa')
@@ -93,7 +93,7 @@ BEGIN
         IdFilaStaging       INT          NOT NULL,
         PartidoRef          VARCHAR(100) NULL,
         TipoEvento          VARCHAR(50)  NULL,
-        DocumentoSancionado VARCHAR(50)  NULL,
+        DocumentoSancionado VARCHAR(200)  NULL,
         DocumentoAsistente  VARCHAR(50)  NULL,
         MinutoTexto         VARCHAR(20)  NULL,
         DetalleTipo         VARCHAR(100) NULL,
@@ -123,7 +123,7 @@ BEGIN
             @idFilaStaging   INT,
             @partidoRef      VARCHAR(100),
             @tipoEvento      VARCHAR(50),
-            @docSancionado   VARCHAR(50),
+            @docSancionado   VARCHAR(200),
             @docAsistente    VARCHAR(50),
             @minutoTexto     VARCHAR(20),
             @detalleTipo     VARCHAR(100),
@@ -259,7 +259,7 @@ BEGIN
                 IF @idJugadorAutor IS NULL
                     SELECT @idStaffTecnico = IdStaffTecnico
                     FROM nucleo.StaffTecnico
-                    WHERE Documento = @docSancionado;
+                    WHERE NombreApellido = @docSancionado;
 
                 IF @idJugadorAutor IS NULL AND @idStaffTecnico IS NULL
                     THROW 52000, N'No existe jugador ni integrante del staff técnico con el DocumentoSancionado informado.', 1;

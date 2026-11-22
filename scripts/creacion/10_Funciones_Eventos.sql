@@ -160,7 +160,7 @@ BEGIN
            @idLocal        = p.IdSeleccionLocal,
            @idVisitante    = p.IdSeleccionVisitante,
            @fechaHoraUTC   = p.FechaHoraUTC,
-           @fechaLocal     = CAST(p.FechaHoraLocal AS DATE)
+           @fechaLocal     = CAST(p.FechaHoraUTC AS DATE)
     FROM nucleo.Partido AS p
     INNER JOIN nucleo.Fase AS f ON f.IdFase = p.IdFase
     WHERE p.IdPartido = @idPartido;
@@ -316,7 +316,7 @@ BEGIN
            @idLocal      = p.IdSeleccionLocal,
            @idVisitante  = p.IdSeleccionVisitante,
            @fechaHoraUTC = p.FechaHoraUTC,
-           @fechaLocal   = CAST(p.FechaHoraLocal AS DATE)
+           @fechaLocal   = CAST(p.FechaHoraUTC AS DATE)
     FROM nucleo.Partido AS p
     WHERE p.IdPartido = @idPartido;
 

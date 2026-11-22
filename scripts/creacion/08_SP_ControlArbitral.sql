@@ -57,7 +57,7 @@ BEGIN
         BEGIN TRANSACTION;
 
         SELECT @idFase = p.IdFase,
-               @descripcionFase = f.Descripcion
+               @descripcionFase = f.Nombre
         FROM nucleo.Partido AS p
         INNER JOIN nucleo.Fase AS f ON f.IdFase = p.IdFase
         WHERE p.IdPartido = @idPartido;
@@ -67,8 +67,8 @@ BEGIN
         WHERE a.IdArbitro = @idArbitro;
 
         -- ---- Validaciones (se acumulan todas) --------------------------------
-        IF @rol IS NULL OR @rol NOT IN ('Principal', 'Asistente', 'Cuarto', 'VAR')
-            SET @errores += N'- Rol inválido. Valores permitidos: Principal, Asistente, Cuarto, VAR.' + @salto;
+        IF @rol IS NULL OR @rol NOT IN ('Principal', 'Asistente 1', 'Asistente 2', 'Cuarto', 'VAR')
+            SET @errores += N'- Rol inválido. Valores permitidos: Principal, Asistente 1, Asistente 2, Cuarto, VAR.' + @salto;
         ELSE
             SET @rolValido = 1;
 
@@ -84,7 +84,7 @@ BEGIN
             -- Impedimento: el árbitro no puede ser del país de ninguna de las selecciones del partido.
             IF EXISTS (
                 SELECT 1
-                FROM jugadores.fn_SeleccionesDelPartido(@idPartido) AS sp
+                FROM nucleo.fn_SeleccionesDelPartido(@idPartido) AS sp
                 INNER JOIN nucleo.Seleccion AS s ON s.IdSeleccion = sp.IdSeleccion
                 WHERE s.IdPais = @idPaisArbitro
             )
@@ -103,7 +103,7 @@ BEGIN
         -- Cupo por rol: depende de que exista el partido y de que el rol sea válido.
         IF @idFase IS NOT NULL AND @rolValido = 1
         BEGIN
-            SET @maxPorRol = CASE @rol WHEN 'Asistente' THEN 2 ELSE 1 END;
+            SET @maxPorRol = 1;
 
             IF (
                 SELECT COUNT(*)
@@ -134,11 +134,11 @@ BEGIN
 
     -- Advertencia desde dieciseisavos: el país del árbitro tiene una selección
     -- que disputa otra llave de la misma fase y podría cruzarse con las de este partido.
-    IF @descripcionFase IN ('Dieciseisavos', 'Octavos', 'Cuartos', 'Semifinal', 'Tercer puesto', 'Final')
+    IF @descripcionFase IN ('Dieciseisavos de final', 'Octavos de final', 'Cuartos de final', 'Semifinal', 'Tercer puesto', 'Final')
        AND EXISTS (
             SELECT 1
             FROM nucleo.Partido AS p
-            CROSS APPLY jugadores.fn_SeleccionesDelPartido(p.IdPartido) AS sp
+            CROSS APPLY nucleo.fn_SeleccionesDelPartido(p.IdPartido) AS sp
             INNER JOIN nucleo.Seleccion AS s ON s.IdSeleccion = sp.IdSeleccion
             WHERE p.IdFase = @idFase
               AND p.IdPartido <> @idPartido

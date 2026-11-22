@@ -9,7 +9,7 @@ Integrantes:
 - Torczuk, Elías Alexei
 - Canseco Carrizo, Yamil Simón
 Objetivo: Pruebas de casos límite y restricciones DDL sobre las tablas del módulo de eventos.
-          Requiere ejecutados los scripts 01 a 09 (usa SP_ABM_Sede y SP_ABM_Partido).
+          Requiere ejecutados los scripts 01 a 06.
 */
 
 USE MundialFutbol;
@@ -49,26 +49,35 @@ DECLARE @idTarjetaAm  INT = (SELECT IdTarjeta FROM eventos.Tarjeta WHERE Tipo = 
 INSERT INTO nucleo.Confederacion (Nombre, Sigla) VALUES ('TEST EV3 Confederacion', 'TE3');
 DECLARE @idConf INT = (SELECT IdConfederacion FROM nucleo.Confederacion WHERE Sigla = 'TE3');
 
-INSERT INTO nucleo.Pais (Nombre, CodigoISO2, CodigoISO3, IdConfederacion, ZonaHoraria)
-VALUES ('TEST EV3 Pais', 'Y1', 'YE1', @idConf, 'Argentina Standard Time');
-DECLARE @idPais INT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'YE1');
+INSERT INTO nucleo.Pais (Nombre, CodigoISO2, CodigoISO3, IdConfederacion, HusoHorarioComercial)
+VALUES ('TEST EV3 Pais', 'YA', 'YEA', @idConf, 'Argentina Standard Time');
+DECLARE @idPais INT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'YEA');
 
-INSERT INTO nucleo.Seleccion (IdPais) VALUES (@idPais);
+IF NOT EXISTS (SELECT 1 FROM nucleo.Grupo WHERE Nombre = 'Z')
+    INSERT INTO nucleo.Grupo (Nombre) VALUES ('Z');
+DECLARE @idGrupo INT = (SELECT IdGrupo FROM nucleo.Grupo WHERE Nombre = 'Z');
+
+INSERT INTO nucleo.Seleccion (CodigoFIFA, RankingFIFA, IdPais, IdGrupo)
+VALUES ('YEA', 101, @idPais, @idGrupo);
 DECLARE @idSel INT = (SELECT IdSeleccion FROM nucleo.Seleccion WHERE IdPais = @idPais);
 
-INSERT INTO nucleo.Ciudad (Nombre, IdPais) VALUES ('TEST EV3 Ciudad', @idPais);
+INSERT INTO nucleo.Ciudad (Nombre, HusoHorario, IdPais)
+VALUES ('TEST EV3 Ciudad', 'Argentina Standard Time', @idPais);
 DECLARE @idCiudad INT = (SELECT IdCiudad FROM nucleo.Ciudad WHERE Nombre = 'TEST EV3 Ciudad');
 
 DECLARE @idSede INT, @idPartido INT;
-EXEC nucleo.SP_ABM_Sede @operacion = 'ALTA', @idSede = @idSede OUTPUT, @nombreEstadio = 'TEST EV3 Estadio',
-     @idCiudad = @idCiudad, @capacidad = 50000, @zonaHoraria = 'Argentina Standard Time';
+INSERT INTO nucleo.Sede (NombreEstadio, Capacidad, IdCiudad)
+VALUES ('TEST EV3 Estadio', 50000, @idCiudad);
+SET @idSede = SCOPE_IDENTITY();
 
-DECLARE @idFase INT = (SELECT IdFase FROM nucleo.Fase WHERE Descripcion = 'Octavos');
-EXEC nucleo.SP_ABM_Partido 'ALTA', @idPartido OUTPUT, 9301, @idFase, @idSede, '2026-06-12 20:00', NULL, NULL;
+DECLARE @idFase INT = (SELECT IdFase FROM nucleo.Fase WHERE Nombre = 'Octavos de final');
+INSERT INTO nucleo.Partido (NumeroPartido, FechaHoraUTC, Estado, IdFase, IdSede, IdSeleccionLocal, IdSeleccionVisitante)
+VALUES (235, '2026-06-12 20:00', 'Programado', @idFase, @idSede, NULL, NULL);
+SET @idPartido = SCOPE_IDENTITY();
 
-INSERT INTO nucleo.StaffTecnico (IdSeleccion, Nombre, Apellido, Documento, Rol)
-VALUES (@idSel, 'Staff', 'Uno', 'TEST_EV3_STAFF', 'Ayudante');
-DECLARE @idStaff INT = (SELECT IdStaffTecnico FROM nucleo.StaffTecnico WHERE Documento = 'TEST_EV3_STAFF');
+INSERT INTO nucleo.StaffTecnico (IdSeleccion, NombreApellido, Rol)
+VALUES (@idSel, 'TEST EV3 Staff Uno', 'Ayudante de campo 1');
+DECLARE @idStaff INT = SCOPE_IDENTITY();
 
 -- =========================================================================
 -- TEST 1: ReglaSuspension - Consistencia entre Criterio y CantidadAmarillas
@@ -91,7 +100,7 @@ BEGIN CATCH
     PRINT 'TEST 1.B OK (Bloqueado): ' + ERROR_MESSAGE();
 END CATCH;
 
--- 1.C Caso límite fallido: Roja Directa informando CantidadAmarillas (viola CK_ReglaSuspension_Amarillas).
+-- 1.C Caso límite fallido: Doble Amarilla informando CantidadAmarillas (viola CK_ReglaSuspension_Amarillas).
 -- Resultado esperado: Error por restricción CHECK CK_ReglaSuspension_Amarillas.
 BEGIN TRY
     INSERT INTO eventos.ReglaSuspension (Criterio, CantidadAmarillas, PartidosSuspension)

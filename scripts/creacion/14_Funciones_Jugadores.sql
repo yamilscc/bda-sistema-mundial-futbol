@@ -265,9 +265,9 @@ BEGIN
             @arquerosTitulares INT;
 
     SELECT @idPartido         = f.IdPartido,
-           @estadoPartido     = p.Estado,
-           @fechaLocalPartido = CAST(p.FechaHoraLocal AS DATE),
-           @idSelFormacion    = CASE WHEN f.Localia = 'Local' THEN p.IdSeleccionLocal ELSE p.IdSeleccionVisitante END
+       @estadoPartido     = p.Estado,
+       @fechaLocalPartido = CAST(p.FechaHoraUTC AS DATE),
+       @idSelFormacion    = CASE WHEN f.Localia = 'Local' THEN p.IdSeleccionLocal ELSE p.IdSeleccionVisitante END
     FROM jugadores.Formacion AS f
     INNER JOIN nucleo.Partido AS p ON p.IdPartido = f.IdPartido
     WHERE f.IdFormacion = @idFormacion;

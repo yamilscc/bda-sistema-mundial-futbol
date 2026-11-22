@@ -61,7 +61,7 @@ GO
 IF OBJECT_ID('jugadores.Convocatoria', 'U') IS NULL
 CREATE TABLE jugadores.Convocatoria (
     IdConvocatoria INT IDENTITY(1,1) CONSTRAINT PK_Convocatoria PRIMARY KEY,
-    IdSeleccion INT NOT NULL,
+    IdSeleccion TINYINT NOT NULL,
     IdJugador INT NOT NULL,
     Dorsal INT NOT NULL CONSTRAINT CK_Convocatoria_Dorsal CHECK (Dorsal BETWEEN 1 AND 99),
     FechaAlta DATE NOT NULL CONSTRAINT DF_Convocatoria_FechaAlta DEFAULT (CAST(GETDATE() AS DATE)),
@@ -90,7 +90,7 @@ GO
 IF OBJECT_ID('jugadores.Formacion', 'U') IS NULL
 CREATE TABLE jugadores.Formacion (
     IdFormacion INT IDENTITY(1,1) CONSTRAINT PK_Formacion PRIMARY KEY,
-    IdPartido INT NOT NULL,
+    IdPartido SMALLINT NOT NULL,
     Localia VARCHAR(9) NOT NULL CONSTRAINT CK_Formacion_Localia CHECK (Localia IN ('Visitante', 'Local')),
     EsquemaTactico VARCHAR(10) NOT NULL
         CONSTRAINT CK_Formacion_Esquema CHECK (EsquemaTactico LIKE '[1-9]-[1-9]-[1-9]' 
@@ -124,7 +124,7 @@ GO
 IF OBJECT_ID('jugadores.Sustitucion', 'U') IS NULL
 CREATE TABLE jugadores.Sustitucion (
     IdSustitucion     INT IDENTITY(1,1) CONSTRAINT PK_Sustitucion PRIMARY KEY,
-    IdPartido         INT         NOT NULL,
+    IdPartido         SMALLINT         NOT NULL,
     IdJugadorSaliente INT         NOT NULL,
     IdJugadorEntrante INT         NOT NULL,
     Minuto            INT         NOT NULL CONSTRAINT CK_Sustitucion_Minuto CHECK (Minuto > 0),

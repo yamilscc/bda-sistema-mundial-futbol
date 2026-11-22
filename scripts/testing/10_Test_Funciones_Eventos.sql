@@ -30,9 +30,9 @@ GO
 -- =========================================================================
 -- LIMPIEZA PREVIA
 -- =========================================================================
-DELETE FROM eventos.Gol          WHERE IdPartido IN (SELECT IdPartido FROM nucleo.Partido WHERE NumeroPartido BETWEEN 9200 AND 9299);
-DELETE FROM eventos.Amonestacion WHERE IdPartido IN (SELECT IdPartido FROM nucleo.Partido WHERE NumeroPartido BETWEEN 9200 AND 9299);
-DELETE FROM nucleo.Partido       WHERE NumeroPartido BETWEEN 9200 AND 9299;
+DELETE FROM eventos.Gol          WHERE IdPartido IN (SELECT IdPartido FROM nucleo.Partido WHERE NumeroPartido BETWEEN 240 AND 249);
+DELETE FROM eventos.Amonestacion WHERE IdPartido IN (SELECT IdPartido FROM nucleo.Partido WHERE NumeroPartido BETWEEN 240 AND 249);
+DELETE FROM nucleo.Partido       WHERE NumeroPartido BETWEEN 240 AND 249;
 DELETE FROM jugadores.Convocatoria WHERE IdJugador IN (SELECT IdJugador FROM jugadores.Jugador WHERE Documento LIKE 'TEST_EV%');
 DELETE FROM jugadores.Jugador    WHERE Documento LIKE 'TEST_EV%';
 DELETE FROM nucleo.Seleccion     WHERE IdPais IN (SELECT IdPais FROM nucleo.Pais WHERE Nombre LIKE 'TEST EV%');
@@ -71,27 +71,32 @@ DECLARE @tarRoja  INT = (SELECT IdTarjeta FROM eventos.Tarjeta WHERE Tipo = 'Roj
 INSERT INTO nucleo.Confederacion (Nombre, Sigla) VALUES ('TEST EV Confederacion', 'TEV');
 DECLARE @idConf INT = (SELECT IdConfederacion FROM nucleo.Confederacion WHERE Sigla = 'TEV');
 
-INSERT INTO nucleo.Pais (Nombre, CodigoISO2, CodigoISO3, IdConfederacion, ZonaHoraria)
-VALUES ('TEST EV Pais 1', 'X1', 'XE1', @idConf, 'Argentina Standard Time'),
-       ('TEST EV Pais 2', 'X2', 'XE2', @idConf, 'Argentina Standard Time'),
-       ('TEST EV Pais 3', 'X3', 'XE3', @idConf, 'Argentina Standard Time'),
-       ('TEST EV Pais 4', 'X4', 'XE4', @idConf, 'Argentina Standard Time');
+INSERT INTO nucleo.Pais (Nombre, CodigoISO2, CodigoISO3, IdConfederacion, HusoHorarioComercial)
+VALUES ('TEST EV Pais 1', 'XA', 'XEA', @idConf, 'Argentina Standard Time'),
+       ('TEST EV Pais 2', 'XB', 'XEB', @idConf, 'Argentina Standard Time'),
+       ('TEST EV Pais 3', 'XC', 'XEC', @idConf, 'Argentina Standard Time'),
+       ('TEST EV Pais 4', 'XD', 'XED', @idConf, 'Argentina Standard Time');
 
-INSERT INTO nucleo.Seleccion (IdPais)
-SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 IN ('XE1', 'XE2', 'XE3', 'XE4');
+IF NOT EXISTS (SELECT 1 FROM nucleo.Grupo WHERE Nombre = 'Z')
+    INSERT INTO nucleo.Grupo (Nombre) VALUES ('Z');
+DECLARE @idGrupo INT = (SELECT IdGrupo FROM nucleo.Grupo WHERE Nombre = 'Z');
 
-DECLARE @idSel1 INT = (SELECT s.IdSeleccion FROM nucleo.Seleccion AS s INNER JOIN nucleo.Pais AS p ON p.IdPais = s.IdPais WHERE p.CodigoISO3 = 'XE1');
-DECLARE @idSel2 INT = (SELECT s.IdSeleccion FROM nucleo.Seleccion AS s INNER JOIN nucleo.Pais AS p ON p.IdPais = s.IdPais WHERE p.CodigoISO3 = 'XE2');
-DECLARE @idSel3 INT = (SELECT s.IdSeleccion FROM nucleo.Seleccion AS s INNER JOIN nucleo.Pais AS p ON p.IdPais = s.IdPais WHERE p.CodigoISO3 = 'XE3');
-DECLARE @idSel4 INT = (SELECT s.IdSeleccion FROM nucleo.Seleccion AS s INNER JOIN nucleo.Pais AS p ON p.IdPais = s.IdPais WHERE p.CodigoISO3 = 'XE4');
+INSERT INTO nucleo.Seleccion (CodigoFIFA, RankingFIFA, IdPais, IdGrupo)
+SELECT CodigoISO3, 100 + ROW_NUMBER() OVER (ORDER BY IdPais), IdPais, @idGrupo
+FROM nucleo.Pais WHERE CodigoISO3 IN ('XEA', 'XEB', 'XEC', 'XED');
 
-DECLARE @idPais1 INT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'XE1');
-INSERT INTO nucleo.Ciudad (Nombre, IdPais) VALUES ('TEST EV Ciudad', @idPais1);
+DECLARE @idSel1 INT = (SELECT s.IdSeleccion FROM nucleo.Seleccion AS s INNER JOIN nucleo.Pais AS p ON p.IdPais = s.IdPais WHERE p.CodigoISO3 = 'XEA');
+DECLARE @idSel2 INT = (SELECT s.IdSeleccion FROM nucleo.Seleccion AS s INNER JOIN nucleo.Pais AS p ON p.IdPais = s.IdPais WHERE p.CodigoISO3 = 'XEB');
+DECLARE @idSel3 INT = (SELECT s.IdSeleccion FROM nucleo.Seleccion AS s INNER JOIN nucleo.Pais AS p ON p.IdPais = s.IdPais WHERE p.CodigoISO3 = 'XEC');
+DECLARE @idSel4 INT = (SELECT s.IdSeleccion FROM nucleo.Seleccion AS s INNER JOIN nucleo.Pais AS p ON p.IdPais = s.IdPais WHERE p.CodigoISO3 = 'XED');
+
+DECLARE @idPais1 INT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'XEA');
+INSERT INTO nucleo.Ciudad (Nombre, HusoHorario, IdPais) VALUES ('TEST EV Ciudad', 'Argentina Standard Time', @idPais1);
 DECLARE @idCiudad INT = (SELECT IdCiudad FROM nucleo.Ciudad WHERE Nombre = 'TEST EV Ciudad');
 
 DECLARE @idSede INT;
-EXEC nucleo.SP_ABM_Sede @operacion = 'ALTA', @idSede = @idSede OUTPUT, @nombreEstadio = 'TEST EV Estadio',
-     @idCiudad = @idCiudad, @capacidad = 60000, @zonaHoraria = 'Argentina Standard Time';
+INSERT INTO nucleo.Sede (NombreEstadio, Capacidad, IdCiudad) VALUES ('TEST EV Estadio', 60000, @idCiudad);
+SET @idSede = SCOPE_IDENTITY();
 
 -- Jugadores convocados.
 INSERT INTO jugadores.Jugador (Nombre, Apellido, Documento, Sexo, Posicion, IdClub)
@@ -107,16 +112,23 @@ INSERT INTO jugadores.Convocatoria (IdSeleccion, IdJugador, Dorsal)
 VALUES (@idSel1, @idJ1, 9), (@idSel1, @idJ2, 4), (@idSel2, @idJ3, 9);
 
 -- Partidos.
-DECLARE @idFase INT = (SELECT IdFase FROM nucleo.Fase WHERE Descripcion = 'Octavos');
+DECLARE @idFase INT = (SELECT IdFase FROM nucleo.Fase WHERE Nombre = 'Octavos de final');
 DECLARE @p9201 INT, @p9202 INT, @p9203 INT, @p9204 INT, @p9205 INT, @p9206 INT, @p9207 INT;
 
-EXEC nucleo.SP_ABM_Partido 'ALTA', @p9201 OUTPUT, 9201, @idFase, @idSede, '2026-06-12 20:00', @idSel1, @idSel2;
-EXEC nucleo.SP_ABM_Partido 'ALTA', @p9202 OUTPUT, 9202, @idFase, @idSede, '2026-06-16 20:00', @idSel1, @idSel2;
-EXEC nucleo.SP_ABM_Partido 'ALTA', @p9203 OUTPUT, 9203, @idFase, @idSede, '2026-06-20 20:00', @idSel1, @idSel2;
-EXEC nucleo.SP_ABM_Partido 'ALTA', @p9204 OUTPUT, 9204, @idFase, @idSede, '2026-06-24 20:00', @idSel1, @idSel2;
-EXEC nucleo.SP_ABM_Partido 'ALTA', @p9205 OUTPUT, 9205, @idFase, @idSede, '2026-06-28 20:00', @idSel1, @idSel2;
-EXEC nucleo.SP_ABM_Partido 'ALTA', @p9206 OUTPUT, 9206, @idFase, @idSede, '2026-07-02 20:00', @idSel1, @idSel2;
-EXEC nucleo.SP_ABM_Partido 'ALTA', @p9207 OUTPUT, 9207, @idFase, @idSede, '2026-06-21 20:00', @idSel3, @idSel4;
+INSERT INTO nucleo.Partido (NumeroPartido, FechaHoraUTC, Estado, IdFase, IdSede, IdSeleccionLocal, IdSeleccionVisitante)
+VALUES (241, '2026-06-12 20:00', 'Programado', @idFase, @idSede, @idSel1, @idSel2); SET @p9201 = SCOPE_IDENTITY();
+INSERT INTO nucleo.Partido (NumeroPartido, FechaHoraUTC, Estado, IdFase, IdSede, IdSeleccionLocal, IdSeleccionVisitante)
+VALUES (242, '2026-06-16 20:00', 'Programado', @idFase, @idSede, @idSel1, @idSel2); SET @p9202 = SCOPE_IDENTITY();
+INSERT INTO nucleo.Partido (NumeroPartido, FechaHoraUTC, Estado, IdFase, IdSede, IdSeleccionLocal, IdSeleccionVisitante)
+VALUES (243, '2026-06-20 20:00', 'Programado', @idFase, @idSede, @idSel1, @idSel2); SET @p9203 = SCOPE_IDENTITY();
+INSERT INTO nucleo.Partido (NumeroPartido, FechaHoraUTC, Estado, IdFase, IdSede, IdSeleccionLocal, IdSeleccionVisitante)
+VALUES (244, '2026-06-24 20:00', 'Programado', @idFase, @idSede, @idSel1, @idSel2); SET @p9204 = SCOPE_IDENTITY();
+INSERT INTO nucleo.Partido (NumeroPartido, FechaHoraUTC, Estado, IdFase, IdSede, IdSeleccionLocal, IdSeleccionVisitante)
+VALUES (245, '2026-06-28 20:00', 'Programado', @idFase, @idSede, @idSel1, @idSel2); SET @p9205 = SCOPE_IDENTITY();
+INSERT INTO nucleo.Partido (NumeroPartido, FechaHoraUTC, Estado, IdFase, IdSede, IdSeleccionLocal, IdSeleccionVisitante)
+VALUES (246, '2026-07-02 20:00', 'Programado', @idFase, @idSede, @idSel1, @idSel2); SET @p9206 = SCOPE_IDENTITY();
+INSERT INTO nucleo.Partido (NumeroPartido, FechaHoraUTC, Estado, IdFase, IdSede, IdSeleccionLocal, IdSeleccionVisitante)
+VALUES (247, '2026-06-21 20:00', 'Programado', @idFase, @idSede, @idSel3, @idSel4); SET @p9207 = SCOPE_IDENTITY();
 
 -- Goles del partido 9201: 2 a 2 en juego (uno en contra) y tanda 2 a 1 para Sel1.
 INSERT INTO eventos.Gol (IdPartido, IdJugadorAutor, IdJugadorAsistencia, IdTipoGol, IdPeriodo, Minuto)
@@ -192,9 +204,9 @@ GO
 -- =========================================================================
 -- LIMPIEZA FINAL
 -- =========================================================================
-DELETE FROM eventos.Gol          WHERE IdPartido IN (SELECT IdPartido FROM nucleo.Partido WHERE NumeroPartido BETWEEN 9200 AND 9299);
-DELETE FROM eventos.Amonestacion WHERE IdPartido IN (SELECT IdPartido FROM nucleo.Partido WHERE NumeroPartido BETWEEN 9200 AND 9299);
-DELETE FROM nucleo.Partido       WHERE NumeroPartido BETWEEN 9200 AND 9299;
+DELETE FROM eventos.Gol          WHERE IdPartido IN (SELECT IdPartido FROM nucleo.Partido WHERE NumeroPartido BETWEEN 240 AND 249);
+DELETE FROM eventos.Amonestacion WHERE IdPartido IN (SELECT IdPartido FROM nucleo.Partido WHERE NumeroPartido BETWEEN 240 AND 249);
+DELETE FROM nucleo.Partido       WHERE NumeroPartido BETWEEN 240 AND 249;
 DELETE FROM jugadores.Convocatoria WHERE IdJugador IN (SELECT IdJugador FROM jugadores.Jugador WHERE Documento LIKE 'TEST_EV%');
 DELETE FROM jugadores.Jugador    WHERE Documento LIKE 'TEST_EV%';
 DELETE FROM nucleo.Seleccion     WHERE IdPais IN (SELECT IdPais FROM nucleo.Pais WHERE Nombre LIKE 'TEST EV%');

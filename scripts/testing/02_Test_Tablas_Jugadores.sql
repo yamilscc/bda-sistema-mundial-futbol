@@ -12,7 +12,7 @@ Objetivo: Probar las restricciones DDL (CHECK, UNIQUE, PK y FK) de las tablas de
           de jugadores creadas en 02_Tablas_Jugadores_y_Alineaciones.sql:
           ReglaConvocados, ReglaCambios, Club, Jugador, Convocatoria, Baja,
           Formacion, FormacionJugador y Sustitucion.
-          Requiere ejecutados los scripts 01 a 09 (usa SP_ABM_Sede y SP_ABM_Partido).
+          Requiere ejecutados los scripts 01 y 02.
           Todo corre dentro de una transacción que se deshace al final (ROLLBACK).
 */
 
@@ -27,26 +27,36 @@ BEGIN TRANSACTION;
 INSERT INTO nucleo.Confederacion (Nombre, Sigla) VALUES ('TEST JUG Confederacion', 'TJC');
 DECLARE @idConf INT = (SELECT IdConfederacion FROM nucleo.Confederacion WHERE Sigla = 'TJC');
 
-INSERT INTO nucleo.Pais (Nombre, CodigoISO2, CodigoISO3, IdConfederacion, ZonaHoraria)
-VALUES ('TEST JUG Pais 1', 'J1', 'TJ1', @idConf, 'Argentina Standard Time'),
-       ('TEST JUG Pais 2', 'J2', 'TJ2', @idConf, 'Argentina Standard Time');
+INSERT INTO nucleo.Pais (Nombre, CodigoISO2, CodigoISO3, IdConfederacion, HusoHorarioComercial)
+VALUES ('TEST JUG Pais 1', 'JA', 'TJA', @idConf, 'Argentina Standard Time'),
+       ('TEST JUG Pais 2', 'JB', 'TJB', @idConf, 'Argentina Standard Time');
 
-DECLARE @idPais1 INT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'TJ1');
-DECLARE @idPais2 INT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'TJ2');
+DECLARE @idPais1 INT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'TJA');
+DECLARE @idPais2 INT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'TJB');
 
-INSERT INTO nucleo.Seleccion (IdPais) VALUES (@idPais1), (@idPais2);
+IF NOT EXISTS (SELECT 1 FROM nucleo.Grupo WHERE Nombre = 'Z')
+    INSERT INTO nucleo.Grupo (Nombre) VALUES ('Z');
+DECLARE @idGrupo INT = (SELECT IdGrupo FROM nucleo.Grupo WHERE Nombre = 'Z');
+
+INSERT INTO nucleo.Seleccion (CodigoFIFA, RankingFIFA, IdPais, IdGrupo)
+VALUES ('TJA', 101, @idPais1, @idGrupo),
+       ('TJB', 102, @idPais2, @idGrupo);
 DECLARE @idSel1 INT = (SELECT IdSeleccion FROM nucleo.Seleccion WHERE IdPais = @idPais1);
 DECLARE @idSel2 INT = (SELECT IdSeleccion FROM nucleo.Seleccion WHERE IdPais = @idPais2);
 
-INSERT INTO nucleo.Ciudad (Nombre, IdPais) VALUES ('TEST JUG Ciudad', @idPais1);
+INSERT INTO nucleo.Ciudad (Nombre, HusoHorario, IdPais)
+VALUES ('TEST JUG Ciudad', 'Argentina Standard Time', @idPais1);
 DECLARE @idCiudad INT = (SELECT IdCiudad FROM nucleo.Ciudad WHERE Nombre = 'TEST JUG Ciudad');
 
 DECLARE @idSede INT, @idPartido INT;
-EXEC nucleo.SP_ABM_Sede @operacion = 'ALTA', @idSede = @idSede OUTPUT, @nombreEstadio = 'TEST JUG Estadio',
-     @idCiudad = @idCiudad, @capacidad = 50000, @zonaHoraria = 'Argentina Standard Time';
+INSERT INTO nucleo.Sede (NombreEstadio, Capacidad, IdCiudad)
+VALUES ('TEST JUG Estadio', 50000, @idCiudad);
+SET @idSede = SCOPE_IDENTITY();
 
-DECLARE @idFase INT = (SELECT IdFase FROM nucleo.Fase WHERE Descripcion = 'Octavos');
-EXEC nucleo.SP_ABM_Partido 'ALTA', @idPartido OUTPUT, 9701, @idFase, @idSede, '2026-06-12 20:00', @idSel1, @idSel2;
+DECLARE @idFase INT = (SELECT IdFase FROM nucleo.Fase WHERE Nombre = 'Octavos de final');
+INSERT INTO nucleo.Partido (NumeroPartido, FechaHoraUTC, Estado, IdFase, IdSede, IdSeleccionLocal, IdSeleccionVisitante)
+VALUES (234, '2026-06-12 20:00', 'Programado', @idFase, @idSede, @idSel1, @idSel2);
+SET @idPartido = SCOPE_IDENTITY();
 
 -- =========================================================================
 -- TEST 1: ReglaConvocados y ReglaCambios
