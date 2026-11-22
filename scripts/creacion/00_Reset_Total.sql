@@ -198,6 +198,11 @@ GO
 :r "$(RUTA)\23_SP_Importacion_Jugadores.sql"
 GO
 
+PRINT '--- 24 SP importación CSV de eventos';
+GO
+:r "$(RUTA)\24_SP_Importacion_Eventos.sql"
+GO
+
 -- Los próximos SP, vistas y funciones se suman acá, siempre en orden numérico.
 
 -- =========================================================================

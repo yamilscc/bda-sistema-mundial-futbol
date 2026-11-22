@@ -1,0 +1,9 @@
+PartidoRef;TipoEvento;DocumentoSancionado;DocumentoAsistente;MinutoTexto;DetalleTipo;PeriodoOMotivo
+1;Gol;ARG-04;ARG-03;18;Jugada;Primer Tiempo
+1;Amonestacion;BRA-02;;32;Amarilla;Falta tactica en mitad de cancha
+1;Amonestacion;BRA-02;;64;Amarilla;Reiteracion de faltas
+1;Gol;BRA-04;;71;Penal;Segundo Tiempo
+1;Gol;BRA-02;;79;Jugada;Segundo Tiempo
+1;Gol;DOC-INEXISTENTE;;82;Jugada;Segundo Tiempo
+1;Gol;ARG-04;;150;Jugada;Segundo Tiempo
+999;Amonestacion;ARG-02;;40;Amarilla;Partido inexistente
