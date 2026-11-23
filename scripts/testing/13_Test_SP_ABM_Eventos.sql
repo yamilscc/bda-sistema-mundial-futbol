@@ -15,7 +15,8 @@ Objetivo: Probar los 6 stored procedures ABM del módulo de eventos (script 13_S
           - eventos.SP_ABM_Tarjeta
           - eventos.SP_ABM_Gol
           - eventos.SP_ABM_Amonestacion
-          Requiere ejecutados los scripts 01 a 13.
+          Requiere ejecutados los scripts 01 a 13 (usa nucleo.SP_ALTA_Sede y
+          nucleo.SP_ALTA_Partido).
           Todo corre dentro de una transacción que se deshace al final (ROLLBACK).
 */
 
@@ -35,25 +36,36 @@ DELETE FROM eventos.Periodo;
 DELETE FROM eventos.TipoGol;
 
 INSERT INTO nucleo.Confederacion (Nombre, Sigla) VALUES ('TEST EV6 Confederacion', 'TE6');
-DECLARE @idConf INT = (SELECT IdConfederacion FROM nucleo.Confederacion WHERE Sigla = 'TE6');
+DECLARE @idConf TINYINT = (SELECT IdConfederacion FROM nucleo.Confederacion WHERE Sigla = 'TE6');
 
-INSERT INTO nucleo.Pais (Nombre, CodigoISO2, CodigoISO3, IdConfederacion, ZonaHoraria)
-VALUES ('TEST EV6 Pais 1', 'V1', 'VE1', @idConf, 'Argentina Standard Time'),
-       ('TEST EV6 Pais 2', 'V2', 'VE2', @idConf, 'Argentina Standard Time');
+IF NOT EXISTS (SELECT 1 FROM nucleo.Grupo WHERE Nombre = 'Z')
+    INSERT INTO nucleo.Grupo (Nombre) VALUES ('Z');
+DECLARE @idGrupo TINYINT = (SELECT IdGrupo FROM nucleo.Grupo WHERE Nombre = 'Z');
 
-INSERT INTO nucleo.Seleccion (IdPais)
-SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 IN ('VE1', 'VE2');
+INSERT INTO nucleo.Pais (Nombre, CodigoISO2, CodigoISO3, HusoHorarioComercial, IdConfederacion)
+VALUES ('TEST EV6 Pais 1', 'VA', 'VEA', 'Argentina Standard Time', @idConf),
+       ('TEST EV6 Pais 2', 'VB', 'VEB', 'Argentina Standard Time', @idConf);
 
-DECLARE @idSel1  INT = (SELECT s.IdSeleccion FROM nucleo.Seleccion AS s INNER JOIN nucleo.Pais AS p ON p.IdPais = s.IdPais WHERE p.CodigoISO3 = 'VE1');
-DECLARE @idSel2  INT = (SELECT s.IdSeleccion FROM nucleo.Seleccion AS s INNER JOIN nucleo.Pais AS p ON p.IdPais = s.IdPais WHERE p.CodigoISO3 = 'VE2');
-DECLARE @idPais1 INT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'VE1');
+DECLARE @idPais1 SMALLINT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'VEA');
+DECLARE @idPais2 SMALLINT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'VEB');
 
-INSERT INTO nucleo.Ciudad (Nombre, IdPais) VALUES ('TEST EV6 Ciudad', @idPais1);
-DECLARE @idCiudad INT = (SELECT IdCiudad FROM nucleo.Ciudad WHERE Nombre = 'TEST EV6 Ciudad');
+INSERT INTO nucleo.Seleccion (CodigoFIFA, RankingFIFA, EsAnfitrion, IdPais, IdGrupo)
+VALUES ('VEA', 101, 0, @idPais1, @idGrupo),
+       ('VEB', 102, 0, @idPais2, @idGrupo);
 
-DECLARE @idSede INT;
-EXEC nucleo.SP_ABM_Sede @operacion = 'ALTA', @idSede = @idSede OUTPUT, @nombreEstadio = 'TEST EV6 Estadio',
-     @idCiudad = @idCiudad, @capacidad = 60000, @zonaHoraria = 'Argentina Standard Time';
+DECLARE @idSel1 TINYINT = (SELECT IdSeleccion FROM nucleo.Seleccion WHERE CodigoFIFA = 'VEA');
+DECLARE @idSel2 TINYINT = (SELECT IdSeleccion FROM nucleo.Seleccion WHERE CodigoFIFA = 'VEB');
+
+INSERT INTO nucleo.Ciudad (Nombre, HusoHorario, IdPais)
+VALUES ('TEST EV6 Ciudad', 'Argentina Standard Time', @idPais1);
+DECLARE @idCiudad SMALLINT = (SELECT IdCiudad FROM nucleo.Ciudad WHERE Nombre = 'TEST EV6 Ciudad');
+
+DECLARE @idSede TINYINT;
+EXEC nucleo.SP_ALTA_Sede
+     @nombreEstadio = 'TEST EV6 Estadio',
+     @idCiudad      = @idCiudad,
+     @capacidad     = 60000,
+     @idSede        = @idSede OUTPUT;
 
 INSERT INTO jugadores.Jugador (Nombre, Apellido, Documento, Sexo, Posicion, IdClub)
 VALUES ('Jugador', 'Uno', 'TEST_EV6_1', 'M', 'Delantero', NULL),
@@ -67,10 +79,17 @@ DECLARE @idJ3 INT = (SELECT IdJugador FROM jugadores.Jugador WHERE Documento = '
 INSERT INTO jugadores.Convocatoria (IdSeleccion, IdJugador, Dorsal)
 VALUES (@idSel1, @idJ1, 9), (@idSel1, @idJ2, 10), (@idSel2, @idJ3, 4);
 
-DECLARE @idFase INT = (SELECT IdFase FROM nucleo.Fase WHERE Descripcion = 'Octavos');
-DECLARE @p9601 INT, @p9602 INT;
-EXEC nucleo.SP_ABM_Partido 'ALTA', @p9601 OUTPUT, 9601, @idFase, @idSede, '2026-06-12 20:00', @idSel1, @idSel2;
-EXEC nucleo.SP_ABM_Partido 'ALTA', @p9602 OUTPUT, 9602, @idFase, @idSede, '2026-06-16 20:00', @idSel1, @idSel2;
+DECLARE @idFase TINYINT = (SELECT IdFase FROM nucleo.Fase WHERE Nombre = 'Octavos de final');
+DECLARE @p251 SMALLINT, @p252 SMALLINT;
+
+-- En fases eliminatorias SP_ALTA_Partido exige las selecciones en NULL.
+EXEC nucleo.SP_ALTA_Partido @numeroPartido = 251, @idFase = @idFase, @idSede = @idSede, @fechaHoraLocal = '2026-06-12 20:00', @idPartido = @p251 OUTPUT;
+EXEC nucleo.SP_ALTA_Partido @numeroPartido = 252, @idFase = @idFase, @idSede = @idSede, @fechaHoraLocal = '2026-06-16 20:00', @idPartido = @p252 OUTPUT;
+
+-- Se asignan las selecciones al cruce eliminatorio para poder probar los eventos:
+UPDATE nucleo.Partido
+SET IdSeleccionLocal = @idSel1, IdSeleccionVisitante = @idSel2
+WHERE IdPartido IN (@p251, @p252);
 
 -- =========================================================================
 -- TEST 1: eventos.SP_ABM_ReglaSuspension
@@ -225,10 +244,10 @@ DECLARE @idGol1 INT, @idGol2 INT;
 -- 5.A ALTA exitosa (delega en SP_REGISTRAR_GOL).
 BEGIN TRY
     EXEC eventos.SP_ABM_Gol @operacion = 'ALTA', @idGol = @idGol1 OUTPUT,
-         @idPartido = @p9601, @idJugadorAutor = @idJ1, @tipoGol = 'Jugada',
+         @idPartido = @p251, @idJugadorAutor = @idJ1, @tipoGol = 'Jugada',
          @periodo = 'Primer Tiempo', @minuto = 15, @idJugadorAsistencia = NULL;
     EXEC eventos.SP_ABM_Gol @operacion = 'ALTA', @idGol = @idGol2 OUTPUT,
-         @idPartido = @p9601, @idJugadorAutor = @idJ3, @tipoGol = 'Jugada',
+         @idPartido = @p251, @idJugadorAutor = @idJ3, @tipoGol = 'Jugada',
          @periodo = 'Segundo Tiempo', @minuto = 55, @idJugadorAsistencia = NULL;
     PRINT '5.A: OK - 2 goles registrados vía SP_ABM_Gol.';
 END TRY
@@ -248,7 +267,7 @@ END CATCH;
 -- 5.C MODIFICACION exitosa (cambia minuto a 20 y agrega asistencia de J2).
 BEGIN TRY
     EXEC eventos.SP_ABM_Gol @operacion = 'MODIFICACION', @idGol = @idGol1,
-         @idPartido = @p9601, @idJugadorAutor = @idJ1, @tipoGol = 'Jugada',
+         @idPartido = @p251, @idJugadorAutor = @idJ1, @tipoGol = 'Jugada',
          @periodo = 'Primer Tiempo', @minuto = 20, @idJugadorAsistencia = @idJ2;
     PRINT '5.C: OK - gol modificado con asistencia y nuevo minuto.';
 END TRY
@@ -259,7 +278,7 @@ END CATCH;
 -- 5.D MODIFICACION fallida (auto-asistencia y minuto inválido).
 BEGIN TRY
     EXEC eventos.SP_ABM_Gol @operacion = 'MODIFICACION', @idGol = @idGol1,
-         @idPartido = @p9601, @idJugadorAutor = @idJ1, @tipoGol = 'Jugada',
+         @idPartido = @p251, @idJugadorAutor = @idJ1, @tipoGol = 'Jugada',
          @periodo = 'Primer Tiempo', @minuto = 200, @idJugadorAsistencia = @idJ1;
     PRINT '5.D: FALLÓ - permitió modificación inválida de gol.';
 END TRY
@@ -283,14 +302,14 @@ PRINT '--- TEST 6: SP_ABM_Amonestacion ---';
 
 DECLARE @idAmon1 INT, @idAmon2 INT, @idAmon3 INT;
 
--- 6.A ALTA exitosa de 1ra y 2da amarilla a J1 en 9601, y amarilla a J3 en 9601.
+-- 6.A ALTA exitosa de 1ra y 2da amarilla a J1 en 251, y amarilla a J3 en 251.
 BEGIN TRY
     EXEC eventos.SP_ABM_Amonestacion @operacion = 'ALTA', @idAmonestacion = @idAmon1 OUTPUT,
-         @idPartido = @p9601, @tipoTarjeta = 'Amarilla', @minuto = 25, @motivo = 'Falta táctica', @idJugador = @idJ1;
+         @idPartido = @p251, @tipoTarjeta = 'Amarilla', @minuto = 25, @motivo = 'Falta táctica', @idJugador = @idJ1;
     EXEC eventos.SP_ABM_Amonestacion @operacion = 'ALTA', @idAmonestacion = @idAmon2 OUTPUT,
-         @idPartido = @p9601, @tipoTarjeta = 'Amarilla', @minuto = 70, @motivo = 'Reiteración', @idJugador = @idJ1;
+         @idPartido = @p251, @tipoTarjeta = 'Amarilla', @minuto = 70, @motivo = 'Reiteración', @idJugador = @idJ1;
     EXEC eventos.SP_ABM_Amonestacion @operacion = 'ALTA', @idAmonestacion = @idAmon3 OUTPUT,
-         @idPartido = @p9601, @tipoTarjeta = 'Amarilla', @minuto = 40, @motivo = 'Demorar juego', @idJugador = @idJ3;
+         @idPartido = @p251, @tipoTarjeta = 'Amarilla', @minuto = 40, @motivo = 'Demorar juego', @idJugador = @idJ3;
     PRINT '6.A: OK - 3 amonestaciones dadas de alta.';
 END TRY
 BEGIN CATCH
@@ -309,7 +328,7 @@ END CATCH;
 -- 6.C MODIFICACION exitosa: la amarilla de J3 (@idAmon3) pasa a 'Roja directa' (PartidosSuspension debe pasar a 2).
 BEGIN TRY
     EXEC eventos.SP_ABM_Amonestacion @operacion = 'MODIFICACION', @idAmonestacion = @idAmon3,
-         @idPartido = @p9601, @tipoTarjeta = 'Roja directa', @minuto = 42,
+         @idPartido = @p251, @tipoTarjeta = 'Roja directa', @minuto = 42,
          @motivo = 'Plancha revisada en VAR', @idJugador = @idJ3;
     PRINT '6.C: OK - amonestación de J3 modificada a Roja directa.';
 END TRY
@@ -328,7 +347,11 @@ BEGIN CATCH
 END CATCH;
 
 -- 6.E Bloqueo de BAJA de Gol y Amonestación cuando el partido pasa a 'Finalizado'.
-EXEC nucleo.SP_REGISTRAR_RESULTADO_PARTIDO @idPartido = @p9601, @golesLocal = 1, @golesVisitante = 0;
+UPDATE nucleo.Partido
+SET Estado         = 'Finalizado',
+    GolesLocal     = 1,
+    GolesVisitante = 0
+WHERE IdPartido = @p251;
 
 BEGIN TRY
     EXEC eventos.SP_ABM_Gol @operacion = 'BAJA', @idGol = @idGol1;
@@ -349,14 +372,14 @@ END CATCH;
 -- =========================================================================
 -- CONTROLES FINALES
 -- =========================================================================
-SELECT 'Goles en 9601 (esperado: 1)' AS Control, COUNT(*) AS Cantidad
-FROM eventos.Gol WHERE IdPartido = @p9601;
+SELECT 'Goles en 251 (esperado: 1)' AS Control, COUNT(*) AS Cantidad
+FROM eventos.Gol WHERE IdPartido = @p251;
 
-SELECT 'Amonestaciones en 9601 (esperado: 1, Roja directa con 2 partidos)' AS Control,
+SELECT 'Amonestaciones en 251 (esperado: 1, Roja directa con 2 partidos)' AS Control,
        t.Tipo, a.Minuto, a.Motivo, a.PartidosSuspension
 FROM eventos.Amonestacion AS a
 INNER JOIN eventos.Tarjeta AS t ON t.IdTarjeta = a.IdTarjeta
-WHERE a.IdPartido = @p9601;
+WHERE a.IdPartido = @p251;
 
 ROLLBACK TRANSACTION;
 GO

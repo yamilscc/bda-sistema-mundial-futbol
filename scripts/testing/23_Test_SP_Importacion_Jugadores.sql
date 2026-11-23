@@ -30,14 +30,22 @@ INSERT INTO jugadores.ReglaConvocados (Minimo, Maximo) VALUES (2, 3);
 INSERT INTO nucleo.Confederacion (Nombre, Sigla) VALUES ('TEST IMP Confederacion', 'TI0');
 DECLARE @idConf INT = (SELECT IdConfederacion FROM nucleo.Confederacion WHERE Sigla = 'TI0');
 
-INSERT INTO nucleo.Pais (Nombre, CodigoISO2, CodigoISO3, IdConfederacion, ZonaHoraria)
-VALUES ('TEST IMP Pais 1', 'I1', 'TI1', @idConf, 'Argentina Standard Time'),
-       ('TEST IMP Pais 2', 'I2', 'TI2', @idConf, 'Argentina Standard Time');
+-- Los códigos ISO y FIFA deben ser solo letras (CHECK [A-Z]); se usan ZZA y ZZB.
+INSERT INTO nucleo.Pais (Nombre, CodigoISO2, CodigoISO3, PBIPerCapitaUSD, HusoHorarioComercial, IdConfederacion)
+VALUES ('TEST IMP Pais 1', 'ZA', 'ZZA', 1000, 'Argentina Standard Time', @idConf),
+       ('TEST IMP Pais 2', 'ZB', 'ZZB', 1000, 'Argentina Standard Time', @idConf);
 
-DECLARE @idPais1 INT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'TI1');
-DECLARE @idPais2 INT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'TI2');
+DECLARE @idPais1 INT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'ZZA');
+DECLARE @idPais2 INT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'ZZB');
 
-INSERT INTO nucleo.Seleccion (IdPais) VALUES (@idPais1), (@idPais2);
+-- Seleccion exige grupo, código FIFA y ranking.
+IF NOT EXISTS (SELECT 1 FROM nucleo.Grupo WHERE Nombre = 'Z')
+    INSERT INTO nucleo.Grupo (Nombre) VALUES ('Z');
+DECLARE @idGrupo INT = (SELECT IdGrupo FROM nucleo.Grupo WHERE Nombre = 'Z');
+
+INSERT INTO nucleo.Seleccion (CodigoFIFA, RankingFIFA, EsAnfitrion, IdPais, IdGrupo)
+VALUES ('ZZA', 1000, 0, @idPais1, @idGrupo),
+       ('ZZB', 1001, 0, @idPais2, @idGrupo);
 DECLARE @idSel1 INT = (SELECT IdSeleccion FROM nucleo.Seleccion WHERE IdPais = @idPais1);
 DECLARE @idSel2 INT = (SELECT IdSeleccion FROM nucleo.Seleccion WHERE IdPais = @idPais2);
 
@@ -49,7 +57,7 @@ DECLARE @procOK INT, @procErr INT;
 -- =========================================================================
 DECLARE @xmlInicial XML = N'
 <Convocatorias>
-  <Seleccion CodigoISO3="TI1">
+  <Seleccion CodigoISO3="ZZA">
     <Jugador>
       <Nombre>Emiliano</Nombre>
       <Apellido>Martinez</Apellido>
@@ -73,7 +81,7 @@ DECLARE @xmlInicial XML = N'
       <FechaAlta>2026-05-20</FechaAlta>
     </Jugador>
   </Seleccion>
-  <Seleccion CodigoISO3="TI2">
+  <Seleccion CodigoISO3="ZZB">
     <Jugador>
       <Nombre>Rival</Nombre>
       <Apellido>Uno</Apellido>
@@ -101,7 +109,7 @@ SELECT '1' AS Test, @procOK AS OK_Esperado_3, @procErr AS Error_Esperado_0,
 -- =========================================================================
 DECLARE @xmlUpsert XML = N'
 <Convocatorias>
-  <Seleccion CodigoISO3="TI1">
+  <Seleccion CodigoISO3="ZZA">
     <Jugador>
       <Nombre>Emiliano</Nombre>
       <Apellido>Martinez</Apellido>
@@ -125,7 +133,7 @@ DECLARE @xmlUpsert XML = N'
       <FechaAlta>2026-05-20</FechaAlta>
     </Jugador>
   </Seleccion>
-  <Seleccion CodigoISO3="TI2">
+  <Seleccion CodigoISO3="ZZB">
     <Jugador>
       <Nombre>Rival</Nombre>
       <Apellido>Uno</Apellido>
@@ -149,15 +157,15 @@ SELECT '2' AS Test, @procOK AS OK_Esperado_3, @procErr AS Error_Esperado_0,
 
 -- =========================================================================
 -- TEST 3: Importación con errores parciales
---   - Fila 1 válida (entra como 3er convocado de TI1, completando el tope Maximo = 3).
---   - Fila 2 falla por superar el cupo máximo de 3 convocados en TI1.
+--   - Fila 1 válida (entra como 3er convocado de ZZA, completando el tope Maximo = 3).
+--   - Fila 2 falla por superar el cupo máximo de 3 convocados en ZZA.
 --   - Fila 3 falla por CodigoISO3 'XXX' inexistente.
 --   - Fila 4 falla por Dorsal 'ABC' no numérico.
 -- Resultado esperado: ProcesadosOK = 1, ConError = 3, y 3 registros en eventos.LogImportacion.
 -- =========================================================================
 DECLARE @xmlParcial XML = N'
 <Convocatorias>
-  <Seleccion CodigoISO3="TI1">
+  <Seleccion CodigoISO3="ZZA">
     <Jugador>
       <Nombre>Julian</Nombre>
       <Apellido>Alvarez</Apellido>
@@ -185,7 +193,7 @@ DECLARE @xmlParcial XML = N'
       <Dorsal>2</Dorsal>
     </Jugador>
   </Seleccion>
-  <Seleccion CodigoISO3="TI2">
+  <Seleccion CodigoISO3="ZZB">
     <Jugador>
       <Nombre>Dorsal</Nombre>
       <Apellido>Invalido</Apellido>

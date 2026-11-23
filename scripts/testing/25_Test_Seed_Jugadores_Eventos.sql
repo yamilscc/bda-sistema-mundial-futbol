@@ -23,10 +23,15 @@ Objetivo: Validar en un escenario aislado (BEGIN TRANSACTION / ROLLBACK) los vol
 USE MundialFutbol;
 GO
 
+-- Si una corrida anterior falló a mitad de camino, SSMS deja la transacción abierta con sus datos
+-- (por eso aparecen errores de claves duplicadas al re-ejecutar). Se deshace antes de empezar.
+WHILE @@TRANCOUNT > 0
+    ROLLBACK TRANSACTION;
+
 BEGIN TRANSACTION;
 
 -- =========================================================================
--- 1. ESCENARIO DE PRUEBA: 16 SELECCIONES Y 24 PARTIDOS (Nros 9701..9724)
+-- 1. ESCENARIO DE PRUEBA: 16 SELECCIONES Y 24 PARTIDOS (Nros 201..224)
 -- =========================================================================
 DELETE FROM jugadores.ReglaConvocados;
 INSERT INTO jugadores.ReglaConvocados (Minimo, Maximo) VALUES (23, 26);
@@ -56,46 +61,56 @@ IF NOT EXISTS (SELECT 1 FROM eventos.Tarjeta WHERE Tipo = 'Roja directa')
 INSERT INTO nucleo.Confederacion (Nombre, Sigla) VALUES ('TEST SEED Conf', 'TSC');
 DECLARE @idConf INT = (SELECT IdConfederacion FROM nucleo.Confederacion WHERE Sigla = 'TSC');
 
-INSERT INTO nucleo.Grupo (Nombre) VALUES ('TS-A'), ('TS-B'), ('TS-C'), ('TS-D');
-DECLARE @gA INT = (SELECT IdGrupo FROM nucleo.Grupo WHERE Nombre = 'TS-A'),
-        @gB INT = (SELECT IdGrupo FROM nucleo.Grupo WHERE Nombre = 'TS-B'),
-        @gC INT = (SELECT IdGrupo FROM nucleo.Grupo WHERE Nombre = 'TS-C'),
-        @gD INT = (SELECT IdGrupo FROM nucleo.Grupo WHERE Nombre = 'TS-D');
+-- Grupo.Nombre es CHAR(1) con CHECK [A-Z]: se usan W, X, Y, Z (si ya existen, se reutilizan).
+INSERT INTO nucleo.Grupo (Nombre)
+SELECT v.Nombre FROM (VALUES ('W'), ('X'), ('Y'), ('Z')) AS v (Nombre)
+WHERE NOT EXISTS (SELECT 1 FROM nucleo.Grupo g WHERE g.Nombre = v.Nombre);
+DECLARE @gA INT = (SELECT IdGrupo FROM nucleo.Grupo WHERE Nombre = 'W'),
+        @gB INT = (SELECT IdGrupo FROM nucleo.Grupo WHERE Nombre = 'X'),
+        @gC INT = (SELECT IdGrupo FROM nucleo.Grupo WHERE Nombre = 'Y'),
+        @gD INT = (SELECT IdGrupo FROM nucleo.Grupo WHERE Nombre = 'Z');
 
 -- Crear 16 países y sus 16 selecciones (4 por grupo)
-DECLARE @k INT = 1, @idPaisT INT, @idSelT INT, @iso3 CHAR(3), @iso2 CHAR(2), @nomP VARCHAR(80), @grp INT;
+DECLARE @k INT = 1, @idPaisT INT, @idSelT INT, @iso3 CHAR(3), @iso2 CHAR(2), @nomP VARCHAR(80), @grp INT, @letra CHAR(1);
 DECLARE @sels TABLE (Idx INT IDENTITY(1,1) PRIMARY KEY, IdSeleccion INT, CodigoISO3 CHAR(3), IdGrupo INT);
 
 WHILE @k <= 16
 BEGIN
-    SET @iso2 = 'S' + CASE WHEN @k < 10 THEN CAST(@k AS CHAR(1)) ELSE CHAR(55 + @k) END;
-    SET @iso3 = 'TS' + CASE WHEN @k < 10 THEN CAST(@k AS CHAR(1)) ELSE CHAR(55 + @k) END;
+    -- Códigos solo con letras (CHECK [A-Z]) y del rango de uso libre ISO (X..); se saltea la K
+    -- (XK es Kosovo). k = 1..16 genera las letras A..J y L..Q.
+    SET @letra = CHAR(CASE WHEN @k <= 10 THEN 64 + @k ELSE 65 + @k END);
+    SET @iso2 = 'X' + @letra;
+    SET @iso3 = 'XX' + @letra;
     SET @nomP = 'TEST SEED Pais ' + CAST(@k AS VARCHAR(2));
     SET @grp  = CASE WHEN @k <= 4 THEN @gA WHEN @k <= 8 THEN @gB WHEN @k <= 12 THEN @gC ELSE @gD END;
 
-    INSERT INTO nucleo.Pais (Nombre, CodigoISO2, CodigoISO3, IdConfederacion, ZonaHoraria)
-    VALUES (@nomP, @iso2, @iso3, @idConf, 'Argentina Standard Time');
+    INSERT INTO nucleo.Pais (Nombre, CodigoISO2, CodigoISO3, HusoHorarioComercial, IdConfederacion)
+    VALUES (@nomP, @iso2, @iso3, 'Argentina Standard Time', @idConf);
     SET @idPaisT = SCOPE_IDENTITY();
 
-    INSERT INTO nucleo.Seleccion (IdPais, IdGrupo) VALUES (@idPaisT, @grp);
+    -- CodigoFIFA y RankingFIFA son obligatorios (CodigoFIFA único, solo letras).
+    INSERT INTO nucleo.Seleccion (CodigoFIFA, RankingFIFA, EsAnfitrion, IdPais, IdGrupo)
+    VALUES (@iso3, 1000 + @k, 0, @idPaisT, @grp);
     SET @idSelT = SCOPE_IDENTITY();
 
     INSERT INTO @sels (IdSeleccion, CodigoISO3, IdGrupo) VALUES (@idSelT, @iso3, @grp);
     SET @k += 1;
 END;
 
-INSERT INTO nucleo.Ciudad (Nombre, IdPais)
-VALUES ('TEST SEED Ciudad', (SELECT TOP (1) IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'TS1'));
+-- Ciudad exige HusoHorario. La sede no tiene zona horaria propia: la hereda de Ciudad.
+INSERT INTO nucleo.Ciudad (Nombre, HusoHorario, IdPais)
+VALUES ('TEST SEED Ciudad', 'Argentina Standard Time', (SELECT TOP (1) IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'XXA'));
 DECLARE @idCiudad INT = SCOPE_IDENTITY();
 
-DECLARE @idSede INT;
-EXEC nucleo.SP_ABM_Sede @operacion = 'ALTA', @idSede = @idSede OUTPUT, @nombreEstadio = 'TEST SEED Estadio',
-     @idCiudad = @idCiudad, @capacidad = 60000, @zonaHoraria = 'Argentina Standard Time';
+DECLARE @idSede TINYINT;
+EXEC nucleo.SP_ALTA_Sede @nombreEstadio = 'TEST SEED Estadio', @idCiudad = @idCiudad,
+     @capacidad = 60000, @idSede = @idSede OUTPUT;
 
-DECLARE @idFaseGrupos INT = (SELECT IdFase FROM nucleo.Fase WHERE Descripcion = 'Grupos');
+DECLARE @idFaseGrupos INT = (SELECT IdFase FROM nucleo.Fase WHERE Nombre = 'Fase de grupos');
 
--- Generar 24 partidos de grupos (6 por grupo, separados 5 días entre fechas y 4 horas en la sede)
-DECLARE @gIdx INT = 1, @baseIdx INT, @s1 INT, @s2 INT, @s3 INT, @s4 INT, @pOut INT, @numP INT = 9701;
+-- Generar 24 partidos de grupos con nucleo.SP_ALTA_Partido (la hora es LOCAL de la sede).
+-- 6 por grupo, 5 días entre fechas (descanso de selección >= 48 h) y >= 4 h entre partidos de la sede (mínimo 180 min).
+DECLARE @gIdx INT = 1, @baseIdx INT, @s1 INT, @s2 INT, @s3 INT, @s4 INT, @pOut SMALLINT, @numP INT = 201;
 WHILE @gIdx <= 4
 BEGIN
     SET @baseIdx = (@gIdx - 1) * 4;
@@ -108,17 +123,17 @@ BEGIN
     DECLARE @f2 DATETIME2(0) = DATEADD(DAY, 5, @f1);
     DECLARE @f3 DATETIME2(0) = DATEADD(DAY, 10, @f1);
 
-    EXEC nucleo.SP_ABM_Partido 'ALTA', @pOut OUTPUT, @numP, @idFaseGrupos, @idSede, @f1, @s1, @s2; SET @numP += 1;
+    EXEC nucleo.SP_ALTA_Partido @numP, @idFaseGrupos, @idSede, @f1, @s1, @s2, @pOut OUTPUT; SET @numP += 1;
     SET @f1 = DATEADD(HOUR, 16, @f1);
-    EXEC nucleo.SP_ABM_Partido 'ALTA', @pOut OUTPUT, @numP, @idFaseGrupos, @idSede, @f1, @s3, @s4; SET @numP += 1;
+    EXEC nucleo.SP_ALTA_Partido @numP, @idFaseGrupos, @idSede, @f1, @s3, @s4, @pOut OUTPUT; SET @numP += 1;
 
-    EXEC nucleo.SP_ABM_Partido 'ALTA', @pOut OUTPUT, @numP, @idFaseGrupos, @idSede, @f2, @s1, @s3; SET @numP += 1;
+    EXEC nucleo.SP_ALTA_Partido @numP, @idFaseGrupos, @idSede, @f2, @s1, @s3, @pOut OUTPUT; SET @numP += 1;
     SET @f2 = DATEADD(HOUR, 16, @f2);
-    EXEC nucleo.SP_ABM_Partido 'ALTA', @pOut OUTPUT, @numP, @idFaseGrupos, @idSede, @f2, @s2, @s4; SET @numP += 1;
+    EXEC nucleo.SP_ALTA_Partido @numP, @idFaseGrupos, @idSede, @f2, @s2, @s4, @pOut OUTPUT; SET @numP += 1;
 
-    EXEC nucleo.SP_ABM_Partido 'ALTA', @pOut OUTPUT, @numP, @idFaseGrupos, @idSede, @f3, @s1, @s4; SET @numP += 1;
+    EXEC nucleo.SP_ALTA_Partido @numP, @idFaseGrupos, @idSede, @f3, @s1, @s4, @pOut OUTPUT; SET @numP += 1;
     SET @f3 = DATEADD(HOUR, 16, @f3);
-    EXEC nucleo.SP_ABM_Partido 'ALTA', @pOut OUTPUT, @numP, @idFaseGrupos, @idSede, @f3, @s2, @s3; SET @numP += 1;
+    EXEC nucleo.SP_ALTA_Partido @numP, @idFaseGrupos, @idSede, @f3, @s2, @s3, @pOut OUTPUT; SET @numP += 1;
 
     SET @gIdx += 1;
 END;
@@ -158,7 +173,7 @@ DECLARE @pSel1_1  INT, @pSel1_2 INT, @pSel1_3 INT;
 ;WITH P1 AS (
     SELECT IdPartido, ROW_NUMBER() OVER (ORDER BY FechaHoraUTC) AS Rn
     FROM nucleo.Partido
-    WHERE NumeroPartido BETWEEN 9701 AND 9724
+    WHERE NumeroPartido BETWEEN 201 AND 224
       AND @selTest1 IN (IdSeleccionLocal, IdSeleccionVisitante)
 )
 SELECT @pSel1_1 = MAX(CASE WHEN Rn = 1 THEN IdPartido END),
@@ -167,15 +182,17 @@ SELECT @pSel1_1 = MAX(CASE WHEN Rn = 1 THEN IdPartido END),
 FROM P1;
 
 -- Cargar formaciones de los 24 partidos (filtrando suspendidos) + eventos obligatorios
-DECLARE @pCur INT = 9701, @idPartCur INT, @locCur INT, @visCur INT, @fOut INT, @aOut INT, @sOut INT;
-WHILE @pCur <= 9724
+DECLARE @pCur INT = 201, @idPartCur INT, @locCur INT, @visCur INT, @fOut INT, @aOut INT, @sOut INT;
+WHILE @pCur <= 224
 BEGIN
     SELECT @idPartCur = IdPartido, @locCur = IdSeleccionLocal, @visCur = IdSeleccionVisitante
     FROM nucleo.Partido WHERE NumeroPartido = @pCur;
 
     EXEC jugadores.SP_REGISTRAR_FORMACION @idPartCur, 'Local',     '4-3-3', 1, @fOut OUTPUT;
     -- 11 titulares + 7 suplentes Local (excluyendo suspendidos)
-    DECLARE @tList TABLE (Rn INT IDENTITY(1,1) PRIMARY KEY, IdJugador INT, Posicion VARCHAR(20));
+    -- Rn se numera con ROW_NUMBER() (no IDENTITY): DELETE no reinicia un IDENTITY y el 2º equipo
+    -- quedaba con Rn 19..36, por lo que el SELECT por Rn = 1..18 no encontraba filas.
+    DECLARE @tList TABLE (Rn INT NOT NULL PRIMARY KEY, IdJugador INT, Posicion VARCHAR(20));
     DELETE FROM @tList;
 
     ;WITH El AS (
@@ -195,12 +212,14 @@ BEGIN
         SELECT TOP (7) e.IdJugador, e.Posicion, e.Dorsal, 0 AS T FROM El e
         WHERE NOT EXISTS (SELECT 1 FROM Tit WHERE Tit.IdJugador = e.IdJugador) ORDER BY e.Dorsal
     )
-    INSERT INTO @tList (IdJugador, Posicion)
-    SELECT IdJugador, Posicion FROM (SELECT * FROM Tit UNION ALL SELECT * FROM Sup) x ORDER BY x.T DESC, x.Dorsal;
+    INSERT INTO @tList (Rn, IdJugador, Posicion)
+    SELECT ROW_NUMBER() OVER (ORDER BY x.T DESC, x.Dorsal), x.IdJugador, x.Posicion
+    FROM (SELECT * FROM Tit UNION ALL SELECT * FROM Sup) AS x;
 
     DECLARE @r INT = 1, @jIns INT, @pIns VARCHAR(20), @est VARCHAR(8), @posC VARCHAR(20);
     WHILE @r <= 18
     BEGIN
+        SELECT @jIns = NULL, @pIns = NULL;
         SELECT @jIns = IdJugador, @pIns = Posicion FROM @tList WHERE Rn = @r;
         SET @est  = CASE WHEN @r <= 11 THEN 'Titular' ELSE 'Suplente' END;
         SET @posC = CASE WHEN @r <= 11 THEN @pIns ELSE NULL END;
@@ -228,12 +247,14 @@ BEGIN
         SELECT TOP (7) e.IdJugador, e.Posicion, e.Dorsal, 0 AS T FROM ElV e
         WHERE NOT EXISTS (SELECT 1 FROM TitV WHERE TitV.IdJugador = e.IdJugador) ORDER BY e.Dorsal
     )
-    INSERT INTO @tList (IdJugador, Posicion)
-    SELECT IdJugador, Posicion FROM (SELECT * FROM TitV UNION ALL SELECT * FROM SupV) x ORDER BY x.T DESC, x.Dorsal;
+    INSERT INTO @tList (Rn, IdJugador, Posicion)
+    SELECT ROW_NUMBER() OVER (ORDER BY x.T DESC, x.Dorsal), x.IdJugador, x.Posicion
+    FROM (SELECT * FROM TitV UNION ALL SELECT * FROM SupV) AS x;
 
     SET @r = 1;
     WHILE @r <= 18
     BEGIN
+        SELECT @jIns = NULL, @pIns = NULL;
         SELECT @jIns = IdJugador, @pIns = Posicion FROM @tList WHERE Rn = @r;
         SET @est  = CASE WHEN @r <= 11 THEN 'Titular' ELSE 'Suplente' END;
         SET @posC = CASE WHEN @r <= 11 THEN @pIns ELSE NULL END;
@@ -241,8 +262,8 @@ BEGIN
         SET @r += 1;
     END;
 
-    -- Eventos de los 4 casos obligatorios en el partido 9701
-    IF @pCur = 9701
+    -- Eventos de los 4 casos obligatorios en el partido 201
+    IF @pCur = 201
     BEGIN
         DECLARE @jLesSal INT = (SELECT IdJugador FROM jugadores.Convocatoria WHERE IdSeleccion = @locCur AND Dorsal = 2);
         DECLARE @jLesEnt INT = (SELECT TOP (1) fj.IdJugador FROM jugadores.Formacion f JOIN jugadores.FormacionJugador fj ON fj.IdFormacion = f.IdFormacion WHERE f.IdPartido = @idPartCur AND f.Localia = 'Local' AND fj.EstadoTitularidad = 'Suplente');
@@ -268,10 +289,10 @@ END;
 -- =========================================================================
 SELECT 'Volumenes' AS Test,
        (SELECT COUNT(*) FROM jugadores.Convocatoria c WHERE c.IdSeleccion IN (SELECT IdSeleccion FROM @sels)) AS Convocados_Esperado_368,
-       (SELECT COUNT(*) FROM jugadores.Formacion f INNER JOIN nucleo.Partido p ON p.IdPartido = f.IdPartido WHERE p.NumeroPartido BETWEEN 9701 AND 9724) AS Formaciones_Esperado_48,
-       (SELECT COUNT(*) FROM eventos.Amonestacion a INNER JOIN eventos.Tarjeta t ON t.IdTarjeta = a.IdTarjeta INNER JOIN nucleo.Partido p ON p.IdPartido = a.IdPartido WHERE p.NumeroPartido = 9701 AND t.Tipo = 'Roja por doble amarilla') AS DobleAmarilla_Esperado_1,
-       (SELECT COUNT(*) FROM eventos.Amonestacion a INNER JOIN eventos.Tarjeta t ON t.IdTarjeta = a.IdTarjeta INNER JOIN nucleo.Partido p ON p.IdPartido = a.IdPartido WHERE p.NumeroPartido = 9701 AND t.Tipo = 'Roja directa') AS RojaDirecta_Esperado_1,
-       (SELECT COUNT(*) FROM jugadores.Sustitucion s INNER JOIN nucleo.Partido p ON p.IdPartido = s.IdPartido WHERE p.NumeroPartido = 9701 AND s.Motivo = 'Lesion' AND s.Minuto < 20) AS CambioLesionPre20_Esperado_1,
+       (SELECT COUNT(*) FROM jugadores.Formacion f INNER JOIN nucleo.Partido p ON p.IdPartido = f.IdPartido WHERE p.NumeroPartido BETWEEN 201 AND 224) AS Formaciones_Esperado_48,
+       (SELECT COUNT(*) FROM eventos.Amonestacion a INNER JOIN eventos.Tarjeta t ON t.IdTarjeta = a.IdTarjeta INNER JOIN nucleo.Partido p ON p.IdPartido = a.IdPartido WHERE p.NumeroPartido = 201 AND t.Tipo = 'Roja por doble amarilla') AS DobleAmarilla_Esperado_1,
+       (SELECT COUNT(*) FROM eventos.Amonestacion a INNER JOIN eventos.Tarjeta t ON t.IdTarjeta = a.IdTarjeta INNER JOIN nucleo.Partido p ON p.IdPartido = a.IdPartido WHERE p.NumeroPartido = 201 AND t.Tipo = 'Roja directa') AS RojaDirecta_Esperado_1,
+       (SELECT COUNT(*) FROM jugadores.Sustitucion s INNER JOIN nucleo.Partido p ON p.IdPartido = s.IdPartido WHERE p.NumeroPartido = 201 AND s.Motivo = 'Lesion' AND s.Minuto < 20) AS CambioLesionPre20_Esperado_1,
        eventos.fn_EstaSuspendido(@jugAcum, @pSel1_3) AS SuspendidoEnPartido3_Esperado_1;
 
 -- Verificar que intentar incluir al jugador suspendido por acumulación en la formación del partido 3 falla
