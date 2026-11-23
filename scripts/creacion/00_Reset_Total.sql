@@ -203,6 +203,11 @@ GO
 :r "$(RUTA)\24_SP_Importacion_Eventos.sql"
 GO
 
+PRINT '--- 26 SP Reportes';
+GO
+:r "$(RUTA)\26_SP_Reportes.sql"
+GO
+
 -- Los próximos SP, vistas y funciones se suman acá, siempre en orden numérico.
 
 -- =========================================================================
