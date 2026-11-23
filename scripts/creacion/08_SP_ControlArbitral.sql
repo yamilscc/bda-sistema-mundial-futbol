@@ -22,8 +22,10 @@ USE MundialFutbol;
 GO
 
 /*
-Roles válidos: 'Principal', 'Asistente' (hasta 2), 'Cuarto', 'VAR'.
-Fases eliminatorias: 'Dieciseisavos', 'Octavos', 'Cuartos', 'Semifinal', 'Tercer puesto', 'Final'.
+Roles válidos: 'Principal', 'Asistente 1', 'Asistente 2', 'Cuarto', 'VAR' (uno de cada uno).
+Fases eliminatorias: 'Dieciseisavos de final', 'Octavos de final', 'Cuartos de final', 'Semifinal',
+'Tercer puesto', 'Final'.
+Solo se designan árbitros habilitados (Arbitro.EstaHabilitado = 'Y').
 
 CRITERIO DE ADVERTENCIA ("puede cruzarse"):
   Desde dieciseisavos se advierte si el país del árbitro tiene una selección que
@@ -48,6 +50,7 @@ BEGIN
             @idFase          INT,
             @descripcionFase VARCHAR(50),
             @idPaisArbitro   INT,
+            @estaHabilitado  CHAR(1),
             @rolValido       BIT = 0,
             @maxPorRol       INT;
 
@@ -62,7 +65,8 @@ BEGIN
         INNER JOIN nucleo.Fase AS f ON f.IdFase = p.IdFase
         WHERE p.IdPartido = @idPartido;
 
-        SELECT @idPaisArbitro = a.IdPais
+        SELECT @idPaisArbitro  = a.IdPais,
+               @estaHabilitado = a.EstaHabilitado
         FROM nucleo.Arbitro AS a
         WHERE a.IdArbitro = @idArbitro;
 
@@ -77,6 +81,8 @@ BEGIN
 
         IF @idPaisArbitro IS NULL
             SET @errores += N'- El árbitro indicado no existe.' + @salto;
+        ELSE IF @estaHabilitado <> 'Y'
+            SET @errores += N'- El árbitro no está habilitado para ser designado.' + @salto;
 
         -- Estas dos dependen de que existan el partido y el árbitro.
         IF @idFase IS NOT NULL AND @idPaisArbitro IS NOT NULL

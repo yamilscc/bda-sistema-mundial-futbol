@@ -978,6 +978,51 @@ END TRY
 BEGIN CATCH
 	PRINT 'TEST 4.E FALLÓ: error inesperado -> ' + ERROR_MESSAGE();
 END CATCH;
+
+-- =========================================================================
+-- TEST 5: llamadas dentro de una transacción del llamador (savepoint PuntoSP)
+-- =========================================================================
+
+-- 5.A Alta inválida (nombre en blanco) dentro de una transacción abierta por el llamador.
+-- Esperado: OK (Bloqueado): el SP rechaza el alta pero NO cierra la transacción del llamador
+--           (@@TRANCOUNT sigue en 1 dentro del CATCH).
+BEGIN TRANSACTION;
+BEGIN TRY
+	EXEC nucleo.SP_ALTA_Sede @nombreEstadio = '   ', @idCiudad = @ciudadNY;
+	PRINT 'TEST 5.A FALLÓ: permitió el alta con nombre en blanco.';
+END TRY
+BEGIN CATCH
+	SET @msg = ERROR_MESSAGE();
+	IF ERROR_NUMBER() = 52000 AND @@TRANCOUNT = 1 AND @msg LIKE N'%nombre del estadio es obligatorio%'
+		PRINT 'TEST 5.A OK (Bloqueado): la transacción del llamador sigue abierta -> ' + @msg;
+	ELSE
+		PRINT 'TEST 5.A FALLÓ: @@TRANCOUNT = ' + CAST(@@TRANCOUNT AS VARCHAR(5)) + ' -> ' + @msg;
+END CATCH;
+IF @@TRANCOUNT > 0
+	ROLLBACK TRANSACTION;
+
+-- 5.B Alta válida dentro de una transacción del llamador que después se deshace.
+-- Esperado: OK: el SP no confirma la transacción ajena (@@TRANCOUNT = 1 después del EXEC) y,
+--           tras el ROLLBACK del llamador, 'TEST Estadio Transaccion' no existe.
+DECLARE @sedeTran TINYINT, @tranDespues INT;
+BEGIN TRANSACTION;
+BEGIN TRY
+	EXEC nucleo.SP_ALTA_Sede @nombreEstadio = 'TEST Estadio Transaccion', @idCiudad = @ciudadNY,
+	     @idSede = @sedeTran OUTPUT;
+	SET @tranDespues = @@TRANCOUNT;
+END TRY
+BEGIN CATCH
+	PRINT 'TEST 5.B FALLÓ: error inesperado -> ' + ERROR_MESSAGE();
+END CATCH;
+IF @@TRANCOUNT > 0
+	ROLLBACK TRANSACTION;
+
+IF @tranDespues = 1
+   AND NOT EXISTS (SELECT 1 FROM nucleo.Sede WHERE NombreEstadio = 'TEST Estadio Transaccion')
+	PRINT 'TEST 5.B OK: el SP respetó la transacción del llamador y el ROLLBACK deshizo el alta.';
+ELSE
+	PRINT 'TEST 5.B FALLÓ: @@TRANCOUNT después del EXEC = ' + ISNULL(CAST(@tranDespues AS VARCHAR(5)), 'NULL')
+	      + ' o la sede quedó insertada.';
 GO
 
 -- =========================================================================

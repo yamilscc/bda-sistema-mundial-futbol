@@ -21,15 +21,15 @@ GO
 -- Registra un gol de un partido y devuelve la fila insertada.
 -- Validaciones (se informan todas juntas en un único mensaje):
 --   - Partido existente, con ambas selecciones definidas, no finalizado y ya jugado
---     (@permitirFechaFutura = 1 lo habilita para pruebas, igual que el SP de resultado).
+--     (@permitirFechaFutura = 1 lo habilita para pruebas).
 --   - Tipo de gol y período existentes; minuto entre 1 y 135.
 --   - La definición por penales solo admite goles de tipo 'Penal' y solo en eliminación directa.
 --   - El gol 'En contra', el penal y los goles de la tanda no admiten asistencia.
 --   - Autor y asistente: convocados en una selección del partido, sin baja, no suspendidos
 --     para ese partido y no expulsados antes del minuto del gol; el asistente debe ser de la
 --     misma selección que el autor y distinto de él.
--- El resultado final del partido se carga con nucleo.SP_REGISTRAR_RESULTADO_PARTIDO
--- (se puede contrastar con eventos.fn_ResultadoPartido).
+-- El resultado del partido se deriva de los goles con eventos.fn_ResultadoPartido; el partido
+-- se cierra con nucleo.SP_FINALIZAR_PARTIDO (script 27).
 -- =========================================================================
 CREATE OR ALTER PROCEDURE eventos.SP_REGISTRAR_GOL
     @idPartido           INT,
