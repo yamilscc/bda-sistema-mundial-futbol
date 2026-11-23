@@ -27,18 +27,25 @@ DELETE FROM jugadores.ReglaConvocados;
 INSERT INTO jugadores.ReglaConvocados (Minimo, Maximo) VALUES (2, 3);
 
 INSERT INTO nucleo.Confederacion (Nombre, Sigla) VALUES ('TEST CB Confederacion', 'TCB');
-DECLARE @idConf INT = (SELECT IdConfederacion FROM nucleo.Confederacion WHERE Sigla = 'TCB');
+DECLARE @idConf TINYINT = (SELECT IdConfederacion FROM nucleo.Confederacion WHERE Sigla = 'TCB');
 
-INSERT INTO nucleo.Pais (Nombre, CodigoISO2, CodigoISO3, IdConfederacion, ZonaHoraria)
-VALUES ('TEST CB Pais 1', 'C1', 'TC1', @idConf, 'Argentina Standard Time'),
-       ('TEST CB Pais 2', 'C2', 'TC2', @idConf, 'Argentina Standard Time');
+IF NOT EXISTS (SELECT 1 FROM nucleo.Grupo WHERE Nombre = 'Z')
+    INSERT INTO nucleo.Grupo (Nombre) VALUES ('Z');
+DECLARE @idGrupo TINYINT = (SELECT IdGrupo FROM nucleo.Grupo WHERE Nombre = 'Z');
 
-DECLARE @idPais1 INT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'TC1');
-DECLARE @idPais2 INT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'TC2');
+INSERT INTO nucleo.Pais (Nombre, CodigoISO2, CodigoISO3, HusoHorarioComercial, IdConfederacion)
+VALUES ('TEST CB Pais 1', 'CA', 'TCA', 'Argentina Standard Time', @idConf),
+       ('TEST CB Pais 2', 'CB', 'TCB', 'Argentina Standard Time', @idConf);
 
-INSERT INTO nucleo.Seleccion (IdPais) VALUES (@idPais1), (@idPais2);
-DECLARE @idSel1 INT = (SELECT IdSeleccion FROM nucleo.Seleccion WHERE IdPais = @idPais1);
-DECLARE @idSel2 INT = (SELECT IdSeleccion FROM nucleo.Seleccion WHERE IdPais = @idPais2);
+DECLARE @idPais1 SMALLINT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'TCA');
+DECLARE @idPais2 SMALLINT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'TCB');
+
+INSERT INTO nucleo.Seleccion (CodigoFIFA, RankingFIFA, EsAnfitrion, IdPais, IdGrupo)
+VALUES ('TCA', 101, 0, @idPais1, @idGrupo),
+       ('TCB', 102, 0, @idPais2, @idGrupo);
+
+DECLARE @idSel1 TINYINT = (SELECT IdSeleccion FROM nucleo.Seleccion WHERE CodigoFIFA = 'TCA');
+DECLARE @idSel2 TINYINT = (SELECT IdSeleccion FROM nucleo.Seleccion WHERE CodigoFIFA = 'TCB');
 
 INSERT INTO jugadores.Jugador (Nombre, Apellido, Documento, Sexo, Posicion)
 VALUES ('Jugador', 'Uno',   'TEST_CB_1', 'M', 'Arquero'),

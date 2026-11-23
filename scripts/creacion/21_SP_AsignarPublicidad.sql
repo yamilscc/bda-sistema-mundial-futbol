@@ -12,7 +12,7 @@ Objetivo: Stored procedure de lógica de negocio publicidad.SP_ASIGNAR_PUBLICIDA
           registra qué piezas publicitarias ocupan los cuatro espacios de un partido, según
           los criterios de la sección H del enunciado (público de cada encuentro y prime time).
           Requiere ejecutados los scripts 01 a 20 (usa nucleo.fn_MercadosEnPrimeTime y
-          jugadores.fn_SeleccionesDelPartido).
+          nucleo.fn_SeleccionesDelPartido).
           Test correspondiente: testing/21_Test_SP_AsignarPublicidad.sql.
 */
 
@@ -118,12 +118,12 @@ BEGIN
             WITH MercadoPieza AS (
                 SELECT op.IdPieza,
                        CASE WHEN sel.IdPais IS NOT NULL THEN 1 ELSE 0 END AS EsParticipante,
-                       ISNULL(pa.PBIPerCapita, 0)                         AS PBI,
+                       ISNULL(pa.PBIPerCapitaUSD, 0)                         AS PBI,
                        CASE WHEN mp.IdPais  IS NOT NULL THEN 1 ELSE 0 END AS EnPrimeTime
                 FROM publicidad.OrientacionPais AS op
                 INNER JOIN nucleo.Pais AS pa ON pa.IdPais = op.IdPais
                 LEFT JOIN (SELECT s.IdPais
-                           FROM jugadores.fn_SeleccionesDelPartido(@idPartido) AS sp
+                           FROM nucleo.fn_SeleccionesDelPartido(@idPartido) AS sp
                            INNER JOIN nucleo.Seleccion AS s ON s.IdSeleccion = sp.IdSeleccion) AS sel
                        ON sel.IdPais = op.IdPais
                 LEFT JOIN nucleo.fn_MercadosEnPrimeTime(@idPartido) AS mp

@@ -13,7 +13,8 @@ Objetivo: Probar publicidad.SP_ASIGNAR_PUBLICIDAD (script 21_SP_AsignarPublicida
           - Criterio 1 (país de una selección que juega), criterio 2 (PBI) y criterio 3 (prime time).
           - Partido sin cruce definido, y partido con espacios cargados a mano (se completan los libres).
           - Casos de validación fallida (un único mensaje con todos los errores).
-          Requiere ejecutados los scripts 01 a 21.
+          Requiere ejecutados los scripts 01 a 21 (usa nucleo.SP_ALTA_Sede y
+          nucleo.SP_ALTA_Partido).
           Todo corre dentro de una transacción que se deshace al final (ROLLBACK).
 */
 
@@ -29,8 +30,8 @@ BEGIN TRANSACTION;
 -- los de zona 'UTC' no (son las 23:00, y el prime time es de 19:00 a 22:59).
 --
 --   País   Zona        PBI      Prime time   Pieza (idioma de prueba)
---   AR1    Argentina   15000    sí           Z1  (selección local de 9901 y 9903)
---   AR2    UTC         48000    no           Z2  (selección visitante de 9901 y 9903)
+--   AR1    Argentina   15000    sí           Z1  (selección local de 251 y 253)
+--   AR2    UTC         48000    no           Z2  (selección visitante de 251 y 253)
 --   UT9    UTC         50000    no           Z10 (se crea ANTES que Z4, para probar el desempate por prime time)
 --   MK3    Argentina   60000    sí           Z3
 --   MK4    Argentina   50000    sí           Z4  (mismo PBI que UT9)
@@ -48,53 +49,71 @@ DELETE FROM publicidad.Anunciante;
 DELETE FROM publicidad.Moneda;
 
 INSERT INTO nucleo.Confederacion (Nombre, Sigla) VALUES ('TEST PU21 Confederacion', 'TP21');
-DECLARE @idConf INT = (SELECT IdConfederacion FROM nucleo.Confederacion WHERE Sigla = 'TP21');
+DECLARE @idConf TINYINT = (SELECT IdConfederacion FROM nucleo.Confederacion WHERE Sigla = 'TP21');
 
-INSERT INTO nucleo.Pais (Nombre, CodigoISO2, CodigoISO3, IdConfederacion, ZonaHoraria, PBIPerCapita)
-VALUES ('TEST PU21 AR1', 'Q1', 'QA1', @idConf, 'Argentina Standard Time', 15000.00),
-       ('TEST PU21 AR2', 'Q2', 'QA2', @idConf, 'UTC',                     48000.00),
-       ('TEST PU21 UT9', 'Q9', 'QA9', @idConf, 'UTC',                     50000.00),
-       ('TEST PU21 MK3', 'Q3', 'QM3', @idConf, 'Argentina Standard Time', 60000.00),
-       ('TEST PU21 MK4', 'Q4', 'QM4', @idConf, 'Argentina Standard Time', 50000.00),
-       ('TEST PU21 MK5', 'Q5', 'QM5', @idConf, 'Argentina Standard Time', 40000.00),
-       ('TEST PU21 MK6', 'Q6', 'QM6', @idConf, 'Argentina Standard Time', 30000.00),
-       ('TEST PU21 MK7', 'Q7', 'QM7', @idConf, 'Argentina Standard Time', 20000.00),
-       ('TEST PU21 MK8', 'Q8', 'QM8', @idConf, 'UTC',                     90000.00);
+IF NOT EXISTS (SELECT 1 FROM nucleo.Grupo WHERE Nombre = 'Z')
+    INSERT INTO nucleo.Grupo (Nombre) VALUES ('Z');
+DECLARE @idGrupo TINYINT = (SELECT IdGrupo FROM nucleo.Grupo WHERE Nombre = 'Z');
 
-DECLARE @pAR1 INT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'QA1');
-DECLARE @pAR2 INT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'QA2');
-DECLARE @pUT9 INT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'QA9');
-DECLARE @pMK3 INT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'QM3');
-DECLARE @pMK4 INT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'QM4');
-DECLARE @pMK5 INT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'QM5');
-DECLARE @pMK6 INT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'QM6');
-DECLARE @pMK7 INT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'QM7');
-DECLARE @pMK8 INT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'QM8');
+INSERT INTO nucleo.Pais (Nombre, CodigoISO2, CodigoISO3, PBIPerCapitaUSD, HusoHorarioComercial, IdConfederacion)
+VALUES ('TEST PU21 AR1', 'QA', 'QAA', 15000.00, 'Argentina Standard Time', @idConf),
+       ('TEST PU21 AR2', 'QB', 'QAB', 48000.00, 'UTC',                     @idConf),
+       ('TEST PU21 UT9', 'QI', 'QAI', 50000.00, 'UTC',                     @idConf),
+       ('TEST PU21 MK3', 'QC', 'QMC', 60000.00, 'Argentina Standard Time', @idConf),
+       ('TEST PU21 MK4', 'QD', 'QMD', 50000.00, 'Argentina Standard Time', @idConf),
+       ('TEST PU21 MK5', 'QE', 'QME', 40000.00, 'Argentina Standard Time', @idConf),
+       ('TEST PU21 MK6', 'QF', 'QMF', 30000.00, 'Argentina Standard Time', @idConf),
+       ('TEST PU21 MK7', 'QG', 'QMG', 20000.00, 'Argentina Standard Time', @idConf),
+       ('TEST PU21 MK8', 'QH', 'QMH', 90000.00, 'UTC',                     @idConf);
 
-INSERT INTO nucleo.Seleccion (IdPais) VALUES (@pAR1), (@pAR2);
-DECLARE @idSel1 INT = (SELECT IdSeleccion FROM nucleo.Seleccion WHERE IdPais = @pAR1);
-DECLARE @idSel2 INT = (SELECT IdSeleccion FROM nucleo.Seleccion WHERE IdPais = @pAR2);
+DECLARE @pAR1 SMALLINT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'QAA');
+DECLARE @pAR2 SMALLINT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'QAB');
+DECLARE @pUT9 SMALLINT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'QAI');
+DECLARE @pMK3 SMALLINT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'QMC');
+DECLARE @pMK4 SMALLINT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'QMD');
+DECLARE @pMK5 SMALLINT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'QME');
+DECLARE @pMK6 SMALLINT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'QMF');
+DECLARE @pMK7 SMALLINT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'QMG');
+DECLARE @pMK8 SMALLINT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'QMH');
 
-INSERT INTO nucleo.Ciudad (Nombre, IdPais) VALUES ('TEST PU21 Ciudad', @pAR1);
-DECLARE @idCiudad INT = (SELECT IdCiudad FROM nucleo.Ciudad WHERE Nombre = 'TEST PU21 Ciudad');
+INSERT INTO nucleo.Seleccion (CodigoFIFA, RankingFIFA, EsAnfitrion, IdPais, IdGrupo)
+VALUES ('QAA', 101, 0, @pAR1, @idGrupo),
+       ('QAB', 102, 0, @pAR2, @idGrupo);
 
-DECLARE @idSede INT;
-EXEC nucleo.SP_ABM_Sede @operacion = 'ALTA', @idSede = @idSede OUTPUT, @nombreEstadio = 'TEST PU21 Estadio',
-     @idCiudad = @idCiudad, @capacidad = 60000, @zonaHoraria = 'Argentina Standard Time';
+DECLARE @idSel1 TINYINT = (SELECT IdSeleccion FROM nucleo.Seleccion WHERE CodigoFIFA = 'QAA');
+DECLARE @idSel2 TINYINT = (SELECT IdSeleccion FROM nucleo.Seleccion WHERE CodigoFIFA = 'QAB');
 
--- Cuatro partidos en fase 'Cuartos' (sin restricción de grupo), separados por más de 72 h.
---   9901: AR1 vs AR2           9902: cruce sin definir
---   9903: AR1 vs AR2 (otra fecha, para el caso de espacios cargados a mano)
---   9904: cruce sin definir (para las validaciones)
-DECLARE @idFase INT = (SELECT IdFase FROM nucleo.Fase WHERE Descripcion = 'Cuartos');
-DECLARE @p9901 INT, @p9902 INT, @p9903 INT, @p9904 INT;
-EXEC nucleo.SP_ABM_Partido 'ALTA', @p9901 OUTPUT, 9901, @idFase, @idSede, '2026-07-04 20:00', @idSel1, @idSel2;
-EXEC nucleo.SP_ABM_Partido 'ALTA', @p9902 OUTPUT, 9902, @idFase, @idSede, '2026-07-08 20:00', NULL, NULL;
-EXEC nucleo.SP_ABM_Partido 'ALTA', @p9903 OUTPUT, 9903, @idFase, @idSede, '2026-07-12 20:00', @idSel1, @idSel2;
-EXEC nucleo.SP_ABM_Partido 'ALTA', @p9904 OUTPUT, 9904, @idFase, @idSede, '2026-07-16 20:00', NULL, NULL;
+INSERT INTO nucleo.Ciudad (Nombre, HusoHorario, IdPais)
+VALUES ('TEST PU21 Ciudad', 'Argentina Standard Time', @pAR1);
+DECLARE @idCiudad SMALLINT = (SELECT IdCiudad FROM nucleo.Ciudad WHERE Nombre = 'TEST PU21 Ciudad');
+
+DECLARE @idSede TINYINT;
+EXEC nucleo.SP_ALTA_Sede
+     @nombreEstadio = 'TEST PU21 Estadio',
+     @idCiudad      = @idCiudad,
+     @capacidad     = 60000,
+     @idSede        = @idSede OUTPUT;
+
+-- Cuatro partidos en fase 'Cuartos de final' (sin restricción de grupo), separados por más de 72 h.
+--   251: AR1 vs AR2           252: cruce sin definir
+--   253: AR1 vs AR2 (otra fecha, para el caso de espacios cargados a mano)
+--   254: cruce sin definir (para las validaciones)
+DECLARE @idFase TINYINT = (SELECT IdFase FROM nucleo.Fase WHERE Nombre = 'Cuartos de final');
+DECLARE @p251 SMALLINT, @p252 SMALLINT, @p253 SMALLINT, @p254 SMALLINT;
+
+-- En fases eliminatorias SP_ALTA_Partido exige las selecciones en NULL.
+EXEC nucleo.SP_ALTA_Partido @numeroPartido = 251, @idFase = @idFase, @idSede = @idSede, @fechaHoraLocal = '2026-07-04 20:00', @idPartido = @p251 OUTPUT;
+EXEC nucleo.SP_ALTA_Partido @numeroPartido = 252, @idFase = @idFase, @idSede = @idSede, @fechaHoraLocal = '2026-07-08 20:00', @idPartido = @p252 OUTPUT;
+EXEC nucleo.SP_ALTA_Partido @numeroPartido = 253, @idFase = @idFase, @idSede = @idSede, @fechaHoraLocal = '2026-07-12 20:00', @idPartido = @p253 OUTPUT;
+EXEC nucleo.SP_ALTA_Partido @numeroPartido = 254, @idFase = @idFase, @idSede = @idSede, @fechaHoraLocal = '2026-07-16 20:00', @idPartido = @p254 OUTPUT;
+
+-- Se asignan selecciones a 251 y 253 (252 y 254 quedan con cruce sin definir):
+UPDATE nucleo.Partido
+SET IdSeleccionLocal = @idSel1, IdSeleccionVisitante = @idSel2
+WHERE IdPartido IN (@p251, @p253);
 
 INSERT INTO nucleo.Idioma (Nombre) VALUES ('TEST PU21 Idioma');
-DECLARE @idIdioma INT = (SELECT IdIdioma FROM nucleo.Idioma WHERE Nombre = 'TEST PU21 Idioma');
+DECLARE @idIdioma TINYINT = (SELECT IdIdioma FROM nucleo.Idioma WHERE Nombre = 'TEST PU21 Idioma');
 
 DECLARE @idUSD INT;
 EXEC publicidad.SP_ABM_Moneda 'ALTA', @idUSD OUTPUT, 'USD', 'Dolar Estadounidense';
@@ -131,17 +150,17 @@ EXEC publicidad.SP_ABM_OrientacionPais 'ALTA', @z8,  @pMK8;
 DECLARE @resultado VARCHAR(200), @advertencia VARCHAR(200), @cantidad INT;
 
 -- =========================================================================
--- TEST 1: Partido en prime time en más de cuatro mercados (9901: AR1 vs AR2)
+-- TEST 1: Partido en prime time en más de cuatro mercados (251: AR1 vs AR2)
 -- =========================================================================
 PRINT '--- TEST 1: prime time en más de cuatro mercados, se eligen solo cuatro ---';
 
 -- 1.A Precondición: el partido cae en prime time en 6 de los países de la prueba.
 -- Resultado esperado: 6.
 SELECT @cantidad = COUNT(*)
-FROM nucleo.fn_MercadosEnPrimeTime(@p9901)
+FROM nucleo.fn_MercadosEnPrimeTime(@p251)
 WHERE IdPais IN (@pAR1, @pAR2, @pUT9, @pMK3, @pMK4, @pMK5, @pMK6, @pMK7, @pMK8);
 IF @cantidad = 6
-    PRINT '1.A: OK - el partido 9901 cae en prime time en 6 mercados de la prueba (más de cuatro).';
+    PRINT '1.A: OK - el partido 251 cae en prime time en 6 mercados de la prueba (más de cuatro).';
 ELSE
     PRINT '1.A: FALLÓ - mercados en prime time: ' + CAST(@cantidad AS VARCHAR(10)) + ' (esperado 6).';
 
@@ -152,12 +171,12 @@ ELSE
 --   Espacio 4 = Z3  (PBI 60000, en prime time)
 -- Z4 a Z7 y Z10 quedan afuera por prioridad; Z9 no tiene países de orientación.
 BEGIN TRY
-    EXEC publicidad.SP_ASIGNAR_PUBLICIDAD @p9901, 25000.00, @idUSD, @advertencia OUTPUT;
+    EXEC publicidad.SP_ASIGNAR_PUBLICIDAD @p251, 25000.00, @idUSD, @advertencia OUTPUT;
 
     SELECT @resultado = STRING_AGG(pz.Titulo, ',') WITHIN GROUP (ORDER BY e.NumeroEspacio)
     FROM publicidad.EspacioPublicitario AS e
     INNER JOIN publicidad.Pieza AS pz ON pz.IdPieza = e.IdPieza
-    WHERE e.IdPartido = @p9901;
+    WHERE e.IdPartido = @p251;
 
     IF @resultado = 'Z2,Z1,Z8,Z3' AND @advertencia IS NULL
         PRINT '1.B: OK - espacios 1 a 4 = ' + @resultado + ' (sin advertencia).';
@@ -172,7 +191,7 @@ END CATCH;
 -- Resultado esperado: 4 espacios, todos con 25000.00 y la moneda USD.
 SELECT @cantidad = COUNT(*)
 FROM publicidad.EspacioPublicitario
-WHERE IdPartido = @p9901 AND TarifaPublicitaria = 25000.00 AND IdMoneda = @idUSD;
+WHERE IdPartido = @p251 AND TarifaPublicitaria = 25000.00 AND IdMoneda = @idUSD;
 IF @cantidad = 4
     PRINT '1.C: OK - los 4 espacios quedaron con tarifa 25000.00 USD.';
 ELSE
@@ -181,7 +200,7 @@ ELSE
 -- 1.D Un partido con los cuatro espacios ocupados no admite otra asignación.
 -- Resultado esperado: error "ya tiene sus cuatro espacios publicitarios asignados".
 BEGIN TRY
-    EXEC publicidad.SP_ASIGNAR_PUBLICIDAD @p9901, 25000.00, @idUSD;
+    EXEC publicidad.SP_ASIGNAR_PUBLICIDAD @p251, 25000.00, @idUSD;
     PRINT '1.D: FALLÓ - permitió asignar sobre un partido con los cuatro espacios ocupados.';
 END TRY
 BEGIN CATCH
@@ -189,7 +208,7 @@ BEGIN CATCH
 END CATCH;
 
 -- =========================================================================
--- TEST 2: Partido sin cruce definido (9902): no hay criterio 1; decide el PBI y desempata el prime time
+-- TEST 2: Partido sin cruce definido (252): no hay criterio 1; decide el PBI y desempata el prime time
 -- =========================================================================
 PRINT '--- TEST 2: sin selecciones definidas, criterios 2 y 3 ---';
 
@@ -199,12 +218,12 @@ PRINT '--- TEST 2: sin selecciones definidas, criterios 2 y 3 ---';
 --   Espacio 3 = Z4   (PBI 50000 y en prime time: gana el desempate a Z10 aunque Z10 tenga menor IdPieza)
 --   Espacio 4 = Z10  (PBI 50000, fuera de prime time: queda adelante de Z2, que tiene PBI 48000)
 BEGIN TRY
-    EXEC publicidad.SP_ASIGNAR_PUBLICIDAD @p9902, 18000.00, @idUSD, @advertencia OUTPUT;
+    EXEC publicidad.SP_ASIGNAR_PUBLICIDAD @p252, 18000.00, @idUSD, @advertencia OUTPUT;
 
     SELECT @resultado = STRING_AGG(pz.Titulo, ',') WITHIN GROUP (ORDER BY e.NumeroEspacio)
     FROM publicidad.EspacioPublicitario AS e
     INNER JOIN publicidad.Pieza AS pz ON pz.IdPieza = e.IdPieza
-    WHERE e.IdPartido = @p9902;
+    WHERE e.IdPartido = @p252;
 
     IF @resultado = 'Z8,Z3,Z4,Z10'
         PRINT '2.A: OK - espacios 1 a 4 = ' + @resultado + '.';
@@ -216,15 +235,15 @@ BEGIN CATCH
 END CATCH;
 
 -- =========================================================================
--- TEST 3: Partido con espacios cargados a mano (9903: AR1 vs AR2): se completan solo los libres
+-- TEST 3: Partido con espacios cargados a mano (253: AR1 vs AR2): se completan solo los libres
 -- =========================================================================
 PRINT '--- TEST 3: se completan solo los espacios libres ---';
 
 -- 3.A Se cargan a mano los espacios 2 (Z5) y 4 (Z6) con tarifa 1000.00.
 -- Resultado esperado: alta exitosa de 2 espacios.
 BEGIN TRY
-    EXEC publicidad.SP_ABM_EspacioPublicitario 'ALTA', @p9903, 2, @z5, 1000.00, @idUSD;
-    EXEC publicidad.SP_ABM_EspacioPublicitario 'ALTA', @p9903, 4, @z6, 1000.00, @idUSD;
+    EXEC publicidad.SP_ABM_EspacioPublicitario 'ALTA', @p253, 2, @z5, 1000.00, @idUSD;
+    EXEC publicidad.SP_ABM_EspacioPublicitario 'ALTA', @p253, 4, @z6, 1000.00, @idUSD;
     PRINT '3.A: OK - espacios 2 y 4 cargados a mano.';
 END TRY
 BEGIN CATCH
@@ -236,12 +255,12 @@ END CATCH;
 --   Espacio 3 = Z1 (nuevo, criterio 1)      Espacio 4 = Z6 (manual, no se toca)
 -- Z5 y Z6 no se repiten porque ya están asignadas en el partido.
 BEGIN TRY
-    EXEC publicidad.SP_ASIGNAR_PUBLICIDAD @p9903, 30000.00, @idUSD, @advertencia OUTPUT;
+    EXEC publicidad.SP_ASIGNAR_PUBLICIDAD @p253, 30000.00, @idUSD, @advertencia OUTPUT;
 
     SELECT @resultado = STRING_AGG(pz.Titulo, ',') WITHIN GROUP (ORDER BY e.NumeroEspacio)
     FROM publicidad.EspacioPublicitario AS e
     INNER JOIN publicidad.Pieza AS pz ON pz.IdPieza = e.IdPieza
-    WHERE e.IdPartido = @p9903;
+    WHERE e.IdPartido = @p253;
 
     IF @resultado = 'Z2,Z5,Z1,Z6'
         PRINT '3.B: OK - espacios 1 a 4 = ' + @resultado + '.';
@@ -256,7 +275,7 @@ END CATCH;
 -- Resultado esperado: espacios 2 y 4 con 1000.00; espacios 1 y 3 con 30000.00.
 SELECT @cantidad = COUNT(*)
 FROM publicidad.EspacioPublicitario
-WHERE IdPartido = @p9903
+WHERE IdPartido = @p253
   AND ((NumeroEspacio IN (2, 4) AND TarifaPublicitaria = 1000.00)
     OR (NumeroEspacio IN (1, 3) AND TarifaPublicitaria = 30000.00));
 IF @cantidad = 4
@@ -265,7 +284,7 @@ ELSE
     PRINT '3.C: FALLÓ - espacios con la tarifa esperada: ' + CAST(@cantidad AS VARCHAR(10)) + ' (esperado 4).';
 
 -- =========================================================================
--- TEST 4: Pocas candidatas: se asigna lo que hay y se informa una advertencia (9904)
+-- TEST 4: Pocas candidatas: se asigna lo que hay y se informa una advertencia (254)
 -- =========================================================================
 PRINT '--- TEST 4: menos candidatas que espacios libres ---';
 
@@ -273,9 +292,9 @@ PRINT '--- TEST 4: menos candidatas que espacios libres ---';
 -- Queda 1 espacio libre (el 4) y una sola candidata con orientación (Z4).
 -- Resultado esperado: Z4 se asigna al espacio 4 y no hay advertencia.
 BEGIN TRY
-    EXEC publicidad.SP_ABM_EspacioPublicitario 'ALTA', @p9904, 1, @z1, 500.00, @idUSD;
-    EXEC publicidad.SP_ABM_EspacioPublicitario 'ALTA', @p9904, 2, @z2, 500.00, @idUSD;
-    EXEC publicidad.SP_ABM_EspacioPublicitario 'ALTA', @p9904, 3, @z3, 500.00, @idUSD;
+    EXEC publicidad.SP_ABM_EspacioPublicitario 'ALTA', @p254, 1, @z1, 500.00, @idUSD;
+    EXEC publicidad.SP_ABM_EspacioPublicitario 'ALTA', @p254, 2, @z2, 500.00, @idUSD;
+    EXEC publicidad.SP_ABM_EspacioPublicitario 'ALTA', @p254, 3, @z3, 500.00, @idUSD;
 
     EXEC publicidad.SP_ABM_OrientacionPais 'BAJA', @z5,  @pMK5;
     EXEC publicidad.SP_ABM_OrientacionPais 'BAJA', @z6,  @pMK6;
@@ -283,12 +302,12 @@ BEGIN TRY
     EXEC publicidad.SP_ABM_OrientacionPais 'BAJA', @z8,  @pMK8;
     EXEC publicidad.SP_ABM_OrientacionPais 'BAJA', @z10, @pUT9;
 
-    EXEC publicidad.SP_ASIGNAR_PUBLICIDAD @p9904, 500.00, @idUSD, @advertencia OUTPUT;
+    EXEC publicidad.SP_ASIGNAR_PUBLICIDAD @p254, 500.00, @idUSD, @advertencia OUTPUT;
 
     SELECT @resultado = STRING_AGG(pz.Titulo, ',') WITHIN GROUP (ORDER BY e.NumeroEspacio)
     FROM publicidad.EspacioPublicitario AS e
     INNER JOIN publicidad.Pieza AS pz ON pz.IdPieza = e.IdPieza
-    WHERE e.IdPartido = @p9904;
+    WHERE e.IdPartido = @p254;
 
     IF @resultado = 'Z1,Z2,Z3,Z4' AND @advertencia IS NULL
         PRINT '4.A: OK - el espacio 4 se completó con Z4 (sin advertencia).';
@@ -304,16 +323,16 @@ END CATCH;
 -- Resultado esperado: Z3 se asigna al espacio 3, el 4 queda libre y se informa la advertencia
 -- (1 pieza candidata para 2 espacios libres).
 BEGIN TRY
-    EXEC publicidad.SP_ABM_EspacioPublicitario 'BAJA', @p9904, 3;
-    EXEC publicidad.SP_ABM_EspacioPublicitario 'BAJA', @p9904, 4;
+    EXEC publicidad.SP_ABM_EspacioPublicitario 'BAJA', @p254, 3;
+    EXEC publicidad.SP_ABM_EspacioPublicitario 'BAJA', @p254, 4;
     EXEC publicidad.SP_ABM_OrientacionPais 'BAJA', @z4, @pMK4;
 
-    EXEC publicidad.SP_ASIGNAR_PUBLICIDAD @p9904, 500.00, @idUSD, @advertencia OUTPUT;
+    EXEC publicidad.SP_ASIGNAR_PUBLICIDAD @p254, 500.00, @idUSD, @advertencia OUTPUT;
 
     SELECT @resultado = STRING_AGG(pz.Titulo, ',') WITHIN GROUP (ORDER BY e.NumeroEspacio)
     FROM publicidad.EspacioPublicitario AS e
     INNER JOIN publicidad.Pieza AS pz ON pz.IdPieza = e.IdPieza
-    WHERE e.IdPartido = @p9904;
+    WHERE e.IdPartido = @p254;
 
     IF @resultado = 'Z1,Z2,Z3' AND @advertencia IS NOT NULL
         PRINT '4.B: OK - se asignó Z3 y se informó: ' + @advertencia;
@@ -339,10 +358,10 @@ BEGIN CATCH
     PRINT '5.A: OK (Bloqueado) - ' + REPLACE(ERROR_MESSAGE(), CHAR(13) + CHAR(10), ' | ');
 END CATCH;
 
--- 5.B Tarifa y moneda en NULL sobre el partido 9902, que ya tiene sus cuatro espacios.
+-- 5.B Tarifa y moneda en NULL sobre el partido 252, que ya tiene sus cuatro espacios.
 -- Resultado esperado: un único error con 3 renglones (tarifa, moneda y partido sin espacios libres).
 BEGIN TRY
-    EXEC publicidad.SP_ASIGNAR_PUBLICIDAD @p9902, NULL, NULL;
+    EXEC publicidad.SP_ASIGNAR_PUBLICIDAD @p252, NULL, NULL;
     PRINT '5.B: FALLÓ - permitió tarifa y moneda NULL.';
 END TRY
 BEGIN CATCH
@@ -351,14 +370,14 @@ END CATCH;
 
 -- 5.C Partido sin piezas candidatas: se quita la orientación de todas las piezas que quedaban.
 -- Resultado esperado: error "No hay piezas publicitarias candidatas".
--- Se usa un partido nuevo sin espacios (9905, sin cruce).
-DECLARE @p9905 INT;
-EXEC nucleo.SP_ABM_Partido 'ALTA', @p9905 OUTPUT, 9905, @idFase, @idSede, '2026-07-20 20:00', NULL, NULL;
+-- Se usa un partido nuevo sin espacios (255, sin cruce).
+DECLARE @p255 SMALLINT;
+EXEC nucleo.SP_ALTA_Partido @numeroPartido = 255, @idFase = @idFase, @idSede = @idSede, @fechaHoraLocal = '2026-07-20 20:00', @idPartido = @p255 OUTPUT;
 EXEC publicidad.SP_ABM_OrientacionPais 'BAJA', @z1, @pAR1;
 EXEC publicidad.SP_ABM_OrientacionPais 'BAJA', @z2, @pAR2;
 EXEC publicidad.SP_ABM_OrientacionPais 'BAJA', @z3, @pMK3;
 BEGIN TRY
-    EXEC publicidad.SP_ASIGNAR_PUBLICIDAD @p9905, 500.00, @idUSD;
+    EXEC publicidad.SP_ASIGNAR_PUBLICIDAD @p255, 500.00, @idUSD;
     PRINT '5.C: FALLÓ - permitió asignar sin piezas candidatas.';
 END TRY
 BEGIN CATCH
@@ -368,11 +387,11 @@ END CATCH;
 -- =========================================================================
 -- CONTROLES FINALES
 -- =========================================================================
-SELECT 'Espacios por partido (esperado: 9901=4, 9902=4, 9903=4, 9904=3, 9905=0)' AS Control,
+SELECT 'Espacios por partido (esperado: 251=4, 252=4, 253=4, 254=3, 255=0)' AS Control,
        pa.NumeroPartido, COUNT(e.NumeroEspacio) AS Espacios
 FROM nucleo.Partido AS pa
 LEFT JOIN publicidad.EspacioPublicitario AS e ON e.IdPartido = pa.IdPartido
-WHERE pa.NumeroPartido BETWEEN 9901 AND 9905
+WHERE pa.NumeroPartido BETWEEN 251 AND 255
 GROUP BY pa.NumeroPartido
 ORDER BY pa.NumeroPartido;
 

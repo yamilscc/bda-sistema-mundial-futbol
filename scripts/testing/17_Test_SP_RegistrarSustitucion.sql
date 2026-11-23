@@ -12,7 +12,8 @@ Objetivo: Probar jugadores.SP_REGISTRAR_SUSTITUCION (script 17_SP_RegistrarSusti
           cambio obligatorio por lesión antes del minuto 20, múltiples cambios en una misma
           ventana, topes de cambios y de ventanas en tiempo regular y suplementario, y bloqueo
           de jugadores expulsados o fuera de cancha.
-          Requiere ejecutados los scripts 01 a 17.
+          Requiere ejecutados los scripts 01 a 17 (usa nucleo.SP_ALTA_Sede y
+          nucleo.SP_ALTA_Partido).
           Todo corre dentro de una transacción que se deshace al final (ROLLBACK).
 */
 
@@ -35,34 +36,50 @@ SELECT v.d FROM (VALUES ('Amarilla'), ('Roja por doble amarilla'), ('Roja direct
 WHERE NOT EXISTS (SELECT 1 FROM eventos.Tarjeta AS t WHERE t.Tipo = v.d);
 
 INSERT INTO nucleo.Confederacion (Nombre, Sigla) VALUES ('TEST RS Confederacion', 'TRS');
-DECLARE @idConf INT = (SELECT IdConfederacion FROM nucleo.Confederacion WHERE Sigla = 'TRS');
+DECLARE @idConf TINYINT = (SELECT IdConfederacion FROM nucleo.Confederacion WHERE Sigla = 'TRS');
 
-INSERT INTO nucleo.Pais (Nombre, CodigoISO2, CodigoISO3, IdConfederacion, ZonaHoraria)
-VALUES ('TEST RS Pais 1', 'S1', 'TS8', @idConf, 'Argentina Standard Time'),
-       ('TEST RS Pais 2', 'S2', 'TS9', @idConf, 'Argentina Standard Time');
+IF NOT EXISTS (SELECT 1 FROM nucleo.Grupo WHERE Nombre = 'Z')
+    INSERT INTO nucleo.Grupo (Nombre) VALUES ('Z');
+DECLARE @idGrupo TINYINT = (SELECT IdGrupo FROM nucleo.Grupo WHERE Nombre = 'Z');
 
-DECLARE @idPais1 INT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'TS8');
-DECLARE @idPais2 INT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'TS9');
+INSERT INTO nucleo.Pais (Nombre, CodigoISO2, CodigoISO3, HusoHorarioComercial, IdConfederacion)
+VALUES ('TEST RS Pais 1', 'SA', 'TSA', 'Argentina Standard Time', @idConf),
+       ('TEST RS Pais 2', 'SB', 'TSB', 'Argentina Standard Time', @idConf);
 
-INSERT INTO nucleo.Grupo (Nombre) VALUES ('TEST-RS');
-DECLARE @idGrupo INT = (SELECT IdGrupo FROM nucleo.Grupo WHERE Nombre = 'TEST-RS');
+DECLARE @idPais1 SMALLINT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'TSA');
+DECLARE @idPais2 SMALLINT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'TSB');
 
-INSERT INTO nucleo.Seleccion (IdPais, IdGrupo) VALUES (@idPais1, @idGrupo), (@idPais2, @idGrupo);
-DECLARE @idSel1 INT = (SELECT IdSeleccion FROM nucleo.Seleccion WHERE IdPais = @idPais1);
-DECLARE @idSel2 INT = (SELECT IdSeleccion FROM nucleo.Seleccion WHERE IdPais = @idPais2);
+INSERT INTO nucleo.Seleccion (CodigoFIFA, RankingFIFA, EsAnfitrion, IdPais, IdGrupo)
+VALUES ('TSA', 101, 0, @idPais1, @idGrupo),
+       ('TSB', 102, 0, @idPais2, @idGrupo);
 
-INSERT INTO nucleo.Ciudad (Nombre, IdPais) VALUES ('TEST RS Ciudad', @idPais1);
-DECLARE @idCiudad INT = (SELECT IdCiudad FROM nucleo.Ciudad WHERE Nombre = 'TEST RS Ciudad');
+DECLARE @idSel1 TINYINT = (SELECT IdSeleccion FROM nucleo.Seleccion WHERE CodigoFIFA = 'TSA');
+DECLARE @idSel2 TINYINT = (SELECT IdSeleccion FROM nucleo.Seleccion WHERE CodigoFIFA = 'TSB');
 
-DECLARE @idSede INT, @pOctavos INT, @pGrupos INT;
-EXEC nucleo.SP_ABM_Sede @operacion = 'ALTA', @idSede = @idSede OUTPUT, @nombreEstadio = 'TEST RS Estadio',
-     @idCiudad = @idCiudad, @capacidad = 60000, @zonaHoraria = 'Argentina Standard Time';
+INSERT INTO nucleo.Ciudad (Nombre, HusoHorario, IdPais)
+VALUES ('TEST RS Ciudad', 'Argentina Standard Time', @idPais1);
+DECLARE @idCiudad SMALLINT = (SELECT IdCiudad FROM nucleo.Ciudad WHERE Nombre = 'TEST RS Ciudad');
 
-DECLARE @idFaseOctavos INT = (SELECT IdFase FROM nucleo.Fase WHERE Descripcion = 'Octavos');
-DECLARE @idFaseGrupos  INT = (SELECT IdFase FROM nucleo.Fase WHERE Descripcion = 'Grupos');
+DECLARE @idSede TINYINT;
+DECLARE @pOctavos SMALLINT, @pGrupos SMALLINT;
+EXEC nucleo.SP_ALTA_Sede
+     @nombreEstadio = 'TEST RS Estadio',
+     @idCiudad      = @idCiudad,
+     @capacidad     = 60000,
+     @idSede        = @idSede OUTPUT;
 
-EXEC nucleo.SP_ABM_Partido 'ALTA', @pOctavos OUTPUT, 9730, @idFaseOctavos, @idSede, '2026-06-12 20:00', @idSel1, @idSel2;
-EXEC nucleo.SP_ABM_Partido 'ALTA', @pGrupos  OUTPUT, 9731, @idFaseGrupos,  @idSede, '2026-06-16 20:00', @idSel1, @idSel2;
+DECLARE @idFaseOctavos TINYINT = (SELECT IdFase FROM nucleo.Fase WHERE Nombre = 'Octavos de final');
+DECLARE @idFaseGrupos  TINYINT = (SELECT IdFase FROM nucleo.Fase WHERE Nombre = 'Fase de grupos');
+
+-- En fases eliminatorias SP_ALTA_Partido exige las selecciones en NULL; en grupos son obligatorias.
+EXEC nucleo.SP_ALTA_Partido @numeroPartido = 251, @idFase = @idFaseOctavos, @idSede = @idSede, @fechaHoraLocal = '2026-06-12 20:00', @idPartido = @pOctavos OUTPUT;
+EXEC nucleo.SP_ALTA_Partido @numeroPartido = 252, @idFase = @idFaseGrupos,  @idSede = @idSede, @fechaHoraLocal = '2026-06-16 20:00',
+     @idSeleccionLocal = @idSel1, @idSeleccionVisitante = @idSel2, @idPartido = @pGrupos OUTPUT;
+
+-- Se asignan las selecciones al cruce eliminatorio de Octavos:
+UPDATE nucleo.Partido
+SET IdSeleccionLocal = @idSel1, IdSeleccionVisitante = @idSel2
+WHERE IdPartido = @pOctavos;
 
 -- 4 titulares (T1..T4), 5 suplentes (S1..S5) de Sel1 y 1 jugador de Sel2 (R1)
 INSERT INTO jugadores.Jugador (Nombre, Apellido, Documento, Sexo, Posicion)
@@ -224,7 +241,7 @@ END CATCH;
 -- CONTROLES FINALES
 -- =========================================================================
 -- Sustituciones esperadas en @pOctavos: 4 (S1, S4, S6 en Regular y S8 en Suplementario).
-SELECT 'Sustituciones registradas en 9730 (esperado: 4)' AS Control, COUNT(*) AS Cantidad
+SELECT 'Sustituciones registradas en 251 (esperado: 4)' AS Control, COUNT(*) AS Cantidad
 FROM jugadores.Sustitucion WHERE IdPartido = @pOctavos;
 
 ROLLBACK TRANSACTION;

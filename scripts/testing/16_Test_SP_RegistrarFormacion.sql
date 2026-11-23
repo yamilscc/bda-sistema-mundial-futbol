@@ -12,7 +12,8 @@ Objetivo: Probar jugadores.SP_REGISTRAR_FORMACION y jugadores.SP_AGREGAR_JUGADOR
           (script 16_SP_RegistrarFormacion.sql), incluyendo el rechazo de jugadores
           suspendidos (eventos.fn_EstaSuspendido), dados de baja, de otra selección,
           tope de 11 titulares y obligatoriedad de 1 arquero.
-          Requiere ejecutados los scripts 01 a 16.
+          Requiere ejecutados los scripts 01 a 16 (usa nucleo.SP_ALTA_Sede y
+          nucleo.SP_ALTA_Partido).
           Todo corre dentro de una transacción que se deshace al final (ROLLBACK).
 */
 
@@ -29,29 +30,48 @@ SELECT v.d FROM (VALUES ('Amarilla'), ('Roja por doble amarilla'), ('Roja direct
 WHERE NOT EXISTS (SELECT 1 FROM eventos.Tarjeta AS t WHERE t.Tipo = v.d);
 
 INSERT INTO nucleo.Confederacion (Nombre, Sigla) VALUES ('TEST RF Confederacion', 'TRF');
-DECLARE @idConf INT = (SELECT IdConfederacion FROM nucleo.Confederacion WHERE Sigla = 'TRF');
+DECLARE @idConf TINYINT = (SELECT IdConfederacion FROM nucleo.Confederacion WHERE Sigla = 'TRF');
 
-INSERT INTO nucleo.Pais (Nombre, CodigoISO2, CodigoISO3, IdConfederacion, ZonaHoraria)
-VALUES ('TEST RF Pais 1', 'R1', 'TR1', @idConf, 'Argentina Standard Time'),
-       ('TEST RF Pais 2', 'R2', 'TR2', @idConf, 'Argentina Standard Time');
+IF NOT EXISTS (SELECT 1 FROM nucleo.Grupo WHERE Nombre = 'Z')
+    INSERT INTO nucleo.Grupo (Nombre) VALUES ('Z');
+DECLARE @idGrupo TINYINT = (SELECT IdGrupo FROM nucleo.Grupo WHERE Nombre = 'Z');
 
-DECLARE @idPais1 INT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'TR1');
-DECLARE @idPais2 INT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'TR2');
+INSERT INTO nucleo.Pais (Nombre, CodigoISO2, CodigoISO3, HusoHorarioComercial, IdConfederacion)
+VALUES ('TEST RF Pais 1', 'RA', 'TRA', 'Argentina Standard Time', @idConf),
+       ('TEST RF Pais 2', 'RB', 'TRB', 'Argentina Standard Time', @idConf);
 
-INSERT INTO nucleo.Seleccion (IdPais) VALUES (@idPais1), (@idPais2);
-DECLARE @idSel1 INT = (SELECT IdSeleccion FROM nucleo.Seleccion WHERE IdPais = @idPais1);
-DECLARE @idSel2 INT = (SELECT IdSeleccion FROM nucleo.Seleccion WHERE IdPais = @idPais2);
+DECLARE @idPais1 SMALLINT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'TRA');
+DECLARE @idPais2 SMALLINT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'TRB');
 
-INSERT INTO nucleo.Ciudad (Nombre, IdPais) VALUES ('TEST RF Ciudad', @idPais1);
-DECLARE @idCiudad INT = (SELECT IdCiudad FROM nucleo.Ciudad WHERE Nombre = 'TEST RF Ciudad');
+INSERT INTO nucleo.Seleccion (CodigoFIFA, RankingFIFA, EsAnfitrion, IdPais, IdGrupo)
+VALUES ('TRA', 101, 0, @idPais1, @idGrupo),
+       ('TRB', 102, 0, @idPais2, @idGrupo);
 
-DECLARE @idSede INT, @pPrevio INT, @pActual INT;
-EXEC nucleo.SP_ABM_Sede @operacion = 'ALTA', @idSede = @idSede OUTPUT, @nombreEstadio = 'TEST RF Estadio',
-     @idCiudad = @idCiudad, @capacidad = 60000, @zonaHoraria = 'Argentina Standard Time';
+DECLARE @idSel1 TINYINT = (SELECT IdSeleccion FROM nucleo.Seleccion WHERE CodigoFIFA = 'TRA');
+DECLARE @idSel2 TINYINT = (SELECT IdSeleccion FROM nucleo.Seleccion WHERE CodigoFIFA = 'TRB');
 
-DECLARE @idFase INT = (SELECT IdFase FROM nucleo.Fase WHERE Descripcion = 'Octavos');
-EXEC nucleo.SP_ABM_Partido 'ALTA', @pPrevio OUTPUT, 9720, @idFase, @idSede, '2026-06-12 20:00', @idSel1, @idSel2;
-EXEC nucleo.SP_ABM_Partido 'ALTA', @pActual OUTPUT, 9721, @idFase, @idSede, '2026-06-16 20:00', @idSel1, @idSel2;
+INSERT INTO nucleo.Ciudad (Nombre, HusoHorario, IdPais)
+VALUES ('TEST RF Ciudad', 'Argentina Standard Time', @idPais1);
+DECLARE @idCiudad SMALLINT = (SELECT IdCiudad FROM nucleo.Ciudad WHERE Nombre = 'TEST RF Ciudad');
+
+DECLARE @idSede TINYINT;
+DECLARE @pPrevio SMALLINT, @pActual SMALLINT;
+EXEC nucleo.SP_ALTA_Sede
+     @nombreEstadio = 'TEST RF Estadio',
+     @idCiudad      = @idCiudad,
+     @capacidad     = 60000,
+     @idSede        = @idSede OUTPUT;
+
+DECLARE @idFase TINYINT = (SELECT IdFase FROM nucleo.Fase WHERE Nombre = 'Octavos de final');
+
+-- En fases eliminatorias SP_ALTA_Partido exige las selecciones en NULL.
+EXEC nucleo.SP_ALTA_Partido @numeroPartido = 253, @idFase = @idFase, @idSede = @idSede, @fechaHoraLocal = '2026-06-12 20:00', @idPartido = @pPrevio OUTPUT;
+EXEC nucleo.SP_ALTA_Partido @numeroPartido = 254, @idFase = @idFase, @idSede = @idSede, @fechaHoraLocal = '2026-06-16 20:00', @idPartido = @pActual OUTPUT;
+
+-- Se asignan las selecciones al cruce eliminatorio para poder probar la formación:
+UPDATE nucleo.Partido
+SET IdSeleccionLocal = @idSel1, IdSeleccionVisitante = @idSel2
+WHERE IdPartido IN (@pPrevio, @pActual);
 
 -- Se crean 15 jugadores para Sel1 (1 al 12 válidos, 13 suspendido, 14 dado de baja, 15 de Sel2).
 INSERT INTO jugadores.Jugador (Nombre, Apellido, Documento, Sexo, Posicion)

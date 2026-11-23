@@ -11,7 +11,8 @@ Integrantes:
 Objetivo: Probar los 9 stored procedures ABM del módulo de jugadores (script 18_SP_ABM_Jugadores.sql):
           ReglaConvocados, ReglaCambios, Club, Jugador, Convocatoria, Baja,
           Formacion, FormacionJugador y Sustitucion.
-          Requiere ejecutados los scripts 01 a 18.
+          Requiere ejecutados los scripts 01 a 18 (usa nucleo.SP_ALTA_Sede y
+          nucleo.SP_ALTA_Partido).
           Todo corre dentro de una transacción que se deshace al final (ROLLBACK).
 */
 
@@ -30,28 +31,47 @@ DELETE FROM jugadores.ReglaConvocados;
 DELETE FROM jugadores.ReglaCambios;
 
 INSERT INTO nucleo.Confederacion (Nombre, Sigla) VALUES ('TEST ABMJ Confederacion', 'TAJ');
-DECLARE @idConf INT = (SELECT IdConfederacion FROM nucleo.Confederacion WHERE Sigla = 'TAJ');
+DECLARE @idConf TINYINT = (SELECT IdConfederacion FROM nucleo.Confederacion WHERE Sigla = 'TAJ');
 
-INSERT INTO nucleo.Pais (Nombre, CodigoISO2, CodigoISO3, IdConfederacion, ZonaHoraria)
-VALUES ('TEST ABMJ Pais 1', 'A1', 'TA1', @idConf, 'Argentina Standard Time'),
-       ('TEST ABMJ Pais 2', 'A2', 'TA2', @idConf, 'Argentina Standard Time');
+IF NOT EXISTS (SELECT 1 FROM nucleo.Grupo WHERE Nombre = 'Z')
+    INSERT INTO nucleo.Grupo (Nombre) VALUES ('Z');
+DECLARE @idGrupo TINYINT = (SELECT IdGrupo FROM nucleo.Grupo WHERE Nombre = 'Z');
 
-DECLARE @idPais1 INT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'TA1');
-DECLARE @idPais2 INT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'TA2');
+INSERT INTO nucleo.Pais (Nombre, CodigoISO2, CodigoISO3, HusoHorarioComercial, IdConfederacion)
+VALUES ('TEST ABMJ Pais 1', 'AA', 'TAA', 'Argentina Standard Time', @idConf),
+       ('TEST ABMJ Pais 2', 'AB', 'TAB', 'Argentina Standard Time', @idConf);
 
-INSERT INTO nucleo.Seleccion (IdPais) VALUES (@idPais1), (@idPais2);
-DECLARE @idSel1 INT = (SELECT IdSeleccion FROM nucleo.Seleccion WHERE IdPais = @idPais1);
-DECLARE @idSel2 INT = (SELECT IdSeleccion FROM nucleo.Seleccion WHERE IdPais = @idPais2);
+DECLARE @idPais1 SMALLINT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'TAA');
+DECLARE @idPais2 SMALLINT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'TAB');
 
-INSERT INTO nucleo.Ciudad (Nombre, IdPais) VALUES ('TEST ABMJ Ciudad', @idPais1);
-DECLARE @idCiudad INT = (SELECT IdCiudad FROM nucleo.Ciudad WHERE Nombre = 'TEST ABMJ Ciudad');
+INSERT INTO nucleo.Seleccion (CodigoFIFA, RankingFIFA, EsAnfitrion, IdPais, IdGrupo)
+VALUES ('TAA', 101, 0, @idPais1, @idGrupo),
+       ('TAB', 102, 0, @idPais2, @idGrupo);
 
-DECLARE @idSede INT, @idPartido INT;
-EXEC nucleo.SP_ABM_Sede @operacion = 'ALTA', @idSede = @idSede OUTPUT, @nombreEstadio = 'TEST ABMJ Estadio',
-     @idCiudad = @idCiudad, @capacidad = 50000, @zonaHoraria = 'Argentina Standard Time';
+DECLARE @idSel1 TINYINT = (SELECT IdSeleccion FROM nucleo.Seleccion WHERE CodigoFIFA = 'TAA');
+DECLARE @idSel2 TINYINT = (SELECT IdSeleccion FROM nucleo.Seleccion WHERE CodigoFIFA = 'TAB');
 
-DECLARE @idFase INT = (SELECT IdFase FROM nucleo.Fase WHERE Descripcion = 'Octavos');
-EXEC nucleo.SP_ABM_Partido 'ALTA', @idPartido OUTPUT, 9740, @idFase, @idSede, '2026-06-12 20:00', @idSel1, @idSel2;
+INSERT INTO nucleo.Ciudad (Nombre, HusoHorario, IdPais)
+VALUES ('TEST ABMJ Ciudad', 'Argentina Standard Time', @idPais1);
+DECLARE @idCiudad SMALLINT = (SELECT IdCiudad FROM nucleo.Ciudad WHERE Nombre = 'TEST ABMJ Ciudad');
+
+DECLARE @idSede TINYINT;
+DECLARE @idPartido SMALLINT;
+EXEC nucleo.SP_ALTA_Sede
+     @nombreEstadio = 'TEST ABMJ Estadio',
+     @idCiudad      = @idCiudad,
+     @capacidad     = 50000,
+     @idSede        = @idSede OUTPUT;
+
+DECLARE @idFase TINYINT = (SELECT IdFase FROM nucleo.Fase WHERE Nombre = 'Octavos de final');
+
+-- En fases eliminatorias SP_ALTA_Partido exige las selecciones en NULL.
+EXEC nucleo.SP_ALTA_Partido @numeroPartido = 251, @idFase = @idFase, @idSede = @idSede, @fechaHoraLocal = '2026-06-12 20:00', @idPartido = @idPartido OUTPUT;
+
+-- Se asignan las selecciones al cruce eliminatorio para poder probar formaciones y sustituciones:
+UPDATE nucleo.Partido
+SET IdSeleccionLocal = @idSel1, IdSeleccionVisitante = @idSel2
+WHERE IdPartido = @idPartido;
 
 -- =========================================================================
 -- TEST 1: SP_ABM_ReglaConvocados y SP_ABM_ReglaCambios

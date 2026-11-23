@@ -14,7 +14,8 @@ Objetivo: Probar los 5 stored procedures ABM del módulo publicidad (script 20_S
           - publicidad.SP_ABM_Pieza
           - publicidad.SP_ABM_OrientacionPais
           - publicidad.SP_ABM_EspacioPublicitario
-          Requiere ejecutados los scripts 01 a 20.
+          Requiere ejecutados los scripts 01 a 20 (usa nucleo.SP_ALTA_Sede y
+          nucleo.SP_ALTA_Partido).
           Todo corre dentro de una transacción que se deshace al final (ROLLBACK).
 */
 
@@ -33,33 +34,50 @@ DELETE FROM publicidad.Anunciante;
 DELETE FROM publicidad.Moneda;
 
 INSERT INTO nucleo.Confederacion (Nombre, Sigla) VALUES ('TEST PU20 Confederacion', 'TP20');
-DECLARE @idConf INT = (SELECT IdConfederacion FROM nucleo.Confederacion WHERE Sigla = 'TP20');
+DECLARE @idConf TINYINT = (SELECT IdConfederacion FROM nucleo.Confederacion WHERE Sigla = 'TP20');
 
-INSERT INTO nucleo.Pais (Nombre, CodigoISO2, CodigoISO3, IdConfederacion, ZonaHoraria, PBIPerCapita)
-VALUES ('TEST PU20 Pais 1', 'U1', 'PU1', @idConf, 'Argentina Standard Time', 15000.00),
-       ('TEST PU20 Pais 2', 'U2', 'PU2', @idConf, 'UTC', 48000.00);
+IF NOT EXISTS (SELECT 1 FROM nucleo.Grupo WHERE Nombre = 'Z')
+    INSERT INTO nucleo.Grupo (Nombre) VALUES ('Z');
+DECLARE @idGrupo TINYINT = (SELECT IdGrupo FROM nucleo.Grupo WHERE Nombre = 'Z');
 
-INSERT INTO nucleo.Seleccion (IdPais)
-SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 IN ('PU1', 'PU2');
+INSERT INTO nucleo.Pais (Nombre, CodigoISO2, CodigoISO3, PBIPerCapitaUSD, HusoHorarioComercial, IdConfederacion)
+VALUES ('TEST PU20 Pais 1', 'UA', 'PUA', 15000.00, 'Argentina Standard Time', @idConf),
+       ('TEST PU20 Pais 2', 'UB', 'PUB', 48000.00, 'UTC', @idConf);
 
-DECLARE @idPais1 INT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'PU1');
-DECLARE @idPais2 INT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'PU2');
-DECLARE @idSel1  INT = (SELECT s.IdSeleccion FROM nucleo.Seleccion AS s INNER JOIN nucleo.Pais AS p ON p.IdPais = s.IdPais WHERE p.CodigoISO3 = 'PU1');
-DECLARE @idSel2  INT = (SELECT s.IdSeleccion FROM nucleo.Seleccion AS s INNER JOIN nucleo.Pais AS p ON p.IdPais = s.IdPais WHERE p.CodigoISO3 = 'PU2');
+DECLARE @idPais1 SMALLINT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'PUA');
+DECLARE @idPais2 SMALLINT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'PUB');
 
-INSERT INTO nucleo.Ciudad (Nombre, IdPais) VALUES ('TEST PU20 Ciudad', @idPais1);
-DECLARE @idCiudad INT = (SELECT IdCiudad FROM nucleo.Ciudad WHERE Nombre = 'TEST PU20 Ciudad');
+INSERT INTO nucleo.Seleccion (CodigoFIFA, RankingFIFA, EsAnfitrion, IdPais, IdGrupo)
+VALUES ('PUA', 101, 0, @idPais1, @idGrupo),
+       ('PUB', 102, 0, @idPais2, @idGrupo);
 
-DECLARE @idSede INT;
-EXEC nucleo.SP_ABM_Sede @operacion = 'ALTA', @idSede = @idSede OUTPUT, @nombreEstadio = 'TEST PU20 Estadio',
-     @idCiudad = @idCiudad, @capacidad = 55000, @zonaHoraria = 'Argentina Standard Time';
+DECLARE @idSel1 TINYINT = (SELECT IdSeleccion FROM nucleo.Seleccion WHERE CodigoFIFA = 'PUA');
+DECLARE @idSel2 TINYINT = (SELECT IdSeleccion FROM nucleo.Seleccion WHERE CodigoFIFA = 'PUB');
 
-DECLARE @idFase INT = (SELECT IdFase FROM nucleo.Fase WHERE Descripcion = 'Cuartos');
-DECLARE @p9801 INT;
-EXEC nucleo.SP_ABM_Partido 'ALTA', @p9801 OUTPUT, 9801, @idFase, @idSede, '2026-07-04 20:00', @idSel1, @idSel2;
+INSERT INTO nucleo.Ciudad (Nombre, HusoHorario, IdPais)
+VALUES ('TEST PU20 Ciudad', 'Argentina Standard Time', @idPais1);
+DECLARE @idCiudad SMALLINT = (SELECT IdCiudad FROM nucleo.Ciudad WHERE Nombre = 'TEST PU20 Ciudad');
+
+DECLARE @idSede TINYINT;
+EXEC nucleo.SP_ALTA_Sede
+     @nombreEstadio = 'TEST PU20 Estadio',
+     @idCiudad      = @idCiudad,
+     @capacidad     = 55000,
+     @idSede        = @idSede OUTPUT;
+
+DECLARE @idFase TINYINT = (SELECT IdFase FROM nucleo.Fase WHERE Nombre = 'Cuartos de final');
+DECLARE @p251 SMALLINT;
+
+-- En fases eliminatorias SP_ALTA_Partido exige las selecciones en NULL.
+EXEC nucleo.SP_ALTA_Partido @numeroPartido = 251, @idFase = @idFase, @idSede = @idSede, @fechaHoraLocal = '2026-07-04 20:00', @idPartido = @p251 OUTPUT;
+
+-- Se asignan las selecciones al cruce eliminatorio:
+UPDATE nucleo.Partido
+SET IdSeleccionLocal = @idSel1, IdSeleccionVisitante = @idSel2
+WHERE IdPartido = @p251;
 
 INSERT INTO nucleo.Idioma (Nombre) VALUES ('TEST PU20 Idioma');
-DECLARE @idIdioma INT = (SELECT IdIdioma FROM nucleo.Idioma WHERE Nombre = 'TEST PU20 Idioma');
+DECLARE @idIdioma TINYINT = (SELECT IdIdioma FROM nucleo.Idioma WHERE Nombre = 'TEST PU20 Idioma');
 
 -- =========================================================================
 -- TEST 1: publicidad.SP_ABM_Moneda
@@ -257,11 +275,11 @@ END CATCH;
 -- =========================================================================
 PRINT '--- TEST 5: SP_ABM_EspacioPublicitario ---';
 
--- 5.A ALTA exitosa de espacios 1 y 2 en partido 9801.
+-- 5.A ALTA exitosa de espacios 1 y 2 en partido 251.
 BEGIN TRY
-    EXEC publicidad.SP_ABM_EspacioPublicitario 'ALTA', @p9801, 1, @idPieza1, 25000.00, @idMonUSD;
-    EXEC publicidad.SP_ABM_EspacioPublicitario 'ALTA', @p9801, 2, @idPieza2, 18000.00, @idMonUSD;
-    PRINT '5.A: OK - 2 espacios publicitarios asignados en 9801.';
+    EXEC publicidad.SP_ABM_EspacioPublicitario 'ALTA', @p251, 1, @idPieza1, 25000.00, @idMonUSD;
+    EXEC publicidad.SP_ABM_EspacioPublicitario 'ALTA', @p251, 2, @idPieza2, 18000.00, @idMonUSD;
+    PRINT '5.A: OK - 2 espacios publicitarios asignados en 251.';
 END TRY
 BEGIN CATCH
     PRINT '5.A: FALLÓ - ' + ERROR_MESSAGE();
@@ -278,7 +296,7 @@ END CATCH;
 
 -- 5.C MODIFICACION exitosa de tarifa en espacio 1.
 BEGIN TRY
-    EXEC publicidad.SP_ABM_EspacioPublicitario 'MODIFICACION', @p9801, 1, @idPieza1, 32000.00, @idMonUSD;
+    EXEC publicidad.SP_ABM_EspacioPublicitario 'MODIFICACION', @p251, 1, @idPieza1, 32000.00, @idMonUSD;
     PRINT '5.C: OK - tarifa del espacio 1 modificada.';
 END TRY
 BEGIN CATCH
@@ -287,7 +305,7 @@ END CATCH;
 
 -- 5.D ALTA fallida con múltiples errores (espacio 5 fuera de rango, pieza repetida y tarifa negativa) + espacio ocupado.
 BEGIN TRY
-    EXEC publicidad.SP_ABM_EspacioPublicitario 'ALTA', @p9801, 5, @idPieza1, -500.00, @idMonUSD;
+    EXEC publicidad.SP_ABM_EspacioPublicitario 'ALTA', @p251, 5, @idPieza1, -500.00, @idMonUSD;
     PRINT '5.D.1: FALLÓ - permitió espacio 5, pieza repetida y tarifa negativa.';
 END TRY
 BEGIN CATCH
@@ -295,7 +313,7 @@ BEGIN CATCH
 END CATCH;
 
 BEGIN TRY
-    EXEC publicidad.SP_ABM_EspacioPublicitario 'ALTA', @p9801, 1, @idPieza2, 15000.00, @idMonUSD;
+    EXEC publicidad.SP_ABM_EspacioPublicitario 'ALTA', @p251, 1, @idPieza2, 15000.00, @idMonUSD;
     PRINT '5.D.2: FALLÓ - permitió sobrescribir espacio 1 ocupado.';
 END TRY
 BEGIN CATCH
@@ -304,7 +322,7 @@ END CATCH;
 
 -- 5.E BAJA exitosa del espacio 2.
 BEGIN TRY
-    EXEC publicidad.SP_ABM_EspacioPublicitario 'BAJA', @p9801, 2;
+    EXEC publicidad.SP_ABM_EspacioPublicitario 'BAJA', @p251, 2;
     PRINT '5.E: OK - espacio publicitario 2 eliminado.';
 END TRY
 BEGIN CATCH
@@ -317,12 +335,12 @@ END CATCH;
 SELECT 'Orientaciones activas de Pieza 1 (esperado: 1)' AS Control, COUNT(*) AS Cantidad
 FROM publicidad.OrientacionPais WHERE IdPieza = @idPieza1;
 
-SELECT 'Espacios activos en 9801 (esperado: 1, Tarifa 32000.00 USD)' AS Control,
+SELECT 'Espacios activos en 251 (esperado: 1, Tarifa 32000.00 USD)' AS Control,
        ep.NumeroEspacio, p.Titulo, ep.TarifaPublicitaria, m.Codigo AS Moneda
 FROM publicidad.EspacioPublicitario AS ep
 INNER JOIN publicidad.Pieza  AS p ON p.IdPieza  = ep.IdPieza
 INNER JOIN publicidad.Moneda AS m ON m.IdMoneda = ep.IdMoneda
-WHERE ep.IdPartido = @p9801;
+WHERE ep.IdPartido = @p251;
 
 ROLLBACK TRANSACTION;
 GO
