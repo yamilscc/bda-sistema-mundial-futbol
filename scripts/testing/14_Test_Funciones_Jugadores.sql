@@ -42,26 +42,34 @@ WHERE NOT EXISTS (SELECT 1 FROM eventos.Tarjeta AS t WHERE t.Tipo = v.d);
 INSERT INTO nucleo.Confederacion (Nombre, Sigla) VALUES ('TEST FJ Confederacion', 'TFJ');
 DECLARE @idConf INT = (SELECT IdConfederacion FROM nucleo.Confederacion WHERE Sigla = 'TFJ');
 
-INSERT INTO nucleo.Pais (Nombre, CodigoISO2, CodigoISO3, IdConfederacion, ZonaHoraria)
-VALUES ('TEST FJ Pais 1', 'F1', 'TF1', @idConf, 'Argentina Standard Time'),
-       ('TEST FJ Pais 2', 'F2', 'TF2', @idConf, 'Argentina Standard Time');
+INSERT INTO nucleo.Pais (Nombre, CodigoISO2, CodigoISO3, IdConfederacion, HusoHorarioComercial)
+VALUES ('TEST FJ Pais 1', 'FA', 'TFA', @idConf, 'Argentina Standard Time'),
+       ('TEST FJ Pais 2', 'FB', 'TFB', @idConf, 'Argentina Standard Time');
 
-DECLARE @idPais1 INT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'TF1');
-DECLARE @idPais2 INT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'TF2');
+DECLARE @idPais1 INT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'TFA');
+DECLARE @idPais2 INT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'TFB');
 
-INSERT INTO nucleo.Seleccion (IdPais) VALUES (@idPais1), (@idPais2);
+IF NOT EXISTS (SELECT 1 FROM nucleo.Grupo WHERE Nombre = 'Z')
+    INSERT INTO nucleo.Grupo (Nombre) VALUES ('Z');
+DECLARE @idGrupo INT = (SELECT IdGrupo FROM nucleo.Grupo WHERE Nombre = 'Z');
+
+INSERT INTO nucleo.Seleccion (CodigoFIFA, RankingFIFA, IdPais, IdGrupo)
+VALUES ('TFA', 101, @idPais1, @idGrupo),
+       ('TFB', 102, @idPais2, @idGrupo);
 DECLARE @idSel1 INT = (SELECT IdSeleccion FROM nucleo.Seleccion WHERE IdPais = @idPais1);
 DECLARE @idSel2 INT = (SELECT IdSeleccion FROM nucleo.Seleccion WHERE IdPais = @idPais2);
 
-INSERT INTO nucleo.Ciudad (Nombre, IdPais) VALUES ('TEST FJ Ciudad', @idPais1);
+INSERT INTO nucleo.Ciudad (Nombre, HusoHorario, IdPais) VALUES ('TEST FJ Ciudad', 'Argentina Standard Time', @idPais1);
 DECLARE @idCiudad INT = (SELECT IdCiudad FROM nucleo.Ciudad WHERE Nombre = 'TEST FJ Ciudad');
 
 DECLARE @idSede INT, @idPartido INT;
-EXEC nucleo.SP_ABM_Sede @operacion = 'ALTA', @idSede = @idSede OUTPUT, @nombreEstadio = 'TEST FJ Estadio',
-     @idCiudad = @idCiudad, @capacidad = 50000, @zonaHoraria = 'Argentina Standard Time';
+INSERT INTO nucleo.Sede (NombreEstadio, Capacidad, IdCiudad) VALUES ('TEST FJ Estadio', 50000, @idCiudad);
+SET @idSede = SCOPE_IDENTITY();
 
-DECLARE @idFase INT = (SELECT IdFase FROM nucleo.Fase WHERE Descripcion = 'Octavos');
-EXEC nucleo.SP_ABM_Partido 'ALTA', @idPartido OUTPUT, 9710, @idFase, @idSede, '2026-06-12 20:00', @idSel1, @idSel2;
+DECLARE @idFase INT = (SELECT IdFase FROM nucleo.Fase WHERE Nombre = 'Octavos de final');
+INSERT INTO nucleo.Partido (NumeroPartido, FechaHoraUTC, Estado, IdFase, IdSede, IdSeleccionLocal, IdSeleccionVisitante)
+VALUES (231, '2026-06-12 20:00', 'Programado', @idFase, @idSede, @idSel1, @idSel2);
+SET @idPartido = SCOPE_IDENTITY();
 
 INSERT INTO jugadores.Jugador (Nombre, Apellido, Documento, Sexo, Posicion)
 VALUES ('Titular',  'SaleMin45', 'TEST_FJ_1', 'M', 'Delantero'),

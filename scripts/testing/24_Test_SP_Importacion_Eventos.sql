@@ -54,38 +54,48 @@ IF NOT EXISTS (SELECT 1 FROM eventos.ReglaSuspension WHERE Criterio = 'Roja Dire
 INSERT INTO nucleo.Confederacion (Nombre, Sigla) VALUES ('TEST EV CSV Conf', 'TEC');
 DECLARE @idConf INT = (SELECT IdConfederacion FROM nucleo.Confederacion WHERE Sigla = 'TEC');
 
-INSERT INTO nucleo.Pais (Nombre, CodigoISO2, CodigoISO3, IdConfederacion, ZonaHoraria)
-VALUES ('TEST EV Pais 1', 'E1', 'TE1', @idConf, 'Argentina Standard Time'),
-       ('TEST EV Pais 2', 'E2', 'TE2', @idConf, 'Argentina Standard Time');
+INSERT INTO nucleo.Pais (Nombre, CodigoISO2, CodigoISO3, IdConfederacion, HusoHorarioComercial)
+VALUES ('TEST EV Pais 1', 'EA', 'TEA', @idConf, 'Argentina Standard Time'),
+       ('TEST EV Pais 2', 'EB', 'TEB', @idConf, 'Argentina Standard Time');
 
-DECLARE @idPais1 INT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'TE1');
-DECLARE @idPais2 INT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'TE2');
+DECLARE @idPais1 INT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'TEA');
+DECLARE @idPais2 INT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'TEB');
 
-INSERT INTO nucleo.Seleccion (IdPais) VALUES (@idPais1), (@idPais2);
+IF NOT EXISTS (SELECT 1 FROM nucleo.Grupo WHERE Nombre = 'Z')
+    INSERT INTO nucleo.Grupo (Nombre) VALUES ('Z');
+DECLARE @idGrupo INT = (SELECT IdGrupo FROM nucleo.Grupo WHERE Nombre = 'Z');
+
+INSERT INTO nucleo.Seleccion (CodigoFIFA, RankingFIFA, IdPais, IdGrupo)
+VALUES ('TEA', 101, @idPais1, @idGrupo),
+       ('TEB', 102, @idPais2, @idGrupo);
 DECLARE @idSel1 INT = (SELECT IdSeleccion FROM nucleo.Seleccion WHERE IdPais = @idPais1);
 DECLARE @idSel2 INT = (SELECT IdSeleccion FROM nucleo.Seleccion WHERE IdPais = @idPais2);
 
-INSERT INTO nucleo.Ciudad (Nombre, IdPais) VALUES ('TEST EV Ciudad', @idPais1);
+INSERT INTO nucleo.Ciudad (Nombre, HusoHorario, IdPais)
+VALUES ('TEST EV Ciudad', 'Argentina Standard Time', @idPais1);
 DECLARE @idCiudad INT = (SELECT IdCiudad FROM nucleo.Ciudad WHERE Nombre = 'TEST EV Ciudad');
 
 DECLARE @idSede INT, @idPartido INT;
-EXEC nucleo.SP_ABM_Sede @operacion = 'ALTA', @idSede = @idSede OUTPUT, @nombreEstadio = 'TEST EV Estadio',
-     @idCiudad = @idCiudad, @capacidad = 50000, @zonaHoraria = 'Argentina Standard Time';
+INSERT INTO nucleo.Sede (NombreEstadio, Capacidad, IdCiudad)
+VALUES ('TEST EV Estadio', 50000, @idCiudad);
+SET @idSede = SCOPE_IDENTITY();
 
-DECLARE @idFase INT = (SELECT IdFase FROM nucleo.Fase WHERE Descripcion = 'Octavos');
-EXEC nucleo.SP_ABM_Partido 'ALTA', @idPartido OUTPUT, 9601, @idFase, @idSede, '2026-06-12 20:00', @idSel1, @idSel2;
+DECLARE @idFase INT = (SELECT IdFase FROM nucleo.Fase WHERE Nombre = 'Octavos de final');
+INSERT INTO nucleo.Partido (NumeroPartido, FechaHoraUTC, Estado, IdFase, IdSede, IdSeleccionLocal, IdSeleccionVisitante)
+VALUES (233, '2026-06-12 20:00', 'Programado', @idFase, @idSede, @idSel1, @idSel2);
+SET @idPartido = SCOPE_IDENTITY();
 
-INSERT INTO nucleo.StaffTecnico (IdSeleccion, Nombre, Apellido, Documento, Rol)
-VALUES (@idSel1, 'TEST', 'DT Eventos', 'TEST_EV_DT1', 'Director Tecnico');
+INSERT INTO nucleo.StaffTecnico (IdSeleccion, NombreApellido, Rol)
+VALUES (@idSel1, 'TEST DT Eventos', 'Director Técnico');
 
 -- Carga rápida de jugadores vía SP de importación XML
 DECLARE @xmlJugadores XML = N'
 <Convocatorias>
-  <Seleccion CodigoISO3="TE1">
+  <Seleccion CodigoISO3="TEA">
     <Jugador><Nombre>Uno</Nombre><Apellido>Local</Apellido><Documento>TEST_EV_J1</Documento><Sexo>M</Sexo><Posicion>Delantero</Posicion><Dorsal>10</Dorsal></Jugador>
     <Jugador><Nombre>Dos</Nombre><Apellido>Local</Apellido><Documento>TEST_EV_J2</Documento><Sexo>M</Sexo><Posicion>Mediocampista</Posicion><Dorsal>8</Dorsal></Jugador>
   </Seleccion>
-  <Seleccion CodigoISO3="TE2">
+  <Seleccion CodigoISO3="TEB">
     <Jugador><Nombre>Uno</Nombre><Apellido>Visita</Apellido><Documento>TEST_EV_J3</Documento><Sexo>M</Sexo><Posicion>Defensor</Posicion><Dorsal>4</Dorsal></Jugador>
   </Seleccion>
 </Convocatorias>';
@@ -104,15 +114,15 @@ INSERT INTO eventos.vw_CargaStagingEvento (
 )
 VALUES
     -- Válidas (4):
-    ('9601', 'Gol',          'TEST_EV_J1',  'TEST_EV_J2', '15', 'Jugada',   'Primer Tiempo'),
-    ('9601', 'Amonestacion', 'TEST_EV_J3',  NULL,         '30', 'Amarilla', 'Falta táctica'),
-    ('9601', 'Amonestacion', 'TEST_EV_J3',  NULL,         '60', 'Amarilla', 'Segunda amarilla -> roja'),
-    ('9601', 'Amonestacion', 'TEST_EV_DT1', NULL,         '70', 'Amarilla', 'Protesta desde el banco'),
+    ('233', 'Gol',          'TEST_EV_J1',      'TEST_EV_J2', '15', 'Jugada',   'Primer Tiempo'),
+    ('233', 'Amonestacion', 'TEST_EV_J3',      NULL,         '30', 'Amarilla', 'Falta táctica'),
+    ('233', 'Amonestacion', 'TEST_EV_J3',      NULL,         '60', 'Amarilla', 'Segunda amarilla -> roja'),
+    ('233', 'Amonestacion', 'TEST DT Eventos', NULL,         '70', 'Amarilla', 'Protesta desde el banco'),
     -- Inválidas (4):
-    ('9601', 'Gol',          'TEST_EV_J3',  NULL,         '75', 'Jugada',   'Segundo Tiempo'), -- ya expulsado al min 60
-    ('9601', 'Gol',          'DOC_NO_EXISTE',NULL,        '80', 'Jugada',   'Segundo Tiempo'), -- documento inexistente
-    ('9601', 'Gol',          'TEST_EV_J1',  NULL,         '150','Jugada',   'Segundo Tiempo'), -- minuto fuera de rango
-    ('9999', 'Gol',          'TEST_EV_J1',  NULL,         '85', 'Jugada',   'Segundo Tiempo'); -- partido inexistente
+    ('233',  'Gol',         'TEST_EV_J3',      NULL,         '75', 'Jugada',   'Segundo Tiempo'), -- ya expulsado al min 60
+    ('233',  'Gol',         'DOC_NO_EXISTE',   NULL,         '80', 'Jugada',   'Segundo Tiempo'), -- documento inexistente
+    ('233',  'Gol',         'TEST_EV_J1',      NULL,         '150','Jugada',   'Segundo Tiempo'), -- minuto fuera de rango
+    ('9999', 'Gol',         'TEST_EV_J1',      NULL,         '85', 'Jugada',   'Segundo Tiempo'); -- partido inexistente
 
 UPDATE eventos.StagingEvento
 SET NombreArchivo = 'test_eventos_csv.csv'

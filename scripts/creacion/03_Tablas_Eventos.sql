@@ -55,7 +55,7 @@ GO
 IF OBJECT_ID('eventos.Gol', 'U') IS NULL
 CREATE TABLE eventos.Gol (
     IdGol               INT IDENTITY(1,1) CONSTRAINT PK_Gol PRIMARY KEY,
-    IdPartido           INT NOT NULL,
+    IdPartido           SMALLINT NOT NULL,
     IdJugadorAutor      INT NOT NULL,
     IdJugadorAsistencia INT NULL,
     IdTipoGol           INT NOT NULL,
@@ -85,10 +85,10 @@ GO
 IF OBJECT_ID('eventos.Amonestacion', 'U') IS NULL
 CREATE TABLE eventos.Amonestacion (
     IdAmonestacion     INT IDENTITY(1,1) CONSTRAINT PK_Amonestacion PRIMARY KEY,
-    IdPartido          INT          NOT NULL,
+    IdPartido          SMALLINT          NOT NULL,
     IdTarjeta          INT          NOT NULL,
     IdJugador          INT          NULL,
-    IdStaffTecnico     INT          NULL,
+    IdStaffTecnico     SMALLINT          NULL,
     Minuto             INT          NOT NULL CONSTRAINT CK_Amonestacion_Minuto CHECK (Minuto BETWEEN 1 AND 135),
     Motivo             VARCHAR(200) NOT NULL,
     PartidosSuspension INT          NOT NULL CONSTRAINT DF_Amonestacion_Partidos DEFAULT (0)

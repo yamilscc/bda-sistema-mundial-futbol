@@ -34,9 +34,10 @@ GO
 -- =========================================================================
 CREATE OR ALTER PROCEDURE nucleo.SP_ABM_Confederacion
     @operacion       VARCHAR(12),
-    @idConfederacion INT         = NULL OUTPUT,
-    @nombre          VARCHAR(60) = NULL,
-    @sigla           VARCHAR(10) = NULL
+    @idConfederacion INT          = NULL OUTPUT,
+    @nombre          VARCHAR(100) = NULL,
+    @sigla           VARCHAR(8)   = NULL,
+    @region          VARCHAR(100) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -48,6 +49,7 @@ BEGIN
     SET @operacion = UPPER(LTRIM(RTRIM(@operacion)));
     SET @nombre    = LTRIM(RTRIM(@nombre));
     SET @sigla     = UPPER(LTRIM(RTRIM(@sigla)));
+    SET @region    = NULLIF(LTRIM(RTRIM(@region)), '');
 
     IF @operacion IS NULL OR @operacion NOT IN ('ALTA', 'MODIFICACION', 'BAJA')
         THROW 52001, 'Operación inválida. Valores permitidos: ALTA, MODIFICACION, BAJA.', 1;
@@ -96,8 +98,8 @@ BEGIN
 
         IF @operacion = 'ALTA'
         BEGIN
-            INSERT INTO nucleo.Confederacion (Nombre, Sigla)
-            VALUES (@nombre, @sigla);
+            INSERT INTO nucleo.Confederacion (Nombre, Sigla, Region)
+            VALUES (@nombre, @sigla, @region);
 
             SET @idConfederacion = SCOPE_IDENTITY();
         END
@@ -105,7 +107,8 @@ BEGIN
         BEGIN
             UPDATE nucleo.Confederacion
             SET Nombre = @nombre,
-                Sigla  = @sigla
+                Sigla  = @sigla,
+                Region = @region
             WHERE IdConfederacion = @idConfederacion;
         END
         ELSE
@@ -128,14 +131,14 @@ GO
 -- 2. SP_ABM_Pais
 -- =========================================================================
 CREATE OR ALTER PROCEDURE nucleo.SP_ABM_Pais
-    @operacion       VARCHAR(12),
-    @idPais          INT           = NULL OUTPUT,
-    @nombre          VARCHAR(80)   = NULL,
-    @codigoISO2      CHAR(2)       = NULL,
-    @codigoISO3      CHAR(3)       = NULL,
-    @idConfederacion INT           = NULL,
-    @zonaHoraria     VARCHAR(60)   = NULL,
-    @pbiPerCapita    DECIMAL(12,2) = NULL
+    @operacion            VARCHAR(12),
+    @idPais               INT           = NULL OUTPUT,
+    @nombre               VARCHAR(50)   = NULL,
+    @codigoISO2           CHAR(2)       = NULL,
+    @codigoISO3           CHAR(3)       = NULL,
+    @idConfederacion      INT           = NULL,
+    @husoHorarioComercial VARCHAR(50)   = NULL,
+    @pbiPerCapitaUSD      DECIMAL(10,2) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -144,11 +147,11 @@ BEGIN
             @mensaje NVARCHAR(2048),
             @salto   NVARCHAR(2)   = CHAR(13) + CHAR(10);
 
-    SET @operacion   = UPPER(LTRIM(RTRIM(@operacion)));
-    SET @nombre      = LTRIM(RTRIM(@nombre));
-    SET @codigoISO2  = UPPER(LTRIM(RTRIM(@codigoISO2)));
-    SET @codigoISO3  = UPPER(LTRIM(RTRIM(@codigoISO3)));
-    SET @zonaHoraria = LTRIM(RTRIM(@zonaHoraria));
+    SET @operacion            = UPPER(LTRIM(RTRIM(@operacion)));
+    SET @nombre               = LTRIM(RTRIM(@nombre));
+    SET @codigoISO2           = UPPER(LTRIM(RTRIM(@codigoISO2)));
+    SET @codigoISO3           = UPPER(LTRIM(RTRIM(@codigoISO3)));
+    SET @husoHorarioComercial = LTRIM(RTRIM(@husoHorarioComercial));
 
     IF @operacion IS NULL OR @operacion NOT IN ('ALTA', 'MODIFICACION', 'BAJA')
         THROW 52001, 'Operación inválida. Valores permitidos: ALTA, MODIFICACION, BAJA.', 1;
@@ -171,16 +174,16 @@ BEGIN
                           AND (@operacion = 'ALTA' OR IdPais <> @idPais))
             SET @errores += N'- Ya existe otro país con ese nombre.' + @salto;
 
-        IF @codigoISO2 IS NULL OR LEN(@codigoISO2) <> 2
-            SET @errores += N'- El código ISO2 es obligatorio y debe tener exactamente 2 caracteres.' + @salto;
+        IF @codigoISO2 IS NULL OR @codigoISO2 NOT LIKE '[A-Z][A-Z]'
+            SET @errores += N'- El código ISO2 es obligatorio y debe tener exactamente 2 letras (A-Z).' + @salto;
         ELSE IF EXISTS (SELECT 1
                         FROM nucleo.Pais
                         WHERE CodigoISO2 = @codigoISO2
                           AND (@operacion = 'ALTA' OR IdPais <> @idPais))
             SET @errores += N'- Ya existe otro país con ese código ISO2.' + @salto;
 
-        IF @codigoISO3 IS NULL OR LEN(@codigoISO3) <> 3
-            SET @errores += N'- El código ISO3 es obligatorio y debe tener exactamente 3 caracteres.' + @salto;
+        IF @codigoISO3 IS NULL OR @codigoISO3 NOT LIKE '[A-Z][A-Z][A-Z]'
+            SET @errores += N'- El código ISO3 es obligatorio y debe tener exactamente 3 letras (A-Z).' + @salto;
         ELSE IF EXISTS (SELECT 1
                         FROM nucleo.Pais
                         WHERE CodigoISO3 = @codigoISO3
@@ -191,11 +194,11 @@ BEGIN
            OR NOT EXISTS (SELECT 1 FROM nucleo.Confederacion WHERE IdConfederacion = @idConfederacion)
             SET @errores += N'- La confederación indicada no existe.' + @salto;
 
-        IF @zonaHoraria IS NULL
-           OR NOT EXISTS (SELECT 1 FROM sys.time_zone_info WHERE name = @zonaHoraria)
-            SET @errores += N'- La zona horaria no es válida (debe existir en sys.time_zone_info).' + @salto;
+        IF @husoHorarioComercial IS NULL OR @husoHorarioComercial = ''
+           OR NOT EXISTS (SELECT 1 FROM sys.time_zone_info WHERE name = @husoHorarioComercial)
+            SET @errores += N'- El huso horario comercial no es válido (debe existir en sys.time_zone_info).' + @salto;
 
-        IF @pbiPerCapita IS NOT NULL AND @pbiPerCapita < 0
+        IF @pbiPerCapitaUSD IS NOT NULL AND @pbiPerCapitaUSD < 0
             SET @errores += N'- El PBI per cápita no puede ser negativo.' + @salto;
     END;
 
@@ -226,20 +229,20 @@ BEGIN
 
         IF @operacion = 'ALTA'
         BEGIN
-            INSERT INTO nucleo.Pais (Nombre, CodigoISO2, CodigoISO3, IdConfederacion, ZonaHoraria, PBIPerCapita)
-            VALUES (@nombre, @codigoISO2, @codigoISO3, @idConfederacion, @zonaHoraria, @pbiPerCapita);
+            INSERT INTO nucleo.Pais (Nombre, CodigoISO2, CodigoISO3, IdConfederacion, HusoHorarioComercial, PBIPerCapitaUSD)
+            VALUES (@nombre, @codigoISO2, @codigoISO3, @idConfederacion, @husoHorarioComercial, @pbiPerCapitaUSD);
 
             SET @idPais = SCOPE_IDENTITY();
         END
         ELSE IF @operacion = 'MODIFICACION'
         BEGIN
             UPDATE nucleo.Pais
-            SET Nombre          = @nombre,
-                CodigoISO2      = @codigoISO2,
-                CodigoISO3      = @codigoISO3,
-                IdConfederacion = @idConfederacion,
-                ZonaHoraria     = @zonaHoraria,
-                PBIPerCapita    = @pbiPerCapita
+            SET Nombre               = @nombre,
+                CodigoISO2           = @codigoISO2,
+                CodigoISO3           = @codigoISO3,
+                IdConfederacion      = @idConfederacion,
+                HusoHorarioComercial = @husoHorarioComercial,
+                PBIPerCapitaUSD      = @pbiPerCapitaUSD
             WHERE IdPais = @idPais;
         END
         ELSE
@@ -262,20 +265,23 @@ GO
 -- 3. SP_ABM_Ciudad
 -- =========================================================================
 CREATE OR ALTER PROCEDURE nucleo.SP_ABM_Ciudad
-    @operacion VARCHAR(12),
-    @idCiudad  INT         = NULL OUTPUT,
-    @nombre    VARCHAR(80) = NULL,
-    @idPais    INT         = NULL
+    @operacion   VARCHAR(12),
+    @idCiudad    INT          = NULL OUTPUT,
+    @nombre      VARCHAR(100) = NULL,
+    @idPais      INT          = NULL,
+    @husoHorario VARCHAR(50)  = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    DECLARE @errores NVARCHAR(MAX) = N'',
-            @mensaje NVARCHAR(2048),
-            @salto   NVARCHAR(2)   = CHAR(13) + CHAR(10);
+    DECLARE @errores             NVARCHAR(MAX) = N'',
+            @mensaje             NVARCHAR(2048),
+            @salto               NVARCHAR(2)   = CHAR(13) + CHAR(10),
+            @husoHorarioEfectivo VARCHAR(50);
 
-    SET @operacion = UPPER(LTRIM(RTRIM(@operacion)));
-    SET @nombre    = LTRIM(RTRIM(@nombre));
+    SET @operacion   = UPPER(LTRIM(RTRIM(@operacion)));
+    SET @nombre      = LTRIM(RTRIM(@nombre));
+    SET @husoHorario = LTRIM(RTRIM(@husoHorario));
 
     IF @operacion IS NULL OR @operacion NOT IN ('ALTA', 'MODIFICACION', 'BAJA')
         THROW 52001, 'Operación inválida. Valores permitidos: ALTA, MODIFICACION, BAJA.', 1;
@@ -296,6 +302,13 @@ BEGIN
         IF @idPais IS NULL
            OR NOT EXISTS (SELECT 1 FROM nucleo.Pais WHERE IdPais = @idPais)
             SET @errores += N'- El país indicado no existe.' + @salto;
+        ELSE
+            SET @husoHorarioEfectivo = COALESCE(@husoHorario, (SELECT HusoHorarioComercial FROM nucleo.Pais WHERE IdPais = @idPais));
+
+        IF @husoHorario IS NOT NULL AND (@husoHorario = '' OR NOT EXISTS (SELECT 1 FROM sys.time_zone_info WHERE name = @husoHorario))
+            SET @errores += N'- El huso horario de la ciudad no es válido (debe existir en sys.time_zone_info).' + @salto;
+        ELSE IF @idPais IS NOT NULL AND (@husoHorarioEfectivo IS NULL OR @husoHorarioEfectivo = '')
+            SET @errores += N'- El huso horario de la ciudad es obligatorio.' + @salto;
 
         IF @nombre IS NOT NULL AND @nombre <> '' AND @idPais IS NOT NULL
            AND EXISTS (SELECT 1
@@ -323,16 +336,17 @@ BEGIN
 
         IF @operacion = 'ALTA'
         BEGIN
-            INSERT INTO nucleo.Ciudad (Nombre, IdPais)
-            VALUES (@nombre, @idPais);
+            INSERT INTO nucleo.Ciudad (Nombre, HusoHorario, IdPais)
+            VALUES (@nombre, @husoHorarioEfectivo, @idPais);
 
             SET @idCiudad = SCOPE_IDENTITY();
         END
         ELSE IF @operacion = 'MODIFICACION'
         BEGIN
             UPDATE nucleo.Ciudad
-            SET Nombre = @nombre,
-                IdPais = @idPais
+            SET Nombre      = @nombre,
+                HusoHorario = @husoHorarioEfectivo,
+                IdPais      = @idPais
             WHERE IdCiudad = @idCiudad;
         END
         ELSE
@@ -357,7 +371,7 @@ GO
 CREATE OR ALTER PROCEDURE nucleo.SP_ABM_Fase
     @operacion      VARCHAR(12),
     @idFase         INT         = NULL OUTPUT,
-    @descripcion    VARCHAR(30) = NULL,
+    @nombre         VARCHAR(28) = NULL,
     @orden          INT         = NULL,
     @esEliminatoria BIT         = NULL
 AS
@@ -368,8 +382,8 @@ BEGIN
             @mensaje NVARCHAR(2048),
             @salto   NVARCHAR(2)   = CHAR(13) + CHAR(10);
 
-    SET @operacion   = UPPER(LTRIM(RTRIM(@operacion)));
-    SET @descripcion = LTRIM(RTRIM(@descripcion));
+    SET @operacion = UPPER(LTRIM(RTRIM(@operacion)));
+    SET @nombre    = LTRIM(RTRIM(@nombre));
 
     IF @operacion IS NULL OR @operacion NOT IN ('ALTA', 'MODIFICACION', 'BAJA')
         THROW 52001, 'Operación inválida. Valores permitidos: ALTA, MODIFICACION, BAJA.', 1;
@@ -384,14 +398,22 @@ BEGIN
 
     IF @operacion IN ('ALTA', 'MODIFICACION')
     BEGIN
-        IF @descripcion IS NULL
-           OR @descripcion NOT IN ('Grupos', 'Dieciseisavos', 'Octavos', 'Cuartos', 'Semifinal', 'Tercer puesto', 'Final')
-            SET @errores += N'- La descripción es obligatoria y debe ser: Grupos, Dieciseisavos, Octavos, Cuartos, Semifinal, Tercer puesto o Final.' + @salto;
+        IF @nombre IS NULL
+           OR @nombre NOT IN (
+               'Fase de grupos',
+               'Dieciseisavos de final',
+               'Octavos de final',
+               'Cuartos de final',
+               'Semifinal',
+               'Tercer puesto',
+               'Final'
+           )
+            SET @errores += N'- El nombre es obligatorio y debe ser: Fase de grupos, Dieciseisavos de final, Octavos de final, Cuartos de final, Semifinal, Tercer puesto o Final.' + @salto;
         ELSE IF EXISTS (SELECT 1
                         FROM nucleo.Fase
-                        WHERE Descripcion = @descripcion
+                        WHERE Nombre = @nombre
                           AND (@operacion = 'ALTA' OR IdFase <> @idFase))
-            SET @errores += N'- Ya existe otra fase con esa descripción.' + @salto;
+            SET @errores += N'- Ya existe otra fase con ese nombre.' + @salto;
 
         IF @orden IS NULL OR @orden <= 0
             SET @errores += N'- El orden es obligatorio y debe ser mayor a cero.' + @salto;
@@ -422,15 +444,15 @@ BEGIN
 
         IF @operacion = 'ALTA'
         BEGIN
-            INSERT INTO nucleo.Fase (Descripcion, Orden, EsEliminatoria)
-            VALUES (@descripcion, @orden, @esEliminatoria);
+            INSERT INTO nucleo.Fase (Nombre, Orden, EsEliminatoria)
+            VALUES (@nombre, @orden, @esEliminatoria);
 
             SET @idFase = SCOPE_IDENTITY();
         END
         ELSE IF @operacion = 'MODIFICACION'
         BEGIN
             UPDATE nucleo.Fase
-            SET Descripcion    = @descripcion,
+            SET Nombre         = @nombre,
                 Orden          = @orden,
                 EsEliminatoria = @esEliminatoria
             WHERE IdFase = @idFase;
@@ -467,7 +489,7 @@ BEGIN
             @salto   NVARCHAR(2)   = CHAR(13) + CHAR(10);
 
     SET @operacion = UPPER(LTRIM(RTRIM(@operacion)));
-    SET @nombre    = LTRIM(RTRIM(@nombre));
+    SET @nombre    = UPPER(LTRIM(RTRIM(@nombre)));
 
     IF @operacion IS NULL OR @operacion NOT IN ('ALTA', 'MODIFICACION', 'BAJA')
         THROW 52001, 'Operación inválida. Valores permitidos: ALTA, MODIFICACION, BAJA.', 1;
@@ -482,8 +504,8 @@ BEGIN
 
     IF @operacion IN ('ALTA', 'MODIFICACION')
     BEGIN
-        IF @nombre IS NULL OR @nombre = ''
-            SET @errores += N'- El nombre del grupo es obligatorio.' + @salto;
+        IF @nombre IS NULL OR @nombre NOT LIKE '[A-Z]'
+            SET @errores += N'- El nombre del grupo es obligatorio y debe ser una única letra (A-Z).' + @salto;
         ELSE IF EXISTS (SELECT 1
                         FROM nucleo.Grupo
                         WHERE Nombre = @nombre
@@ -540,9 +562,12 @@ GO
 -- =========================================================================
 CREATE OR ALTER PROCEDURE nucleo.SP_ABM_Seleccion
     @operacion   VARCHAR(12),
-    @idSeleccion INT = NULL OUTPUT,
-    @idPais      INT = NULL,
-    @idGrupo     INT = NULL
+    @idSeleccion INT      = NULL OUTPUT,
+    @codigoFIFA  CHAR(3)  = NULL,
+    @rankingFIFA SMALLINT = NULL,
+    @esAnfitrion BIT      = 0,
+    @idPais      INT      = NULL,
+    @idGrupo     INT      = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -551,7 +576,9 @@ BEGIN
             @mensaje NVARCHAR(2048),
             @salto   NVARCHAR(2)   = CHAR(13) + CHAR(10);
 
-    SET @operacion = UPPER(LTRIM(RTRIM(@operacion)));
+    SET @operacion   = UPPER(LTRIM(RTRIM(@operacion)));
+    SET @codigoFIFA  = UPPER(LTRIM(RTRIM(@codigoFIFA)));
+    SET @esAnfitrion = ISNULL(@esAnfitrion, 0);
 
     IF @operacion IS NULL OR @operacion NOT IN ('ALTA', 'MODIFICACION', 'BAJA')
         THROW 52001, 'Operación inválida. Valores permitidos: ALTA, MODIFICACION, BAJA.', 1;
@@ -566,6 +593,17 @@ BEGIN
 
     IF @operacion IN ('ALTA', 'MODIFICACION')
     BEGIN
+        IF @codigoFIFA IS NULL OR @codigoFIFA NOT LIKE '[A-Z][A-Z][A-Z]'
+            SET @errores += N'- El código FIFA es obligatorio y debe tener exactamente 3 letras (A-Z).' + @salto;
+        ELSE IF EXISTS (SELECT 1
+                        FROM nucleo.Seleccion
+                        WHERE CodigoFIFA = @codigoFIFA
+                          AND (@operacion = 'ALTA' OR IdSeleccion <> @idSeleccion))
+            SET @errores += N'- Ya existe otra selección con ese código FIFA.' + @salto;
+
+        IF @rankingFIFA IS NULL OR @rankingFIFA <= 0
+            SET @errores += N'- El ranking FIFA es obligatorio y debe ser mayor a cero.' + @salto;
+
         IF @idPais IS NULL
            OR NOT EXISTS (SELECT 1 FROM nucleo.Pais WHERE IdPais = @idPais)
             SET @errores += N'- El país indicado no existe.' + @salto;
@@ -575,9 +613,9 @@ BEGIN
                           AND (@operacion = 'ALTA' OR IdSeleccion <> @idSeleccion))
             SET @errores += N'- Ya existe otra selección registrada para ese país.' + @salto;
 
-        IF @idGrupo IS NOT NULL
-           AND NOT EXISTS (SELECT 1 FROM nucleo.Grupo WHERE IdGrupo = @idGrupo)
-            SET @errores += N'- El grupo indicado no existe.' + @salto;
+        IF @idGrupo IS NULL
+           OR NOT EXISTS (SELECT 1 FROM nucleo.Grupo WHERE IdGrupo = @idGrupo)
+            SET @errores += N'- El grupo es obligatorio y debe existir.' + @salto;
     END;
 
     IF @operacion = 'BAJA'
@@ -603,16 +641,19 @@ BEGIN
 
         IF @operacion = 'ALTA'
         BEGIN
-            INSERT INTO nucleo.Seleccion (IdPais, IdGrupo)
-            VALUES (@idPais, @idGrupo);
+            INSERT INTO nucleo.Seleccion (CodigoFIFA, RankingFIFA, EsAnfitrion, IdPais, IdGrupo)
+            VALUES (@codigoFIFA, @rankingFIFA, @esAnfitrion, @idPais, @idGrupo);
 
             SET @idSeleccion = SCOPE_IDENTITY();
         END
         ELSE IF @operacion = 'MODIFICACION'
         BEGIN
             UPDATE nucleo.Seleccion
-            SET IdPais  = @idPais,
-                IdGrupo = @idGrupo
+            SET CodigoFIFA  = @codigoFIFA,
+                RankingFIFA = @rankingFIFA,
+                EsAnfitrion = @esAnfitrion,
+                IdPais      = @idPais,
+                IdGrupo     = @idGrupo
             WHERE IdSeleccion = @idSeleccion;
         END
         ELSE
@@ -633,16 +674,14 @@ GO
 
 -- =========================================================================
 -- 7. SP_ABM_StaffTecnico
--- Respeta el índice único filtrado UQ_StaffTecnico_DirectorTecnico (un solo DT por selección).
+-- Respeta la restricción única UQ_StaffTecnico_IdSeleccion_Rol (un integrante por rol y selección).
 -- =========================================================================
 CREATE OR ALTER PROCEDURE nucleo.SP_ABM_StaffTecnico
     @operacion      VARCHAR(12),
-    @idStaffTecnico INT         = NULL OUTPUT,
-    @idSeleccion    INT         = NULL,
-    @nombre         VARCHAR(60) = NULL,
-    @apellido       VARCHAR(60) = NULL,
-    @documento      VARCHAR(20) = NULL,
-    @rol            VARCHAR(20) = NULL
+    @idStaffTecnico INT          = NULL OUTPUT,
+    @idSeleccion    INT          = NULL,
+    @nombreApellido VARCHAR(200) = NULL,
+    @rol            VARCHAR(25)  = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -651,11 +690,9 @@ BEGIN
             @mensaje NVARCHAR(2048),
             @salto   NVARCHAR(2)   = CHAR(13) + CHAR(10);
 
-    SET @operacion = UPPER(LTRIM(RTRIM(@operacion)));
-    SET @nombre    = LTRIM(RTRIM(@nombre));
-    SET @apellido  = LTRIM(RTRIM(@apellido));
-    SET @documento = LTRIM(RTRIM(@documento));
-    SET @rol       = LTRIM(RTRIM(@rol));
+    SET @operacion      = UPPER(LTRIM(RTRIM(@operacion)));
+    SET @nombreApellido = LTRIM(RTRIM(@nombreApellido));
+    SET @rol            = LTRIM(RTRIM(@rol));
 
     IF @operacion IS NULL OR @operacion NOT IN ('ALTA', 'MODIFICACION', 'BAJA')
         THROW 52001, 'Operación inválida. Valores permitidos: ALTA, MODIFICACION, BAJA.', 1;
@@ -674,30 +711,18 @@ BEGIN
            OR NOT EXISTS (SELECT 1 FROM nucleo.Seleccion WHERE IdSeleccion = @idSeleccion)
             SET @errores += N'- La selección indicada no existe.' + @salto;
 
-        IF @nombre IS NULL OR @nombre = ''
-            SET @errores += N'- El nombre es obligatorio.' + @salto;
+        IF @nombreApellido IS NULL OR @nombreApellido = ''
+            SET @errores += N'- El nombre y apellido es obligatorio.' + @salto;
 
-        IF @apellido IS NULL OR @apellido = ''
-            SET @errores += N'- El apellido es obligatorio.' + @salto;
-
-        IF @documento IS NULL OR @documento = ''
-            SET @errores += N'- El documento es obligatorio.' + @salto;
-        ELSE IF EXISTS (SELECT 1
-                        FROM nucleo.StaffTecnico
-                        WHERE Documento = @documento
-                          AND (@operacion = 'ALTA' OR IdStaffTecnico <> @idStaffTecnico))
-            SET @errores += N'- Ya existe otro integrante del staff técnico con ese documento.' + @salto;
-
-        IF @rol IS NULL OR @rol NOT IN ('Director Tecnico', 'Ayudante')
-            SET @errores += N'- El rol es obligatorio y debe ser: Director Tecnico o Ayudante.' + @salto;
-        ELSE IF @rol = 'Director Tecnico'
-                AND @idSeleccion IS NOT NULL
+        IF @rol IS NULL OR @rol NOT IN ('Director Técnico', 'Ayudante de campo 1', 'Ayudante de campo 2')
+            SET @errores += N'- El rol es obligatorio y debe ser: Director Técnico, Ayudante de campo 1 o Ayudante de campo 2.' + @salto;
+        ELSE IF @idSeleccion IS NOT NULL
                 AND EXISTS (SELECT 1
                             FROM nucleo.StaffTecnico
                             WHERE IdSeleccion = @idSeleccion
-                              AND Rol = 'Director Tecnico'
+                              AND Rol = @rol
                               AND (@operacion = 'ALTA' OR IdStaffTecnico <> @idStaffTecnico))
-            SET @errores += N'- La selección ya tiene asignado un Director Tecnico.' + @salto;
+            SET @errores += N'- La selección ya tiene asignado un integrante para ese rol.' + @salto;
     END;
 
     IF @operacion = 'BAJA'
@@ -717,19 +742,17 @@ BEGIN
 
         IF @operacion = 'ALTA'
         BEGIN
-            INSERT INTO nucleo.StaffTecnico (IdSeleccion, Nombre, Apellido, Documento, Rol)
-            VALUES (@idSeleccion, @nombre, @apellido, @documento, @rol);
+            INSERT INTO nucleo.StaffTecnico (IdSeleccion, NombreApellido, Rol)
+            VALUES (@idSeleccion, @nombreApellido, @rol);
 
             SET @idStaffTecnico = SCOPE_IDENTITY();
         END
         ELSE IF @operacion = 'MODIFICACION'
         BEGIN
             UPDATE nucleo.StaffTecnico
-            SET IdSeleccion = @idSeleccion,
-                Nombre      = @nombre,
-                Apellido    = @apellido,
-                Documento   = @documento,
-                Rol         = @rol
+            SET IdSeleccion    = @idSeleccion,
+                NombreApellido = @nombreApellido,
+                Rol            = @rol
             WHERE IdStaffTecnico = @idStaffTecnico;
         END
         ELSE
@@ -753,8 +776,8 @@ GO
 -- =========================================================================
 CREATE OR ALTER PROCEDURE nucleo.SP_ABM_Idioma
     @operacion VARCHAR(12),
-    @idIdioma  INT         = NULL OUTPUT,
-    @nombre    VARCHAR(40) = NULL
+    @idIdioma  INT          = NULL OUTPUT,
+    @nombre    VARCHAR(100) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -841,8 +864,8 @@ GO
 -- =========================================================================
 CREATE OR ALTER PROCEDURE nucleo.SP_ABM_Categoria
     @operacion   VARCHAR(12),
-    @idCategoria INT         = NULL OUTPUT,
-    @descripcion VARCHAR(40) = NULL
+    @idCategoria INT          = NULL OUTPUT,
+    @nombre      VARCHAR(100) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -851,8 +874,8 @@ BEGIN
             @mensaje NVARCHAR(2048),
             @salto   NVARCHAR(2)   = CHAR(13) + CHAR(10);
 
-    SET @operacion   = UPPER(LTRIM(RTRIM(@operacion)));
-    SET @descripcion = LTRIM(RTRIM(@descripcion));
+    SET @operacion = UPPER(LTRIM(RTRIM(@operacion)));
+    SET @nombre    = LTRIM(RTRIM(@nombre));
 
     IF @operacion IS NULL OR @operacion NOT IN ('ALTA', 'MODIFICACION', 'BAJA')
         THROW 52001, 'Operación inválida. Valores permitidos: ALTA, MODIFICACION, BAJA.', 1;
@@ -867,13 +890,13 @@ BEGIN
 
     IF @operacion IN ('ALTA', 'MODIFICACION')
     BEGIN
-        IF @descripcion IS NULL OR @descripcion = ''
-            SET @errores += N'- La descripción de la categoría es obligatoria.' + @salto;
+        IF @nombre IS NULL OR @nombre = ''
+            SET @errores += N'- El nombre de la categoría es obligatorio.' + @salto;
         ELSE IF EXISTS (SELECT 1
                         FROM nucleo.Categoria
-                        WHERE Descripcion = @descripcion
+                        WHERE Nombre = @nombre
                           AND (@operacion = 'ALTA' OR IdCategoria <> @idCategoria))
-            SET @errores += N'- Ya existe otra categoría con esa descripción.' + @salto;
+            SET @errores += N'- Ya existe otra categoría con ese nombre.' + @salto;
     END;
 
     IF @operacion = 'BAJA'
@@ -893,15 +916,15 @@ BEGIN
 
         IF @operacion = 'ALTA'
         BEGIN
-            INSERT INTO nucleo.Categoria (Descripcion)
-            VALUES (@descripcion);
+            INSERT INTO nucleo.Categoria (Nombre)
+            VALUES (@nombre);
 
             SET @idCategoria = SCOPE_IDENTITY();
         END
         ELSE IF @operacion = 'MODIFICACION'
         BEGIN
             UPDATE nucleo.Categoria
-            SET Descripcion = @descripcion
+            SET Nombre = @nombre
             WHERE IdCategoria = @idCategoria;
         END
         ELSE
@@ -925,13 +948,13 @@ GO
 -- =========================================================================
 CREATE OR ALTER PROCEDURE nucleo.SP_ABM_Arbitro
     @operacion       VARCHAR(12),
-    @idArbitro       INT         = NULL OUTPUT,
-    @nombre          VARCHAR(60) = NULL,
-    @apellido        VARCHAR(60) = NULL,
-    @documento       VARCHAR(20) = NULL,
-    @fechaNacimiento DATE        = NULL,
-    @idPais          INT         = NULL,
-    @idCategoria     INT         = NULL
+    @idArbitro       INT          = NULL OUTPUT,
+    @nombreApellido  VARCHAR(200) = NULL,
+    @sexo            CHAR(1)      = NULL,
+    @estaHabilitado  CHAR(1)      = 'Y',
+    @fechaNacimiento DATE         = NULL,
+    @idPais          INT          = NULL,
+    @idCategoria     INT          = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -940,10 +963,10 @@ BEGIN
             @mensaje NVARCHAR(2048),
             @salto   NVARCHAR(2)   = CHAR(13) + CHAR(10);
 
-    SET @operacion = UPPER(LTRIM(RTRIM(@operacion)));
-    SET @nombre    = LTRIM(RTRIM(@nombre));
-    SET @apellido  = LTRIM(RTRIM(@apellido));
-    SET @documento = LTRIM(RTRIM(@documento));
+    SET @operacion      = UPPER(LTRIM(RTRIM(@operacion)));
+    SET @nombreApellido = LTRIM(RTRIM(@nombreApellido));
+    SET @sexo           = NULLIF(UPPER(LTRIM(RTRIM(@sexo))), '');
+    SET @estaHabilitado = UPPER(LTRIM(RTRIM(ISNULL(@estaHabilitado, 'Y'))));
 
     IF @operacion IS NULL OR @operacion NOT IN ('ALTA', 'MODIFICACION', 'BAJA')
         THROW 52001, 'Operación inválida. Valores permitidos: ALTA, MODIFICACION, BAJA.', 1;
@@ -958,22 +981,19 @@ BEGIN
 
     IF @operacion IN ('ALTA', 'MODIFICACION')
     BEGIN
-        IF @nombre IS NULL OR @nombre = ''
-            SET @errores += N'- El nombre del árbitro es obligatorio.' + @salto;
+        IF @nombreApellido IS NULL OR @nombreApellido = ''
+            SET @errores += N'- El nombre y apellido del árbitro es obligatorio.' + @salto;
 
-        IF @apellido IS NULL OR @apellido = ''
-            SET @errores += N'- El apellido del árbitro es obligatorio.' + @salto;
+        IF @sexo IS NOT NULL AND @sexo NOT IN ('M', 'F')
+            SET @errores += N'- El sexo debe ser M o F.' + @salto;
 
-        IF @documento IS NULL OR @documento = ''
-            SET @errores += N'- El documento del árbitro es obligatorio.' + @salto;
-        ELSE IF EXISTS (SELECT 1
-                        FROM nucleo.Arbitro
-                        WHERE Documento = @documento
-                          AND (@operacion = 'ALTA' OR IdArbitro <> @idArbitro))
-            SET @errores += N'- Ya existe otro árbitro con ese documento.' + @salto;
+        IF @estaHabilitado NOT IN ('Y', 'N')
+            SET @errores += N'- El estado de habilitación debe ser Y o N.' + @salto;
 
-        IF @fechaNacimiento IS NOT NULL AND @fechaNacimiento > CAST(GETDATE() AS DATE)
-            SET @errores += N'- La fecha de nacimiento no puede ser futura.' + @salto;
+        IF @fechaNacimiento IS NULL
+            SET @errores += N'- La fecha de nacimiento es obligatoria.' + @salto;
+        ELSE IF @fechaNacimiento < '1930-01-01' OR @fechaNacimiento >= CAST(GETDATE() AS DATE)
+            SET @errores += N'- La fecha de nacimiento debe ser mayor o igual a 1930-01-01 y anterior a hoy.' + @salto;
 
         IF @idPais IS NULL
            OR NOT EXISTS (SELECT 1 FROM nucleo.Pais WHERE IdPais = @idPais)
@@ -1005,17 +1025,17 @@ BEGIN
 
         IF @operacion = 'ALTA'
         BEGIN
-            INSERT INTO nucleo.Arbitro (Nombre, Apellido, Documento, FechaNacimiento, IdPais, IdCategoria)
-            VALUES (@nombre, @apellido, @documento, @fechaNacimiento, @idPais, @idCategoria);
+            INSERT INTO nucleo.Arbitro (NombreApellido, Sexo, EstaHabilitado, FechaNacimiento, IdPais, IdCategoria)
+            VALUES (@nombreApellido, @sexo, @estaHabilitado, @fechaNacimiento, @idPais, @idCategoria);
 
             SET @idArbitro = SCOPE_IDENTITY();
         END
         ELSE IF @operacion = 'MODIFICACION'
         BEGIN
             UPDATE nucleo.Arbitro
-            SET Nombre          = @nombre,
-                Apellido        = @apellido,
-                Documento       = @documento,
+            SET NombreApellido  = @nombreApellido,
+                Sexo            = @sexo,
+                EstaHabilitado  = @estaHabilitado,
                 FechaNacimiento = @fechaNacimiento,
                 IdPais          = @idPais,
                 IdCategoria     = @idCategoria
@@ -1116,12 +1136,12 @@ GO
 -- En ALTA delega en nucleo.SP_CONTROL_ARBITRAL (mismo patrón que SP_ABM_Gol).
 -- =========================================================================
 CREATE OR ALTER PROCEDURE nucleo.SP_ABM_DesignacionArbitral
-    @operacion     VARCHAR(12),
-    @idDesignacion INT          = NULL OUTPUT,
-    @idPartido     INT          = NULL,
-    @idArbitro     INT          = NULL,
-    @rol           VARCHAR(15)  = NULL,
-    @advertencia   VARCHAR(200) = NULL OUTPUT
+    @operacion             VARCHAR(12),
+    @idDesignacionArbitral INT          = NULL OUTPUT,
+    @idPartido             INT          = NULL,
+    @idArbitro             INT          = NULL,
+    @rol                   VARCHAR(15)  = NULL,
+    @advertencia           VARCHAR(200) = NULL OUTPUT
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -1142,30 +1162,30 @@ BEGIN
             @rol         = @rol,
             @advertencia = @advertencia OUTPUT;
 
-        SELECT @idDesignacion = d.IdDesignacion
+        SELECT @idDesignacionArbitral = d.IdDesignacionArbitral
         FROM nucleo.DesignacionArbitral AS d
         WHERE d.IdPartido = @idPartido
           AND d.IdArbitro = @idArbitro;
         RETURN;
     END;
 
-    DECLARE @errores         NVARCHAR(MAX) = N'',
-            @mensaje         NVARCHAR(2048),
-            @salto           NVARCHAR(2)   = CHAR(13) + CHAR(10),
-            @idPartidoActual INT,
-            @estadoActual    VARCHAR(10),
-            @idFaseDestino   INT,
-            @descFaseDestino VARCHAR(50),
-            @estadoDestino   VARCHAR(10),
-            @idPaisArbitro   INT,
-            @rolValido       BIT = 0,
-            @maxPorRol       INT;
+    DECLARE @errores           NVARCHAR(MAX) = N'',
+            @mensaje           NVARCHAR(2048),
+            @salto             NVARCHAR(2)   = CHAR(13) + CHAR(10),
+            @idPartidoActual   INT,
+            @estadoActual      VARCHAR(10),
+            @idFaseDestino     INT,
+            @nombreFaseDestino VARCHAR(50),
+            @estadoDestino     VARCHAR(10),
+            @idPaisArbitro     INT,
+            @rolValido         BIT = 0,
+            @maxPorRol         INT;
 
     SELECT @idPartidoActual = d.IdPartido,
            @estadoActual    = p.Estado
     FROM nucleo.DesignacionArbitral AS d
     INNER JOIN nucleo.Partido AS p ON p.IdPartido = d.IdPartido
-    WHERE d.IdDesignacion = @idDesignacion;
+    WHERE d.IdDesignacionArbitral = @idDesignacionArbitral;
 
     -- ---- Validaciones ----------------------------------------------------
     IF @idPartidoActual IS NULL
@@ -1175,9 +1195,9 @@ BEGIN
 
     IF @operacion = 'MODIFICACION'
     BEGIN
-        SELECT @idFaseDestino   = p.IdFase,
-               @descFaseDestino = f.Descripcion,
-               @estadoDestino   = p.Estado
+        SELECT @idFaseDestino     = p.IdFase,
+               @nombreFaseDestino = f.Nombre,
+               @estadoDestino     = p.Estado
         FROM nucleo.Partido AS p
         INNER JOIN nucleo.Fase AS f ON f.IdFase = p.IdFase
         WHERE p.IdPartido = @idPartido;
@@ -1186,8 +1206,8 @@ BEGIN
         FROM nucleo.Arbitro AS a
         WHERE a.IdArbitro = @idArbitro;
 
-        IF @rol IS NULL OR @rol NOT IN ('Principal', 'Asistente', 'Cuarto', 'VAR')
-            SET @errores += N'- Rol inválido. Valores permitidos: Principal, Asistente, Cuarto, VAR.' + @salto;
+        IF @rol IS NULL OR @rol NOT IN ('Principal', 'Asistente 1', 'Asistente 2', 'Cuarto', 'VAR')
+            SET @errores += N'- Rol inválido. Valores permitidos: Principal, Asistente 1, Asistente 2, Cuarto, VAR.' + @salto;
         ELSE
             SET @rolValido = 1;
 
@@ -1203,7 +1223,7 @@ BEGIN
         BEGIN
             IF EXISTS (
                 SELECT 1
-                FROM jugadores.fn_SeleccionesDelPartido(@idPartido) AS sp
+                FROM nucleo.fn_SeleccionesDelPartido(@idPartido) AS sp
                 INNER JOIN nucleo.Seleccion AS s ON s.IdSeleccion = sp.IdSeleccion
                 WHERE s.IdPais = @idPaisArbitro
             )
@@ -1214,28 +1234,28 @@ BEGIN
                 FROM nucleo.DesignacionArbitral AS d
                 WHERE d.IdPartido = @idPartido
                   AND d.IdArbitro = @idArbitro
-                  AND d.IdDesignacion <> @idDesignacion
+                  AND d.IdDesignacionArbitral <> @idDesignacionArbitral
             )
                 SET @errores += N'- El árbitro ya está designado en ese partido.' + @salto;
         END;
 
         IF @idFaseDestino IS NOT NULL AND @rolValido = 1
         BEGIN
-            SET @maxPorRol = CASE @rol WHEN 'Asistente' THEN 2 ELSE 1 END;
+            SET @maxPorRol = 1;
 
             IF (
                 SELECT COUNT(*)
                 FROM nucleo.DesignacionArbitral AS d
                 WHERE d.IdPartido = @idPartido
                   AND d.Rol = @rol
-                  AND d.IdDesignacion <> @idDesignacion
+                  AND d.IdDesignacionArbitral <> @idDesignacionArbitral
             ) >= @maxPorRol
                 SET @errores += N'- El partido ya tiene cubiertos los lugares para ese rol.' + @salto;
         END;
     END
     ELSE IF @operacion = 'BAJA' AND @idPartidoActual IS NOT NULL
     BEGIN
-        IF EXISTS (SELECT 1 FROM nucleo.Sancion WHERE IdDesignacion = @idDesignacion)
+        IF EXISTS (SELECT 1 FROM nucleo.Sancion WHERE IdDesignacionArbitral = @idDesignacionArbitral)
             SET @errores += N'- La designación tiene sanciones o informes asociados y no puede eliminarse.' + @salto;
     END;
 
@@ -1256,12 +1276,12 @@ BEGIN
             SET IdPartido = @idPartido,
                 IdArbitro = @idArbitro,
                 Rol       = @rol
-            WHERE IdDesignacion = @idDesignacion;
+            WHERE IdDesignacionArbitral = @idDesignacionArbitral;
         END
         ELSE
         BEGIN
             DELETE FROM nucleo.DesignacionArbitral
-            WHERE IdDesignacion = @idDesignacion;
+            WHERE IdDesignacionArbitral = @idDesignacionArbitral;
         END;
 
         COMMIT TRANSACTION;
@@ -1273,11 +1293,11 @@ BEGIN
     END CATCH;
 
     IF @operacion = 'MODIFICACION'
-       AND @descFaseDestino IN ('Dieciseisavos', 'Octavos', 'Cuartos', 'Semifinal', 'Tercer puesto', 'Final')
+       AND @nombreFaseDestino IN ('Dieciseisavos de final', 'Octavos de final', 'Cuartos de final', 'Semifinal', 'Tercer puesto', 'Final')
        AND EXISTS (
             SELECT 1
             FROM nucleo.Partido AS p
-            CROSS APPLY jugadores.fn_SeleccionesDelPartido(p.IdPartido) AS sp
+            CROSS APPLY nucleo.fn_SeleccionesDelPartido(p.IdPartido) AS sp
             INNER JOIN nucleo.Seleccion AS s ON s.IdSeleccion = sp.IdSeleccion
             WHERE p.IdFase = @idFaseDestino
               AND p.IdPartido <> @idPartido
@@ -1295,12 +1315,12 @@ GO
 -- Sanciones e informes post-partido recibidos por un árbitro.
 -- =========================================================================
 CREATE OR ALTER PROCEDURE nucleo.SP_ABM_Sancion
-    @operacion     VARCHAR(12),
-    @idSancion     INT          = NULL OUTPUT,
-    @idDesignacion INT          = NULL,
-    @tipo          VARCHAR(20)  = NULL,
-    @descripcion   VARCHAR(500) = NULL,
-    @fecha         DATE         = NULL
+    @operacion             VARCHAR(12),
+    @idSancion             INT          = NULL OUTPUT,
+    @idDesignacionArbitral INT          = NULL,
+    @tipo                  VARCHAR(20)  = NULL,
+    @descripcion           VARCHAR(300) = NULL,
+    @fecha                 DATE         = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -1328,18 +1348,18 @@ BEGIN
 
     IF @operacion IN ('ALTA', 'MODIFICACION')
     BEGIN
-        SELECT @fechaPartido = CAST(p.FechaHoraLocal AS DATE)
+        SELECT @fechaPartido = CAST(p.FechaHoraUTC AS DATE)
         FROM nucleo.DesignacionArbitral AS d
         INNER JOIN nucleo.Partido AS p ON p.IdPartido = d.IdPartido
-        WHERE d.IdDesignacion = @idDesignacion;
+        WHERE d.IdDesignacionArbitral = @idDesignacionArbitral;
 
         IF @fechaPartido IS NULL
             SET @errores += N'- La designación arbitral indicada no existe.' + @salto;
         ELSE IF @fechaEfectiva < @fechaPartido
             SET @errores += N'- La fecha de la sanción/informe no puede ser anterior a la fecha del partido.' + @salto;
 
-        IF @tipo IS NULL OR @tipo NOT IN ('Informe', 'Advertencia', 'Multa', 'Suspension')
-            SET @errores += N'- El tipo es obligatorio y debe ser: Informe, Advertencia, Multa o Suspension.' + @salto;
+        IF @tipo IS NULL OR @tipo NOT IN ('Suspension Temporal', 'Inhabilitacion', 'Multa', 'Advertencia', 'Informe')
+            SET @errores += N'- El tipo es obligatorio y debe ser: Suspension Temporal, Inhabilitacion, Multa, Advertencia o Informe.' + @salto;
 
         IF @descripcion IS NULL OR @descripcion = ''
             SET @errores += N'- La descripción de la sanción o informe es obligatoria.' + @salto;
@@ -1358,18 +1378,18 @@ BEGIN
 
         IF @operacion = 'ALTA'
         BEGIN
-            INSERT INTO nucleo.Sancion (IdDesignacion, Tipo, Descripcion, Fecha)
-            VALUES (@idDesignacion, @tipo, @descripcion, @fechaEfectiva);
+            INSERT INTO nucleo.Sancion (IdDesignacionArbitral, Tipo, Descripcion, Fecha)
+            VALUES (@idDesignacionArbitral, @tipo, @descripcion, @fechaEfectiva);
 
             SET @idSancion = SCOPE_IDENTITY();
         END
         ELSE IF @operacion = 'MODIFICACION'
         BEGIN
             UPDATE nucleo.Sancion
-            SET IdDesignacion = @idDesignacion,
-                Tipo          = @tipo,
-                Descripcion   = @descripcion,
-                Fecha         = @fechaEfectiva
+            SET IdDesignacionArbitral = @idDesignacionArbitral,
+                Tipo                  = @tipo,
+                Descripcion           = @descripcion,
+                Fecha                 = @fechaEfectiva
             WHERE IdSancion = @idSancion;
         END
         ELSE
