@@ -16,7 +16,7 @@ Objetivo: Probar nucleo.SP_CONTROL_ARBITRAL (script 08_SP_ControlArbitral.sql): 
 Escenario (fase Octavos de final, todos los países con huso horario válido):
   TEST Pais 1..4 tienen selección 1..4. Partido 251 = sel 1 vs sel 2; partido 252 = sel 3 vs sel 4.
   TEST Pais 5 no tiene selección.
-  Árbitros: ArbT1 (país 1), ArbT3 (país 3), ArbT5a/b/c/d (país 5).
+  Árbitros: ArbT1 (país 1), ArbT3 (país 3), ArbT5a/b/c/d (país 5) y ArbT5e (país 5, no habilitado).
 */
 
 USE MundialFutbol;
@@ -84,12 +84,17 @@ VALUES ('TEST ArbT1',  '1985-01-01', @pais1, @idCategoria),
        ('TEST ArbT5c', '1985-01-01', @pais5, @idCategoria),
        ('TEST ArbT5d', '1985-01-01', @pais5, @idCategoria);
 
+-- Árbitro no habilitado (para el caso 2.G).
+INSERT INTO nucleo.Arbitro (NombreApellido, EstaHabilitado, FechaNacimiento, IdPais, IdCategoria)
+VALUES ('TEST ArbT5e', 'N', '1985-01-01', @pais5, @idCategoria);
+
 DECLARE @arbT1  SMALLINT = (SELECT IdArbitro FROM nucleo.Arbitro WHERE NombreApellido = 'TEST ArbT1');
 DECLARE @arbT3  SMALLINT = (SELECT IdArbitro FROM nucleo.Arbitro WHERE NombreApellido = 'TEST ArbT3');
 DECLARE @arbT5a SMALLINT = (SELECT IdArbitro FROM nucleo.Arbitro WHERE NombreApellido = 'TEST ArbT5a');
 DECLARE @arbT5b SMALLINT = (SELECT IdArbitro FROM nucleo.Arbitro WHERE NombreApellido = 'TEST ArbT5b');
 DECLARE @arbT5c SMALLINT = (SELECT IdArbitro FROM nucleo.Arbitro WHERE NombreApellido = 'TEST ArbT5c');
 DECLARE @arbT5d SMALLINT = (SELECT IdArbitro FROM nucleo.Arbitro WHERE NombreApellido = 'TEST ArbT5d');
+DECLARE @arbT5e SMALLINT = (SELECT IdArbitro FROM nucleo.Arbitro WHERE NombreApellido = 'TEST ArbT5e');
 
 DECLARE @faseOctavos TINYINT = (SELECT IdFase FROM nucleo.Fase WHERE Nombre = 'Octavos de final');
 DECLARE @sede TINYINT, @p251 SMALLINT, @p252 SMALLINT, @adv VARCHAR(200);
@@ -177,6 +182,19 @@ BEGIN TRY
 END TRY
 BEGIN CATCH
     PRINT 'TEST 2.E OK (Bloqueado): ' + ERROR_MESSAGE();
+END CATCH;
+
+-- 2.G Árbitro no habilitado: ArbT5e (EstaHabilitado = 'N', país 5 sin conflicto) como Cuarto (rol libre).
+-- Resultado esperado: THROW 52000 con 1 renglón ("El árbitro no está habilitado para ser designado").
+BEGIN TRY
+    EXEC nucleo.SP_CONTROL_ARBITRAL @p251, @arbT5e, 'Cuarto', @adv OUTPUT;
+    PRINT 'TEST 2.G FALLÓ: designó a un árbitro no habilitado.';
+END TRY
+BEGIN CATCH
+    IF ERROR_NUMBER() = 52000 AND ERROR_MESSAGE() LIKE N'%no está habilitado%'
+        PRINT 'TEST 2.G OK (Bloqueado): ' + ERROR_MESSAGE();
+    ELSE
+        PRINT 'TEST 2.G FALLÓ: error inesperado -> ' + ERROR_MESSAGE();
 END CATCH;
 
 -- 2.F Ninguna designación inválida debe haber quedado guardada.

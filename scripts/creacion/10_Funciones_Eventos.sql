@@ -160,9 +160,12 @@ BEGIN
            @idLocal        = p.IdSeleccionLocal,
            @idVisitante    = p.IdSeleccionVisitante,
            @fechaHoraUTC   = p.FechaHoraUTC,
-           @fechaLocal     = CAST(p.FechaHoraUTC AS DATE)
+           -- Fecha local de la sede (huso de su ciudad), no la fecha UTC.
+           @fechaLocal     = CAST((p.FechaHoraUTC AT TIME ZONE 'UTC') AT TIME ZONE c.HusoHorario AS DATE)
     FROM nucleo.Partido AS p
     INNER JOIN nucleo.Fase AS f ON f.IdFase = p.IdFase
+    INNER JOIN nucleo.Sede AS s ON s.IdSede = p.IdSede
+    INNER JOIN nucleo.Ciudad AS c ON c.IdCiudad = s.IdCiudad
     WHERE p.IdPartido = @idPartido;
 
     SELECT @idTipoGol = t.IdTipoGol FROM eventos.TipoGol AS t WHERE t.Descripcion = @tipoGol;
@@ -316,8 +319,11 @@ BEGIN
            @idLocal      = p.IdSeleccionLocal,
            @idVisitante  = p.IdSeleccionVisitante,
            @fechaHoraUTC = p.FechaHoraUTC,
-           @fechaLocal   = CAST(p.FechaHoraUTC AS DATE)
+           -- Fecha local de la sede (huso de su ciudad), no la fecha UTC.
+           @fechaLocal   = CAST((p.FechaHoraUTC AT TIME ZONE 'UTC') AT TIME ZONE c.HusoHorario AS DATE)
     FROM nucleo.Partido AS p
+    INNER JOIN nucleo.Sede AS s ON s.IdSede = p.IdSede
+    INNER JOIN nucleo.Ciudad AS c ON c.IdCiudad = s.IdCiudad
     WHERE p.IdPartido = @idPartido;
 
     SELECT @susRoja  = r.PartidosSuspension FROM eventos.ReglaSuspension AS r WHERE r.Criterio = 'Roja Directa';

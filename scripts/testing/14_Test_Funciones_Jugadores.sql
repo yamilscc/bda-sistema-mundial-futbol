@@ -13,6 +13,7 @@ Objetivo: Probar las funciones de 14_Funciones_Jugadores.sql:
           - jugadores.fn_JugadorEnCancha y jugadores.fn_JugadoresEnCancha
           - jugadores.fn_ValidarConvocatoria, jugadores.fn_ValidarFormacionJugador
             y jugadores.fn_ValidarSustitucion
+          - Fecha local del partido (huso de la ciudad de la sede) al validar bajas de convocatoria.
           Requiere ejecutados los scripts 01 a 14.
           Todo corre dentro de una transacción que se deshace al final (ROLLBACK).
 */
@@ -154,6 +155,42 @@ SELECT '3.B' AS Test,
 -- 3.C fn_ValidarSustitucion: intento de sacar a J2 en minuto 75 (ya expulsado en el 60).
 SELECT '3.C' AS Test,
        REPLACE(jugadores.fn_ValidarSustitucion(@idPartido, @idJ2, @idJ3, 75, 'Regular', 'Tactico', 1, NULL), CHAR(13) + CHAR(10), ' | ') AS Errores_Esperados;
+
+-- =========================================================================
+-- TEST 4: fecha local del partido en fn_ValidarFormacionJugador (baja de convocatoria)
+-- Partido 230: 2026-06-13 01:00 UTC = 2026-06-12 22:00 en la sede (Argentina, UTC-3).
+-- La baja se compara contra la fecha LOCAL (12/06), no contra la fecha UTC (13/06).
+-- =========================================================================
+DECLARE @idPartidoNoche INT;
+INSERT INTO nucleo.Partido (NumeroPartido, FechaHoraUTC, Estado, IdFase, IdSede, IdSeleccionLocal, IdSeleccionVisitante)
+VALUES (230, '2026-06-13 01:00', 'Programado', @idFase, @idSede, @idSel1, @idSel2);
+SET @idPartidoNoche = SCOPE_IDENTITY();
+
+INSERT INTO jugadores.Formacion (IdPartido, Localia, EsquemaTactico)
+VALUES (@idPartidoNoche, 'Local', '4-3-3');
+DECLARE @idFormNoche INT = (SELECT IdFormacion FROM jugadores.Formacion WHERE IdPartido = @idPartidoNoche AND Localia = 'Local');
+
+-- J1 es dado de baja el 13/06 (día UTC del partido, pero un día después de la fecha local).
+INSERT INTO jugadores.Baja (IdConvocatoria, FechaBaja, Motivo)
+SELECT IdConvocatoria, '2026-06-13', 'TEST FJ Baja posterior a la fecha local'
+FROM jugadores.Convocatoria WHERE IdJugador = @idJ1;
+
+-- 4.A Baja el 13/06 y partido el 12/06 local.
+-- Esperado: OK, el resultado NO incluye "dado de baja" (con la fecha UTC sí lo incluiría).
+SELECT '4.A' AS Test,
+       CASE WHEN jugadores.fn_ValidarFormacionJugador(@idFormNoche, @idJ1, 'Titular', 'Delantero', 9, 0) LIKE N'%dado de baja%'
+            THEN 'FALLÓ' ELSE 'OK' END AS Resultado_Esperado_OK;
+
+-- 4.B La baja pasa al 12/06 (misma fecha local del partido).
+-- Esperado: OK, el resultado SÍ incluye "dado de baja de la convocatoria para la fecha del partido".
+UPDATE b SET FechaBaja = '2026-06-12'
+FROM jugadores.Baja AS b
+INNER JOIN jugadores.Convocatoria AS c ON c.IdConvocatoria = b.IdConvocatoria
+WHERE c.IdJugador = @idJ1;
+
+SELECT '4.B' AS Test,
+       CASE WHEN jugadores.fn_ValidarFormacionJugador(@idFormNoche, @idJ1, 'Titular', 'Delantero', 9, 0) LIKE N'%dado de baja%'
+            THEN 'OK' ELSE 'FALLÓ' END AS Resultado_Esperado_OK;
 
 ROLLBACK TRANSACTION;
 GO

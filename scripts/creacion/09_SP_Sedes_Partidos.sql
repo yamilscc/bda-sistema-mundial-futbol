@@ -14,7 +14,9 @@ Objetivo:
 
 Convenciones de estos SP:
 	- Cada SP acumula todas las condiciones incumplidas y las informa en UN solo mensaje
-	  (THROW 52000). La operación corre dentro de una transacción explícita.
+	  (THROW 52000). La operación corre dentro de una transacción explícita. Si el llamador
+	  ya tiene una transacción abierta, el SP usa un savepoint (PuntoSP) y ante un error
+	  solo deshace lo propio: un error de validación no cierra la transacción del llamador.
 	- Los parámetros de ids y de número de partido son INT: así un valor fuera de rango
 	  se informa dentro del mensaje consolidado y no como error de conversión al invocar.
 	- Las validaciones comunes de Alta y Modificación están repetidas en ambos SP, en el mismo
@@ -56,6 +58,8 @@ BEGIN
 	SET NOCOUNT ON;
 
 	DECLARE @errores NVARCHAR(MAX) = N'',
+	        @tranExterna BIT = IIF(@@TRANCOUNT > 0, 1, 0), -- 1 si el llamador ya abrió una transacción
+	        @savepoint   BIT = 0,                          -- 1 cuando se tomó el savepoint PuntoSP
 	        @mensaje NVARCHAR(2048),
 	        @salto   NVARCHAR(2) = CHAR(13) + CHAR(10);
 
@@ -97,18 +101,29 @@ BEGIN
 			THROW 52000, @mensaje, 1;
 		END;
 
-		BEGIN TRANSACTION;
+		IF @tranExterna = 0
+			BEGIN TRANSACTION;
+		ELSE
+		BEGIN
+			SAVE TRANSACTION PuntoSP;
+			SET @savepoint = 1;
+		END;
 
 			INSERT INTO nucleo.Sede (NombreEstadio, Capacidad, Latitud, Longitud, IdCiudad)
 			VALUES (@nombreEstadio, @capacidad, @latitud, @longitud, @idCiudad);
 
 			SET @idSede = SCOPE_IDENTITY();
 
-		COMMIT TRANSACTION;
+		IF @tranExterna = 0
+			COMMIT TRANSACTION;
 	END TRY
 	BEGIN CATCH
-		IF @@TRANCOUNT > 0
+		-- Solo se deshace lo propio: la transacción si la abrió este SP, o hasta el savepoint
+		-- si corre dentro de una transacción del llamador (que queda abierta y a su cargo).
+		IF @tranExterna = 0 AND @@TRANCOUNT > 0
 			ROLLBACK TRANSACTION;
+		ELSE IF @savepoint = 1 AND XACT_STATE() = 1
+			ROLLBACK TRANSACTION PuntoSP;
 		THROW;
 	END CATCH;
 END;
@@ -135,6 +150,8 @@ BEGIN
 	SET NOCOUNT ON;
 
 	DECLARE @errores NVARCHAR(MAX) = N'',
+	        @tranExterna BIT = IIF(@@TRANCOUNT > 0, 1, 0), -- 1 si el llamador ya abrió una transacción
+	        @savepoint   BIT = 0,                          -- 1 cuando se tomó el savepoint PuntoSP
 	        @mensaje NVARCHAR(2048),
 	        @salto   NVARCHAR(2) = CHAR(13) + CHAR(10);
 
@@ -201,7 +218,13 @@ BEGIN
 			THROW 52000, @mensaje, 1;
 		END;
 
-		BEGIN TRANSACTION;
+		IF @tranExterna = 0
+			BEGIN TRANSACTION;
+		ELSE
+		BEGIN
+			SAVE TRANSACTION PuntoSP;
+			SET @savepoint = 1;
+		END;
 
 			UPDATE nucleo.Sede
 			SET NombreEstadio = @nombreEstadio,
@@ -211,11 +234,16 @@ BEGIN
 			    IdCiudad      = @idCiudad
 			WHERE IdSede = @idSede;
 
-		COMMIT TRANSACTION;
+		IF @tranExterna = 0
+			COMMIT TRANSACTION;
 	END TRY
 	BEGIN CATCH
-		IF @@TRANCOUNT > 0
+		-- Solo se deshace lo propio: la transacción si la abrió este SP, o hasta el savepoint
+		-- si corre dentro de una transacción del llamador (que queda abierta y a su cargo).
+		IF @tranExterna = 0 AND @@TRANCOUNT > 0
 			ROLLBACK TRANSACTION;
+		ELSE IF @savepoint = 1 AND XACT_STATE() = 1
+			ROLLBACK TRANSACTION PuntoSP;
 		THROW;
 	END CATCH;
 END;
@@ -233,6 +261,8 @@ BEGIN
 	SET NOCOUNT ON;
 
 	DECLARE @errores NVARCHAR(MAX) = N'',
+	        @tranExterna BIT = IIF(@@TRANCOUNT > 0, 1, 0), -- 1 si el llamador ya abrió una transacción
+	        @savepoint   BIT = 0,                          -- 1 cuando se tomó el savepoint PuntoSP
 	        @mensaje NVARCHAR(2048),
 	        @salto   NVARCHAR(2) = CHAR(13) + CHAR(10);
 
@@ -248,15 +278,26 @@ BEGIN
 			THROW 52000, @mensaje, 1;
 		END;
 
-		BEGIN TRANSACTION;
+		IF @tranExterna = 0
+			BEGIN TRANSACTION;
+		ELSE
+		BEGIN
+			SAVE TRANSACTION PuntoSP;
+			SET @savepoint = 1;
+		END;
 
 			DELETE FROM nucleo.Sede WHERE IdSede = @idSede;
 
-		COMMIT TRANSACTION;
+		IF @tranExterna = 0
+			COMMIT TRANSACTION;
 	END TRY
 	BEGIN CATCH
-		IF @@TRANCOUNT > 0
+		-- Solo se deshace lo propio: la transacción si la abrió este SP, o hasta el savepoint
+		-- si corre dentro de una transacción del llamador (que queda abierta y a su cargo).
+		IF @tranExterna = 0 AND @@TRANCOUNT > 0
 			ROLLBACK TRANSACTION;
+		ELSE IF @savepoint = 1 AND XACT_STATE() = 1
+			ROLLBACK TRANSACTION PuntoSP;
 		THROW;
 	END CATCH;
 END;
@@ -282,6 +323,8 @@ BEGIN
 	SET NOCOUNT ON;
 
 	DECLARE @errores NVARCHAR(MAX) = N'',
+	        @tranExterna BIT = IIF(@@TRANCOUNT > 0, 1, 0), -- 1 si el llamador ya abrió una transacción
+	        @savepoint   BIT = 0,                          -- 1 cuando se tomó el savepoint PuntoSP
 	        @mensaje NVARCHAR(2048),
 	        @salto   NVARCHAR(2) = CHAR(13) + CHAR(10),
 	        @esEliminatoria   BIT,
@@ -411,18 +454,29 @@ BEGIN
 			THROW 52000, @mensaje, 1;
 		END;
 
-		BEGIN TRANSACTION;
+		IF @tranExterna = 0
+			BEGIN TRANSACTION;
+		ELSE
+		BEGIN
+			SAVE TRANSACTION PuntoSP;
+			SET @savepoint = 1;
+		END;
 
 			INSERT INTO nucleo.Partido (NumeroPartido, FechaHoraUTC, Estado, IdFase, IdSede, IdSeleccionLocal, IdSeleccionVisitante)
 			VALUES (@numeroPartido, @fechaHoraUTC, 'Programado', @idFase, @idSede, @idSeleccionLocal, @idSeleccionVisitante);
 
 			SET @idPartido = SCOPE_IDENTITY();
 
-		COMMIT TRANSACTION;
+		IF @tranExterna = 0
+			COMMIT TRANSACTION;
 	END TRY
 	BEGIN CATCH
-		IF @@TRANCOUNT > 0
+		-- Solo se deshace lo propio: la transacción si la abrió este SP, o hasta el savepoint
+		-- si corre dentro de una transacción del llamador (que queda abierta y a su cargo).
+		IF @tranExterna = 0 AND @@TRANCOUNT > 0
 			ROLLBACK TRANSACTION;
+		ELSE IF @savepoint = 1 AND XACT_STATE() = 1
+			ROLLBACK TRANSACTION PuntoSP;
 		THROW;
 	END CATCH;
 END;
@@ -452,6 +506,8 @@ BEGIN
 	SET NOCOUNT ON;
 
 	DECLARE @errores NVARCHAR(MAX) = N'',
+	        @tranExterna BIT = IIF(@@TRANCOUNT > 0, 1, 0), -- 1 si el llamador ya abrió una transacción
+	        @savepoint   BIT = 0,                          -- 1 cuando se tomó el savepoint PuntoSP
 	        @mensaje NVARCHAR(2048),
 	        @salto   NVARCHAR(2) = CHAR(13) + CHAR(10),
 	        @esEliminatoria   BIT,
@@ -650,7 +706,13 @@ BEGIN
 			THROW 52000, @mensaje, 1;
 		END;
 
-		BEGIN TRANSACTION;
+		IF @tranExterna = 0
+			BEGIN TRANSACTION;
+		ELSE
+		BEGIN
+			SAVE TRANSACTION PuntoSP;
+			SET @savepoint = 1;
+		END;
 
 			UPDATE nucleo.Partido
 			SET NumeroPartido        = @numeroPartido,
@@ -661,11 +723,16 @@ BEGIN
 			    IdSeleccionVisitante = @idSeleccionVisitante
 			WHERE IdPartido = @idPartido;
 
-		COMMIT TRANSACTION;
+		IF @tranExterna = 0
+			COMMIT TRANSACTION;
 	END TRY
 	BEGIN CATCH
-		IF @@TRANCOUNT > 0
+		-- Solo se deshace lo propio: la transacción si la abrió este SP, o hasta el savepoint
+		-- si corre dentro de una transacción del llamador (que queda abierta y a su cargo).
+		IF @tranExterna = 0 AND @@TRANCOUNT > 0
 			ROLLBACK TRANSACTION;
+		ELSE IF @savepoint = 1 AND XACT_STATE() = 1
+			ROLLBACK TRANSACTION PuntoSP;
 		THROW;
 	END CATCH;
 END;
@@ -684,6 +751,8 @@ BEGIN
 	SET NOCOUNT ON;
 
 	DECLARE @errores NVARCHAR(MAX) = N'',
+	        @tranExterna BIT = IIF(@@TRANCOUNT > 0, 1, 0), -- 1 si el llamador ya abrió una transacción
+	        @savepoint   BIT = 0,                          -- 1 cuando se tomó el savepoint PuntoSP
 	        @mensaje NVARCHAR(2048),
 	        @salto   NVARCHAR(2) = CHAR(13) + CHAR(10),
 	        @existe  BIT = 0,
@@ -732,15 +801,26 @@ BEGIN
 			THROW 52000, @mensaje, 1;
 		END;
 
-		BEGIN TRANSACTION;
+		IF @tranExterna = 0
+			BEGIN TRANSACTION;
+		ELSE
+		BEGIN
+			SAVE TRANSACTION PuntoSP;
+			SET @savepoint = 1;
+		END;
 
 			DELETE FROM nucleo.Partido WHERE IdPartido = @idPartido;
 
-		COMMIT TRANSACTION;
+		IF @tranExterna = 0
+			COMMIT TRANSACTION;
 	END TRY
 	BEGIN CATCH
-		IF @@TRANCOUNT > 0
+		-- Solo se deshace lo propio: la transacción si la abrió este SP, o hasta el savepoint
+		-- si corre dentro de una transacción del llamador (que queda abierta y a su cargo).
+		IF @tranExterna = 0 AND @@TRANCOUNT > 0
 			ROLLBACK TRANSACTION;
+		ELSE IF @savepoint = 1 AND XACT_STATE() = 1
+			ROLLBACK TRANSACTION PuntoSP;
 		THROW;
 	END CATCH;
 END;

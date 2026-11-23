@@ -8,20 +8,22 @@ Integrantes:
 - Chungara Tenorio, Denis Abner
 - Torczuk, Elías Alexei
 - Canseco Carrizo, Yamil Simón
-Objetivo: Probar eventos.fn_ResultadoPartido y eventos.fn_EstaSuspendido.
-          Requiere ejecutados los scripts 01 a 10 (usa SP_ABM_Sede y SP_ABM_Partido).
+Objetivo: Probar eventos.fn_ResultadoPartido, eventos.fn_EstaSuspendido y el uso de la fecha
+          local del partido en eventos.fn_ValidarGol y eventos.fn_ValidarAmonestacion.
+          Requiere ejecutados los scripts 01 a 10. Sede y partidos se cargan con INSERT directo.
           Datos de prueba con prefijo 'TEST EV' / 'TEST_EV', borrados al inicio y al final.
 
-Escenario: 4 países TEST (selecciones 1 a 4) y una sede.
+Escenario: 4 países TEST (selecciones 1 a 4, grupo Z) y una sede en Argentina (UTC-3).
   Jugadores: J1 y J2 son de la selección 1; J3 es de la selección 2.
-  Partidos (todos 20:00, 'Octavos', separados por 4 días por la regla de descanso):
-    9201 Sel1 (local) vs Sel2  12/06  -> prueba de resultado, con goles y tanda
-    9202 Sel1 (local) vs Sel2  16/06  -> prueba de resultado, sin goles
-    9203 Sel1 (local) vs Sel2  20/06  -> partido de la tarjeta (roja directa a J1, 2 partidos)
-    9204 Sel1 (local) vs Sel2  24/06
-    9205 Sel1 (local) vs Sel2  28/06
-    9206 Sel1 (local) vs Sel2  02/07
-    9207 Sel3 (local) vs Sel4  21/06  -> partido de otras selecciones
+  Partidos ('Octavos de final', 20:00 UTC, separados por 4 días; variables @p9201..@p9207):
+    241 Sel1 (local) vs Sel2  12/06  -> prueba de resultado, con goles y tanda
+    242 Sel1 (local) vs Sel2  16/06  -> prueba de resultado, sin goles
+    243 Sel1 (local) vs Sel2  20/06  -> partido de la tarjeta (roja directa a J1, 2 partidos)
+    244 Sel1 (local) vs Sel2  24/06
+    245 Sel1 (local) vs Sel2  28/06
+    246 Sel1 (local) vs Sel2  02/07
+    247 Sel3 (local) vs Sel4  21/06  -> partido de otras selecciones
+    248 Sel1 (local) vs Sel2  10/07 01:00 UTC = 09/07 22:00 local -> prueba de fecha local (TEST 3)
 */
 
 USE MundialFutbol;
@@ -33,9 +35,13 @@ GO
 DELETE FROM eventos.Gol          WHERE IdPartido IN (SELECT IdPartido FROM nucleo.Partido WHERE NumeroPartido BETWEEN 240 AND 249);
 DELETE FROM eventos.Amonestacion WHERE IdPartido IN (SELECT IdPartido FROM nucleo.Partido WHERE NumeroPartido BETWEEN 240 AND 249);
 DELETE FROM nucleo.Partido       WHERE NumeroPartido BETWEEN 240 AND 249;
+DELETE FROM jugadores.Baja       WHERE IdConvocatoria IN (SELECT c.IdConvocatoria FROM jugadores.Convocatoria AS c
+                                                          INNER JOIN jugadores.Jugador AS j ON j.IdJugador = c.IdJugador
+                                                          WHERE j.Documento LIKE 'TEST_EV%');
 DELETE FROM jugadores.Convocatoria WHERE IdJugador IN (SELECT IdJugador FROM jugadores.Jugador WHERE Documento LIKE 'TEST_EV%');
 DELETE FROM jugadores.Jugador    WHERE Documento LIKE 'TEST_EV%';
 DELETE FROM nucleo.Seleccion     WHERE IdPais IN (SELECT IdPais FROM nucleo.Pais WHERE Nombre LIKE 'TEST EV%');
+DELETE FROM nucleo.Grupo         WHERE Nombre = 'Z' AND IdGrupo NOT IN (SELECT IdGrupo FROM nucleo.Seleccion);
 DELETE FROM nucleo.Sede          WHERE NombreEstadio LIKE 'TEST EV%';
 DELETE FROM nucleo.Ciudad        WHERE Nombre LIKE 'TEST EV%';
 DELETE FROM nucleo.Pais          WHERE Nombre LIKE 'TEST EV%';
@@ -199,6 +205,45 @@ SELECT '2.G' AS Test, eventos.fn_EstaSuspendido(-1, @p9204) AS Suspendido;
 -- 2.H Partido inexistente.
 -- Resultado esperado: 0.
 SELECT '2.H' AS Test, eventos.fn_EstaSuspendido(@idJ1, -1) AS Suspendido;
+
+-- =========================================================================
+-- TEST 3: fecha local del partido en fn_ValidarGol y fn_ValidarAmonestacion
+-- Partido 248: 2026-07-10 01:00 UTC = 2026-07-09 22:00 en la sede (Argentina, UTC-3).
+-- La baja de convocatoria se compara contra la fecha LOCAL (09/07), no la UTC (10/07).
+-- =========================================================================
+DECLARE @p248 INT;
+INSERT INTO nucleo.Partido (NumeroPartido, FechaHoraUTC, Estado, IdFase, IdSede, IdSeleccionLocal, IdSeleccionVisitante)
+VALUES (248, '2026-07-10 01:00', 'Programado', @idFase, @idSede, @idSel1, @idSel2); SET @p248 = SCOPE_IDENTITY();
+
+-- J3 (Sel2) es dado de baja el 10/07: el día UTC del partido, pero un día después de la fecha local.
+INSERT INTO jugadores.Baja (IdConvocatoria, FechaBaja, Motivo)
+SELECT IdConvocatoria, '2026-07-10', 'TEST EV Baja posterior a la fecha local'
+FROM jugadores.Convocatoria WHERE IdJugador = @idJ3;
+
+-- 3.A Gol de J3 en el partido 248 con baja del 10/07.
+-- Resultado esperado: OK (el texto de errores NO incluye "dado de baja").
+SELECT '3.A' AS Test,
+       CASE WHEN eventos.fn_ValidarGol(@p248, @idJ3, 'Jugada', 'Primer Tiempo', 10, NULL, 1) LIKE N'%dado de baja%'
+            THEN 'FALLÓ' ELSE 'OK' END AS Resultado_Esperado_OK;
+
+-- 3.B Amarilla a J3 en el partido 248 con baja del 10/07.
+-- Resultado esperado: OK (el texto de errores NO incluye "dado de baja").
+SELECT '3.B' AS Test,
+       CASE WHEN eventos.fn_ValidarAmonestacion(@p248, 'Amarilla', 10, 'TEST EV Falta', @idJ3, NULL, 1, NULL) LIKE N'%dado de baja%'
+            THEN 'FALLÓ' ELSE 'OK' END AS Resultado_Esperado_OK;
+
+-- 3.C La baja pasa al 09/07 (misma fecha local del partido): gol y amarilla de J3.
+-- Resultado esperado: OK en ambas columnas (los dos textos incluyen "dado de baja").
+UPDATE b SET FechaBaja = '2026-07-09'
+FROM jugadores.Baja AS b
+INNER JOIN jugadores.Convocatoria AS c ON c.IdConvocatoria = b.IdConvocatoria
+WHERE c.IdJugador = @idJ3;
+
+SELECT '3.C' AS Test,
+       CASE WHEN eventos.fn_ValidarGol(@p248, @idJ3, 'Jugada', 'Primer Tiempo', 10, NULL, 1) LIKE N'%dado de baja%'
+            THEN 'OK' ELSE 'FALLÓ' END AS Gol_Esperado_OK,
+       CASE WHEN eventos.fn_ValidarAmonestacion(@p248, 'Amarilla', 10, 'TEST EV Falta', @idJ3, NULL, 1, NULL) LIKE N'%dado de baja%'
+            THEN 'OK' ELSE 'FALLÓ' END AS Amonestacion_Esperado_OK;
 GO
 
 -- =========================================================================
@@ -207,9 +252,13 @@ GO
 DELETE FROM eventos.Gol          WHERE IdPartido IN (SELECT IdPartido FROM nucleo.Partido WHERE NumeroPartido BETWEEN 240 AND 249);
 DELETE FROM eventos.Amonestacion WHERE IdPartido IN (SELECT IdPartido FROM nucleo.Partido WHERE NumeroPartido BETWEEN 240 AND 249);
 DELETE FROM nucleo.Partido       WHERE NumeroPartido BETWEEN 240 AND 249;
+DELETE FROM jugadores.Baja       WHERE IdConvocatoria IN (SELECT c.IdConvocatoria FROM jugadores.Convocatoria AS c
+                                                          INNER JOIN jugadores.Jugador AS j ON j.IdJugador = c.IdJugador
+                                                          WHERE j.Documento LIKE 'TEST_EV%');
 DELETE FROM jugadores.Convocatoria WHERE IdJugador IN (SELECT IdJugador FROM jugadores.Jugador WHERE Documento LIKE 'TEST_EV%');
 DELETE FROM jugadores.Jugador    WHERE Documento LIKE 'TEST_EV%';
 DELETE FROM nucleo.Seleccion     WHERE IdPais IN (SELECT IdPais FROM nucleo.Pais WHERE Nombre LIKE 'TEST EV%');
+DELETE FROM nucleo.Grupo         WHERE Nombre = 'Z' AND IdGrupo NOT IN (SELECT IdGrupo FROM nucleo.Seleccion);
 DELETE FROM nucleo.Sede          WHERE NombreEstadio LIKE 'TEST EV%';
 DELETE FROM nucleo.Ciudad        WHERE Nombre LIKE 'TEST EV%';
 DELETE FROM nucleo.Pais          WHERE Nombre LIKE 'TEST EV%';

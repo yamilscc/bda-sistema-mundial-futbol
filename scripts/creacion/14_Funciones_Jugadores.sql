@@ -266,10 +266,13 @@ BEGIN
 
     SELECT @idPartido         = f.IdPartido,
        @estadoPartido     = p.Estado,
-       @fechaLocalPartido = CAST(p.FechaHoraUTC AS DATE),
+       -- Fecha local de la sede (huso de su ciudad), no la fecha UTC.
+       @fechaLocalPartido = CAST((p.FechaHoraUTC AT TIME ZONE 'UTC') AT TIME ZONE c.HusoHorario AS DATE),
        @idSelFormacion    = CASE WHEN f.Localia = 'Local' THEN p.IdSeleccionLocal ELSE p.IdSeleccionVisitante END
     FROM jugadores.Formacion AS f
     INNER JOIN nucleo.Partido AS p ON p.IdPartido = f.IdPartido
+    INNER JOIN nucleo.Sede AS s ON s.IdSede = p.IdSede
+    INNER JOIN nucleo.Ciudad AS c ON c.IdCiudad = s.IdCiudad
     WHERE f.IdFormacion = @idFormacion;
 
     IF @idPartido IS NULL

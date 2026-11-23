@@ -18,14 +18,14 @@ Objetivo: Script maestro. Se ejecuta SIEMPRE primero para levantar la base desde
 REQUISITOS PARA EJECUTARLO:
   - Activar el modo SQLCMD en SSMS: menú Consulta > Modo SQLCMD (sin esto fallan :setvar y :r).
   - Editar abajo la variable RUTA con la carpeta scripts\creacion de TU copia del repositorio,
-    sin barra final. Ejemplo: C:\Users\elias\bda-sistema-mundial-futbol\scripts\creacion
+    sin barra final. Ejemplo: C:\Users\yamil\bda-sistema-mundial-futbol\scripts\creacion
   - Conectarse con un usuario que pueda borrar y crear bases (sysadmin o dbcreator).
 
-Los scripts de testing y de seed NO se ejecutan desde acá (se corren aparte, después).
+Los scripts de testing y de seed NO se ejecutan desde acá (se corren aparte).
 */
 
 :on error exit
-:setvar RUTA "C:\CAMBIAR\bda-sistema-mundial-futbol\scripts\creacion"
+:setvar RUTA C:\CAMBIAR\bda-sistema-mundial-futbol\scripts\creacion
 
 SET NOCOUNT ON;
 GO
@@ -103,104 +103,104 @@ GO
 
 PRINT '--- 01 Tablas del núcleo';
 GO
-:r "$(RUTA)\01_Tablas_Nucleo.sql"
+:r $(RUTA)\01_Tablas_Nucleo.sql
 
 PRINT '--- 02 Tablas de jugadores y alineaciones';
 GO
-:r "$(RUTA)\02_Tablas_Jugadores_y_Alineaciones.sql"
+:r $(RUTA)\02_Tablas_Jugadores_y_Alineaciones.sql
 
 PRINT '--- 03 Tablas de eventos';
 GO
-:r "$(RUTA)\03_Tablas_Eventos.sql"
+:r $(RUTA)\03_Tablas_Eventos.sql
 
 PRINT '--- 04 Tablas de publicidad';
 GO
-:r "$(RUTA)\04_Tablas_Publicidad.sql"
+:r $(RUTA)\04_Tablas_Publicidad.sql
 
 PRINT '--- 05 Tablas de logs y staging';
 GO
-:r "$(RUTA)\05_Tablas_Logs_Staging.sql"
+:r $(RUTA)\05_Tablas_Logs_Staging.sql
 
 PRINT '--- 06 FK cruzadas entre módulos';
 GO
-:r "$(RUTA)\06_FK_Cruzadas.sql"
+:r $(RUTA)\06_FK_Cruzadas.sql
 
 PRINT '--- 07 Funciones del núcleo';
 GO
-:r "$(RUTA)\07_Funciones_Nucleo.sql"
+:r $(RUTA)\07_Funciones_Nucleo.sql
 
 PRINT '--- 08 SP de control arbitral';
 GO
-:r "$(RUTA)\08_SP_ControlArbitral.sql"
+:r $(RUTA)\08_SP_ControlArbitral.sql
 
-PRINT '--- 09 SP de sedes, partidos, resultados y clasificadas';
+PRINT '--- 09 SP de sedes y partidos';
 GO
-:r "$(RUTA)\09_SP_Sedes_Partidos.sql"
+:r $(RUTA)\09_SP_Sedes_Partidos.sql
 
 PRINT '--- 10 Funciones de eventos';
 GO
-:r "$(RUTA)\10_Funciones_Eventos.sql"
+:r $(RUTA)\10_Funciones_Eventos.sql
 
 PRINT '--- 11 SP registrar gol';
 GO
-:r "$(RUTA)\11_SP_RegistrarGol.sql"
+:r $(RUTA)\11_SP_RegistrarGol.sql
 
 PRINT '--- 12 SP registrar amonestación';
 GO
-:r "$(RUTA)\12_SP_RegistrarAmonestacion.sql"
+:r $(RUTA)\12_SP_RegistrarAmonestacion.sql
 
 PRINT '--- 13 SP ABM de eventos';
 GO
-:r "$(RUTA)\13_SP_ABM_Eventos.sql"
+:r $(RUTA)\13_SP_ABM_Eventos.sql
 
 PRINT '--- 14 Funciones de jugadores';
 GO
-:r "$(RUTA)\14_Funciones_Jugadores.sql"
+:r $(RUTA)\14_Funciones_Jugadores.sql
 GO
 
 PRINT '--- 15 SP de convocatoria y bajas';
 GO
-:r "$(RUTA)\15_SP_Convocatoria_Baja.sql"
+:r $(RUTA)\15_SP_Convocatoria_Baja.sql
 GO
 
 PRINT '--- 16 SP registrar formación y titulares/suplentes';
 GO
-:r "$(RUTA)\16_SP_RegistrarFormacion.sql"
+:r $(RUTA)\16_SP_RegistrarFormacion.sql
 GO
 
 PRINT '--- 17 SP registrar sustitución';
 GO
-:r "$(RUTA)\17_SP_RegistrarSustitucion.sql"
+:r $(RUTA)\17_SP_RegistrarSustitucion.sql
 GO
 
 PRINT '--- 18 SP ABM de jugadores';
 GO
-:r "$(RUTA)\18_SP_ABM_Jugadores.sql"
+:r $(RUTA)\18_SP_ABM_Jugadores.sql
 GO
 
 PRINT '--- 19 SP ABM restantes del nucleo';
 GO
-:r "$(RUTA)\19_SP_ABM_Nucleo.sql"
+:r $(RUTA)\19_SP_ABM_Nucleo.sql
 GO
 
 PRINT '--- 20 SP ABM de publicidad';
 GO
-:r "$(RUTA)\20_SP_ABM_Publicidad.sql"
+:r $(RUTA)\20_SP_ABM_Publicidad.sql
 GO
 
 PRINT '--- 21 SP asignar publicidad';
 GO
-:r "$(RUTA)\21_SP_AsignarPublicidad.sql"
+:r $(RUTA)\21_SP_AsignarPublicidad.sql
 GO
 
 PRINT '--- 23 SP importación XML de jugadores';
 GO
-:r "$(RUTA)\23_SP_Importacion_Jugadores.sql"
+:r $(RUTA)\23_SP_Importacion_Jugadores.sql
 GO
 
 PRINT '--- 24 SP importación CSV de eventos';
 GO
-:r "$(RUTA)\24_SP_Importacion_Eventos.sql"
+:r $(RUTA)\24_SP_Importacion_Eventos.sql
 GO
 
 -- Los próximos SP, vistas y funciones se suman acá, siempre en orden numérico.

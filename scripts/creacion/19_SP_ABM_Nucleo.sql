@@ -415,8 +415,8 @@ BEGIN
                           AND (@operacion = 'ALTA' OR IdFase <> @idFase))
             SET @errores += N'- Ya existe otra fase con ese nombre.' + @salto;
 
-        IF @orden IS NULL OR @orden <= 0
-            SET @errores += N'- El orden es obligatorio y debe ser mayor a cero.' + @salto;
+        IF @orden IS NULL OR @orden NOT BETWEEN 1 AND 7
+            SET @errores += N'- El orden es obligatorio y debe estar entre 1 y 7.' + @salto;
         ELSE IF EXISTS (SELECT 1
                         FROM nucleo.Fase
                         WHERE Orden = @orden
@@ -1178,6 +1178,7 @@ BEGIN
             @nombreFaseDestino VARCHAR(50),
             @estadoDestino     VARCHAR(10),
             @idPaisArbitro     INT,
+            @estaHabilitado    CHAR(1),
             @rolValido         BIT = 0,
             @maxPorRol         INT;
 
@@ -1202,7 +1203,8 @@ BEGIN
         INNER JOIN nucleo.Fase AS f ON f.IdFase = p.IdFase
         WHERE p.IdPartido = @idPartido;
 
-        SELECT @idPaisArbitro = a.IdPais
+        SELECT @idPaisArbitro  = a.IdPais,
+               @estaHabilitado = a.EstaHabilitado
         FROM nucleo.Arbitro AS a
         WHERE a.IdArbitro = @idArbitro;
 
@@ -1218,6 +1220,8 @@ BEGIN
 
         IF @idPaisArbitro IS NULL
             SET @errores += N'- El árbitro indicado no existe.' + @salto;
+        ELSE IF @estaHabilitado <> 'Y'
+            SET @errores += N'- El árbitro no está habilitado para ser designado.' + @salto;
 
         IF @idFaseDestino IS NOT NULL AND @idPaisArbitro IS NOT NULL
         BEGIN

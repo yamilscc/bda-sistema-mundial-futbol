@@ -191,9 +191,11 @@ DECLARE @idFaseGrupos INT = (SELECT IdFase FROM nucleo.Fase WHERE Nombre = 'Fase
 DECLARE @idFaseFinal  INT = (SELECT IdFase FROM nucleo.Fase WHERE Nombre = 'Final');
 DECLARE @ordenFinal   INT = (SELECT Orden  FROM nucleo.Fase WHERE IdFase = @idFaseFinal);
 
--- 4.A MODIFICACION exitosa (cambia Orden de Final a 70 y luego lo restaura).
+-- 4.A MODIFICACION exitosa (cambia EsEliminatoria de Final a 0 y luego lo restaura; el orden
+-- no se puede mover porque los valores 1 a 7 ya están todos ocupados por las fases reglamentarias).
+-- Esperado: OK, la fase Final queda como al inicio.
 BEGIN TRY
-    EXEC nucleo.SP_ABM_Fase 'MODIFICACION', @idFaseFinal, 'Final', 70, 1;
+    EXEC nucleo.SP_ABM_Fase 'MODIFICACION', @idFaseFinal, 'Final', @ordenFinal, 0;
     EXEC nucleo.SP_ABM_Fase 'MODIFICACION', @idFaseFinal, 'Final', @ordenFinal, 1;
     PRINT '4.A: OK - fase Final modificada y restaurada.';
 END TRY
@@ -201,7 +203,21 @@ BEGIN CATCH
     PRINT '4.A: FALLÓ - ' + ERROR_MESSAGE();
 END CATCH;
 
--- 4.B ALTA fallida con múltiples errores (nombre inválido, orden <= 0, esEliminatoria NULL).
+-- 4.C MODIFICACION con orden fuera de rango (8).
+-- Esperado: Bloqueado: "El orden es obligatorio y debe estar entre 1 y 7".
+BEGIN TRY
+    EXEC nucleo.SP_ABM_Fase 'MODIFICACION', @idFaseFinal, 'Final', 8, 1;
+    PRINT '4.C: FALLÓ - permitió un orden fuera del rango 1 a 7.';
+END TRY
+BEGIN CATCH
+    IF ERROR_NUMBER() = 52000 AND ERROR_MESSAGE() LIKE N'%entre 1 y 7%'
+        PRINT '4.C: OK (Bloqueado) - ' + REPLACE(ERROR_MESSAGE(), CHAR(13) + CHAR(10), ' | ');
+    ELSE
+        PRINT '4.C: FALLÓ - error inesperado: ' + ERROR_MESSAGE();
+END CATCH;
+
+-- 4.B ALTA fallida con múltiples errores (nombre inválido, orden fuera de 1 a 7, esEliminatoria NULL).
+-- Esperado: Bloqueado con UN mensaje de 3 renglones.
 BEGIN TRY
     EXEC nucleo.SP_ABM_Fase 'ALTA', NULL, 'Repechaje', 0, NULL;
     PRINT '4.B: FALLÓ - permitió alta inválida de fase.';
@@ -588,6 +604,25 @@ BEGIN TRY
 END TRY
 BEGIN CATCH
     PRINT '12.D: FALLÓ - ' + ERROR_MESSAGE();
+END CATCH;
+
+-- 12.E MODIFICACION hacia un árbitro no habilitado (EstaHabilitado = 'N', país neutral).
+-- Esperado: Bloqueado: "El árbitro no está habilitado para ser designado"; la designación
+--           @idDesig1 conserva a @idArbNeutral.
+DECLARE @idArbInhabilitado INT;
+EXEC nucleo.SP_ABM_Arbitro 'ALTA', @idArbInhabilitado OUTPUT, 'TEST N19 Arbitro Inhabilitado', 'F', 'N', '1985-03-10', @idPais3, @idCat1;
+BEGIN TRY
+    EXEC nucleo.SP_ABM_DesignacionArbitral @operacion = 'MODIFICACION', @idDesignacionArbitral = @idDesig1,
+         @idPartido = @p9701, @idArbitro = @idArbInhabilitado, @rol = 'Principal', @advertencia = @adv OUTPUT;
+    PRINT '12.E: FALLÓ - permitió designar a un árbitro no habilitado.';
+END TRY
+BEGIN CATCH
+    IF ERROR_NUMBER() = 52000 AND ERROR_MESSAGE() LIKE N'%no está habilitado%'
+       AND EXISTS (SELECT 1 FROM nucleo.DesignacionArbitral
+                   WHERE IdDesignacionArbitral = @idDesig1 AND IdArbitro = @idArbNeutral)
+        PRINT '12.E: OK (Bloqueado) - ' + REPLACE(ERROR_MESSAGE(), CHAR(13) + CHAR(10), ' | ');
+    ELSE
+        PRINT '12.E: FALLÓ - ' + ERROR_MESSAGE();
 END CATCH;
 
 -- =========================================================================
