@@ -11,8 +11,8 @@ Objetivo:
 	- Crear nucleo.SP_CALCULO_DE_SELECCIONES_CLASIFICADAS: valida que la fase de grupos esté
 	  completa y devuelve las posiciones, los clasificados y la fase con la que empieza la
 	  eliminación directa.
-	- Requiere ejecutados los scripts 01 a 26 (usa nucleo.fn_SeleccionesClasificadas y
-	  nucleo.fn_FaseEliminatoriaInicial del script 25).
+	- Requiere ejecutados los scripts 01 a 26 (usa nucleo.fn_SeleccionesClasificadas,
+	  nucleo.fn_FaseEliminatoriaInicial y nucleo.fn_ValidarFaseGruposCompleta del script 25).
 	- Test correspondiente: testing/27_Test_SP_CalculoSeleccionesClasificadas.sql.
 */
 
@@ -25,7 +25,8 @@ GO
 -- validan al cargar cada partido con nucleo.SP_DEFINIR_CRUCE_ELIMINATORIO, script 28).
 -- Parámetros de salida (opcionales, para que otro SP o un test use el resultado sin leer los
 -- result sets): @idFaseInicial, @totalClasificados y @avisoDesempate.
--- Validaciones (se informan todas juntas en un único mensaje):
+-- Validaciones (se informan todas juntas en un único mensaje). Las tres primeras las hace
+-- nucleo.fn_ValidarFaseGruposCompleta (script 25), compartida con SP_DEFINIR_CRUCE_ELIMINATORIO:
 --   - Hay partidos de 'Fase de grupos' cargados.
 --   - Todos esos partidos están 'Finalizado' (se listan hasta 20 números de partido y "y N más").
 --   - Cada selección tiene cargados todos sus partidos de grupo (n - 1, con n = tamaño de su grupo):
@@ -61,11 +62,6 @@ BEGIN
 	DECLARE @errores NVARCHAR(MAX) = N'',
 	        @mensaje NVARCHAR(2048),
 	        @salto   NVARCHAR(2) = CHAR(13) + CHAR(10),
-	        @totalPartidosGrupos INT,
-	        @pendientes INT,
-	        @listaPendientes NVARCHAR(MAX),
-	        @faltantes INT,
-	        @listaFaltantes NVARCHAR(MAX),
 	        @hayRegla BIT = 0,
 	        @clasificadosPorGrupo TINYINT,
 	        @mejoresTerceros TINYINT,
@@ -80,67 +76,9 @@ BEGIN
 
 	BEGIN TRY
 		-- ---- Validaciones ---------------------------------------------------
-		SELECT @totalPartidosGrupos = COUNT(*),
-		       @pendientes = ISNULL(SUM(CASE WHEN p.Estado <> 'Finalizado' THEN 1 ELSE 0 END), 0)
-		FROM nucleo.Partido AS p
-		INNER JOIN nucleo.Fase AS f ON f.IdFase = p.IdFase AND f.Nombre = 'Fase de grupos';
-
-		IF @totalPartidosGrupos = 0
-			SET @errores += N'- No hay partidos de fase de grupos cargados.' + @salto;
-		ELSE
-		BEGIN
-			IF @pendientes > 0
-			BEGIN
-				SELECT @listaPendientes = STRING_AGG(CAST(x.NumeroPartido AS NVARCHAR(5)), N', ')
-				                          WITHIN GROUP (ORDER BY x.NumeroPartido)
-				FROM (SELECT TOP (20) p.NumeroPartido
-				      FROM nucleo.Partido AS p
-				      INNER JOIN nucleo.Fase AS f ON f.IdFase = p.IdFase AND f.Nombre = 'Fase de grupos'
-				      WHERE p.Estado <> 'Finalizado'
-				      ORDER BY p.NumeroPartido) AS x;
-
-				SET @errores += N'- Hay ' + CAST(@pendientes AS NVARCHAR(12))
-				              + N' partido(s) de fase de grupos sin finalizar: ' + @listaPendientes
-				              + CASE WHEN @pendientes > 20
-				                     THEN N' y ' + CAST(@pendientes - 20 AS NVARCHAR(12)) + N' más'
-				                     ELSE N'' END
-				              + N'.' + @salto;
-			END;
-
-			-- Selecciones con menos partidos de grupo cargados que n - 1 (n = tamaño de su grupo).
-			SELECT @faltantes = COUNT(*)
-			FROM (SELECT s.IdSeleccion, COUNT(*) OVER (PARTITION BY s.IdGrupo) - 1 AS Esperados
-			      FROM nucleo.Seleccion AS s) AS s
-			CROSS APPLY (SELECT COUNT(*) AS Cargados
-			             FROM nucleo.Partido AS p
-			             INNER JOIN nucleo.Fase AS f ON f.IdFase = p.IdFase AND f.Nombre = 'Fase de grupos'
-			             WHERE s.IdSeleccion IN (p.IdSeleccionLocal, p.IdSeleccionVisitante)) AS c
-			WHERE c.Cargados < s.Esperados;
-
-			IF @faltantes > 0
-			BEGIN
-				SELECT @listaFaltantes = STRING_AGG(CAST(y.CodigoFIFA + N' (' + CAST(y.Cargados AS NVARCHAR(5))
-				                                         + N' de ' + CAST(y.Esperados AS NVARCHAR(5)) + N')' AS NVARCHAR(MAX)), N', ')
-				                         WITHIN GROUP (ORDER BY y.CodigoFIFA)
-				FROM (SELECT TOP (20) s.CodigoFIFA, s.Esperados, c.Cargados
-				      FROM (SELECT s.IdSeleccion, s.CodigoFIFA, COUNT(*) OVER (PARTITION BY s.IdGrupo) - 1 AS Esperados
-				            FROM nucleo.Seleccion AS s) AS s
-				      CROSS APPLY (SELECT COUNT(*) AS Cargados
-				                   FROM nucleo.Partido AS p
-				                   INNER JOIN nucleo.Fase AS f ON f.IdFase = p.IdFase AND f.Nombre = 'Fase de grupos'
-				                   WHERE s.IdSeleccion IN (p.IdSeleccionLocal, p.IdSeleccionVisitante)) AS c
-				      WHERE c.Cargados < s.Esperados
-				      ORDER BY s.CodigoFIFA) AS y;
-
-				SET @errores += N'- Hay ' + CAST(@faltantes AS NVARCHAR(12))
-				              + N' selección(es) con partidos de fase de grupos sin cargar (cargados de esperados): '
-				              + @listaFaltantes
-				              + CASE WHEN @faltantes > 20
-				                     THEN N' y ' + CAST(@faltantes - 20 AS NVARCHAR(12)) + N' más'
-				                     ELSE N'' END
-				              + N'.' + @salto;
-			END;
-		END;
+		-- Fase de grupos completa (partidos cargados y finalizados): la validación vive en
+		-- nucleo.fn_ValidarFaseGruposCompleta (script 25), que también usa SP_DEFINIR_CRUCE_ELIMINATORIO.
+		SET @errores += nucleo.fn_ValidarFaseGruposCompleta();
 
 		SELECT @hayRegla = 1,
 		       @clasificadosPorGrupo = rc.ClasificadosPorGrupo,

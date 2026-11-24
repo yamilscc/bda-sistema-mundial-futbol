@@ -13,6 +13,8 @@ Objetivo:
 		  nucleo.fn_DefinicionPartido(@IdPartido)  -> ganador, perdedor y si se definió por penales.
 		  nucleo.fn_SeleccionesClasificadas()      -> tabla de posiciones por grupo y clasificados.
 		  nucleo.fn_FaseEliminatoriaInicial()      -> fase con la que empieza la eliminación directa.
+		  nucleo.fn_ValidarFaseGruposCompleta()    -> texto de las condiciones que impiden dar por
+		                                              terminada la fase de grupos (vacío si está completa).
 		  nucleo.vw_PartidoResultado               -> partido + resultado + definición (reportes y BI).
 	- Requiere ejecutados los scripts 01 a 24 (usa nucleo.ReglaClasificacion, jugadores.Convocatoria
 	  y eventos.fn_ResultadoPartido).
@@ -206,6 +208,97 @@ RETURN
 	                           WHEN 8  THEN 'Cuartos de final'
 	                      END
 );
+GO
+
+/*
+fn_ValidarFaseGruposCompleta
+Devuelve el texto de las condiciones que impiden considerar terminada la fase de grupos (cada línea
+empieza con "- " y termina con CHAR(13) + CHAR(10)); cadena vacía si la fase está completa.
+Condiciones (la usan nucleo.SP_CALCULO_DE_SELECCIONES_CLASIFICADAS, script 27, y
+nucleo.SP_DEFINIR_CRUCE_ELIMINATORIO, script 28, para los cruces de la fase inicial):
+	- Hay partidos de 'Fase de grupos' cargados.
+	- Todos esos partidos están 'Finalizado' (se listan hasta 20 números de partido y "y N más").
+	- Cada selección tiene cargados todos sus partidos de grupo (n - 1, con n = tamaño de su grupo):
+	  detecta partidos que nunca se cargaron (se listan hasta 20 selecciones).
+Los partidos de grupos se pueden cargar y finalizar en cualquier momento y de a uno: esta función
+solo se consulta cuando hace falta saber quién clasificó.
+*/
+CREATE OR ALTER FUNCTION nucleo.fn_ValidarFaseGruposCompleta ()
+RETURNS NVARCHAR(MAX)
+AS
+BEGIN
+	DECLARE @errores NVARCHAR(MAX) = N'',
+	        @salto   NVARCHAR(2) = CHAR(13) + CHAR(10),
+	        @totalPartidosGrupos INT,
+	        @pendientes INT,
+	        @listaPendientes NVARCHAR(MAX),
+	        @faltantes INT,
+	        @listaFaltantes NVARCHAR(MAX);
+
+	SELECT @totalPartidosGrupos = COUNT(*),
+	       @pendientes = ISNULL(SUM(CASE WHEN p.Estado <> 'Finalizado' THEN 1 ELSE 0 END), 0)
+	FROM nucleo.Partido AS p
+	INNER JOIN nucleo.Fase AS f ON f.IdFase = p.IdFase AND f.Nombre = 'Fase de grupos';
+
+	IF @totalPartidosGrupos = 0
+		SET @errores += N'- No hay partidos de fase de grupos cargados.' + @salto;
+	ELSE
+	BEGIN
+		IF @pendientes > 0
+		BEGIN
+			SELECT @listaPendientes = STRING_AGG(CAST(x.NumeroPartido AS NVARCHAR(5)), N', ')
+			                          WITHIN GROUP (ORDER BY x.NumeroPartido)
+			FROM (SELECT TOP (20) p.NumeroPartido
+			      FROM nucleo.Partido AS p
+			      INNER JOIN nucleo.Fase AS f ON f.IdFase = p.IdFase AND f.Nombre = 'Fase de grupos'
+			      WHERE p.Estado <> 'Finalizado'
+			      ORDER BY p.NumeroPartido) AS x;
+
+			SET @errores += N'- Hay ' + CAST(@pendientes AS NVARCHAR(12))
+			              + N' partido(s) de fase de grupos sin finalizar: ' + @listaPendientes
+			              + CASE WHEN @pendientes > 20
+			                     THEN N' y ' + CAST(@pendientes - 20 AS NVARCHAR(12)) + N' más'
+			                     ELSE N'' END
+			              + N'.' + @salto;
+		END;
+
+		-- Selecciones con menos partidos de grupo cargados que n - 1 (n = tamaño de su grupo).
+		SELECT @faltantes = COUNT(*)
+		FROM (SELECT s.IdSeleccion, COUNT(*) OVER (PARTITION BY s.IdGrupo) - 1 AS Esperados
+		      FROM nucleo.Seleccion AS s) AS s
+		CROSS APPLY (SELECT COUNT(*) AS Cargados
+		             FROM nucleo.Partido AS p
+		             INNER JOIN nucleo.Fase AS f ON f.IdFase = p.IdFase AND f.Nombre = 'Fase de grupos'
+		             WHERE s.IdSeleccion IN (p.IdSeleccionLocal, p.IdSeleccionVisitante)) AS c
+		WHERE c.Cargados < s.Esperados;
+
+		IF @faltantes > 0
+		BEGIN
+			SELECT @listaFaltantes = STRING_AGG(CAST(y.CodigoFIFA + N' (' + CAST(y.Cargados AS NVARCHAR(5))
+			                                         + N' de ' + CAST(y.Esperados AS NVARCHAR(5)) + N')' AS NVARCHAR(MAX)), N', ')
+			                         WITHIN GROUP (ORDER BY y.CodigoFIFA)
+			FROM (SELECT TOP (20) s.CodigoFIFA, s.Esperados, c.Cargados
+			      FROM (SELECT s.IdSeleccion, s.CodigoFIFA, COUNT(*) OVER (PARTITION BY s.IdGrupo) - 1 AS Esperados
+			            FROM nucleo.Seleccion AS s) AS s
+			      CROSS APPLY (SELECT COUNT(*) AS Cargados
+			                   FROM nucleo.Partido AS p
+			                   INNER JOIN nucleo.Fase AS f ON f.IdFase = p.IdFase AND f.Nombre = 'Fase de grupos'
+			                   WHERE s.IdSeleccion IN (p.IdSeleccionLocal, p.IdSeleccionVisitante)) AS c
+			      WHERE c.Cargados < s.Esperados
+			      ORDER BY s.CodigoFIFA) AS y;
+
+			SET @errores += N'- Hay ' + CAST(@faltantes AS NVARCHAR(12))
+			              + N' selección(es) con partidos de fase de grupos sin cargar (cargados de esperados): '
+			              + @listaFaltantes
+			              + CASE WHEN @faltantes > 20
+			                     THEN N' y ' + CAST(@faltantes - 20 AS NVARCHAR(12)) + N' más'
+			                     ELSE N'' END
+			              + N'.' + @salto;
+		END;
+	END;
+
+	RETURN @errores;
+END;
 GO
 
 /*

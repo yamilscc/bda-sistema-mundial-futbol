@@ -29,9 +29,11 @@ Convenciones de estos SP:
 	  crea el partido en estado 'Programado'. Estos SP no cargan Concurrencia
 	  (eso ocurre al finalizar el partido). Partido no guarda el resultado: se deriva de
 	  eventos.Gol con eventos.fn_ResultadoPartido.
-	- Reglas de agenda (constantes declaradas al inicio de SP_ALTA_Partido y SP_MODIFICACION_Partido):
-	  180 minutos mínimos entre dos partidos de la misma sede y 48 horas mínimas entre los
-	  inicios de dos partidos de una selección.
+	- Reglas de agenda: 180 minutos mínimos entre dos partidos de la misma sede (constante declarada
+	  al inicio de SP_ALTA_Partido y SP_MODIFICACION_Partido) y 48 horas mínimas entre los inicios
+	  de dos partidos de una selección (regla única en nucleo.fn_SeleccionConPartidoCercano, script 07).
+	- Los registros asociados a un partido (formaciones, goles, espacios publicitarios, etc.) los
+	  informa nucleo.fn_PartidoTieneRegistros (script 07), que también usa SP_DEFINIR_CRUCE_ELIMINATORIO.
 	- En fases eliminatorias el cruce queda sin definir (NULL/NULL): las selecciones las
 	  asigna nucleo.SP_DEFINIR_CRUCE_ELIMINATORIO.
 	- Se rechazan las horas locales inexistentes (salto de horario de verano) o ambiguas
@@ -336,7 +338,7 @@ BEGIN
 	        @idGrupoVisitante TINYINT,
 	        -- Reglas de agenda (si cambian, ajustar también en SP_MODIFICACION_Partido).
 	        @minutosEntrePartidosSede INT = 180, -- mínimo entre dos partidos de la misma sede
-	        @horasDescansoSeleccion   INT = 48;  -- mínimo entre los inicios de dos partidos de una selección
+	        @horasDescansoSeleccion   INT;       -- descanso entre partidos de una selección: lo informa nucleo.fn_SeleccionConPartidoCercano
 
 	BEGIN TRY
 		SELECT @esEliminatoria = EsEliminatoria FROM nucleo.Fase WHERE IdFase = @idFase;
@@ -437,13 +439,11 @@ BEGIN
 				SET @errores += N'- La sede ya tiene otro partido a menos de ' + CAST(@minutosEntrePartidosSede AS NVARCHAR(10))
 				              + N' minutos de ese horario.' + @salto;
 
-			IF (@idSeleccionLocal IS NOT NULL OR @idSeleccionVisitante IS NOT NULL)
-			   AND EXISTS (SELECT 1
-			               FROM nucleo.Partido AS p
-			               WHERE (p.IdSeleccionLocal IN (@idSeleccionLocal, @idSeleccionVisitante)
-			                   OR p.IdSeleccionVisitante IN (@idSeleccionLocal, @idSeleccionVisitante))
-			                 AND p.FechaHoraUTC > DATEADD(HOUR, -@horasDescansoSeleccion, @fechaHoraUTC)
-			                 AND p.FechaHoraUTC < DATEADD(HOUR,  @horasDescansoSeleccion, @fechaHoraUTC))
+			-- Descanso entre partidos de una selección: la regla vive en nucleo.fn_SeleccionConPartidoCercano.
+			SELECT @horasDescansoSeleccion = MAX(c.HorasDescanso)
+			FROM nucleo.fn_SeleccionConPartidoCercano(@idSeleccionLocal, @idSeleccionVisitante, @fechaHoraUTC, NULL) AS c;
+
+			IF @horasDescansoSeleccion IS NOT NULL
 				SET @errores += N'- Alguna de las selecciones tiene otro partido a menos de ' + CAST(@horasDescansoSeleccion AS NVARCHAR(10))
 				              + N' horas de ese horario.' + @salto;
 		END;
@@ -530,7 +530,7 @@ BEGIN
 	        @seleccionesCambian  BIT = 0,
 	        -- Reglas de agenda (si cambian, ajustar también en SP_ALTA_Partido).
 	        @minutosEntrePartidosSede INT = 180, -- mínimo entre dos partidos de la misma sede
-	        @horasDescansoSeleccion   INT = 48;  -- mínimo entre los inicios de dos partidos de una selección
+	        @horasDescansoSeleccion   INT;       -- descanso entre partidos de una selección: lo informa nucleo.fn_SeleccionConPartidoCercano
 
 	BEGIN TRY
 		SELECT @existe             = 1,
@@ -651,14 +651,11 @@ BEGIN
 				SET @errores += N'- La sede ya tiene otro partido a menos de ' + CAST(@minutosEntrePartidosSede AS NVARCHAR(10))
 				              + N' minutos de ese horario.' + @salto;
 
-			IF (@idSeleccionLocal IS NOT NULL OR @idSeleccionVisitante IS NOT NULL)
-			   AND EXISTS (SELECT 1
-			               FROM nucleo.Partido AS p
-			               WHERE p.IdPartido <> @idPartido -- [solo MODIFICACION] excluye el propio partido
-			                 AND (p.IdSeleccionLocal IN (@idSeleccionLocal, @idSeleccionVisitante)
-			                   OR p.IdSeleccionVisitante IN (@idSeleccionLocal, @idSeleccionVisitante))
-			                 AND p.FechaHoraUTC > DATEADD(HOUR, -@horasDescansoSeleccion, @fechaHoraUTC)
-			                 AND p.FechaHoraUTC < DATEADD(HOUR,  @horasDescansoSeleccion, @fechaHoraUTC))
+			-- Descanso entre partidos de una selección: la regla vive en nucleo.fn_SeleccionConPartidoCercano.
+			SELECT @horasDescansoSeleccion = MAX(c.HorasDescanso)
+			FROM nucleo.fn_SeleccionConPartidoCercano(@idSeleccionLocal, @idSeleccionVisitante, @fechaHoraUTC, @idPartido) AS c; -- [solo MODIFICACION] excluye el propio partido
+
+			IF @horasDescansoSeleccion IS NOT NULL
 				SET @errores += N'- Alguna de las selecciones tiene otro partido a menos de ' + CAST(@horasDescansoSeleccion AS NVARCHAR(10))
 				              + N' horas de ese horario.' + @salto;
 		END;
@@ -667,21 +664,9 @@ BEGIN
 		-- Reglas propias de la modificación: partidos con registros asociados (solo si el partido existe).
 		IF @existe = 1
 		BEGIN
-			SET @tieneEspacios = CASE WHEN EXISTS (SELECT 1 FROM publicidad.EspacioPublicitario WHERE IdPartido = @idPartido)
-			                          THEN 1 ELSE 0 END;
-
-			SET @tieneDependientes = CASE
-				WHEN @tieneEspacios = 1
-				  OR EXISTS (SELECT 1 FROM jugadores.Formacion WHERE IdPartido = @idPartido)
-				  OR EXISTS (SELECT 1 FROM jugadores.Sustitucion WHERE IdPartido = @idPartido)
-				  OR EXISTS (SELECT 1 FROM eventos.Gol WHERE IdPartido = @idPartido)
-				  OR EXISTS (SELECT 1 FROM eventos.Amonestacion WHERE IdPartido = @idPartido)
-				  OR EXISTS (SELECT 1 FROM nucleo.DesignacionArbitral WHERE IdPartido = @idPartido)
-				  OR EXISTS (SELECT 1
-				             FROM nucleo.Sancion AS sa
-				             INNER JOIN nucleo.DesignacionArbitral AS d ON d.IdDesignacionArbitral = sa.IdDesignacionArbitral
-				             WHERE d.IdPartido = @idPartido)
-				THEN 1 ELSE 0 END;
+			-- Registros asociados: la lista vive en nucleo.fn_PartidoTieneRegistros.
+			SELECT @tieneEspacios = r.TieneEspacios, @tieneDependientes = r.TieneAlguno
+			FROM nucleo.fn_PartidoTieneRegistros(@idPartido) AS r;
 
 			SET @seleccionesCambian = CASE
 				WHEN ISNULL(@idSeleccionLocal, 0) <> ISNULL(@localActual, 0)
@@ -771,28 +756,26 @@ BEGIN
 			IF @estadoActual <> 'Programado'
 				SET @errores += N'- Solo se pueden eliminar partidos en estado Programado.' + @salto;
 
-			IF EXISTS (SELECT 1 FROM jugadores.Formacion WHERE IdPartido = @idPartido)
+			-- Registros asociados: la lista vive en nucleo.fn_PartidoTieneRegistros.
+			IF EXISTS (SELECT 1 FROM nucleo.fn_PartidoTieneRegistros(@idPartido) WHERE TieneFormaciones = 1)
 				SET @errores += N'- El partido tiene formaciones cargadas.' + @salto;
 
-			IF EXISTS (SELECT 1 FROM jugadores.Sustitucion WHERE IdPartido = @idPartido)
+			IF EXISTS (SELECT 1 FROM nucleo.fn_PartidoTieneRegistros(@idPartido) WHERE TieneSustituciones = 1)
 				SET @errores += N'- El partido tiene sustituciones cargadas.' + @salto;
 
-			IF EXISTS (SELECT 1 FROM eventos.Gol WHERE IdPartido = @idPartido)
+			IF EXISTS (SELECT 1 FROM nucleo.fn_PartidoTieneRegistros(@idPartido) WHERE TieneGoles = 1)
 				SET @errores += N'- El partido tiene goles cargados.' + @salto;
 
-			IF EXISTS (SELECT 1 FROM eventos.Amonestacion WHERE IdPartido = @idPartido)
+			IF EXISTS (SELECT 1 FROM nucleo.fn_PartidoTieneRegistros(@idPartido) WHERE TieneAmonestaciones = 1)
 				SET @errores += N'- El partido tiene amonestaciones cargadas.' + @salto;
 
-			IF EXISTS (SELECT 1 FROM nucleo.DesignacionArbitral WHERE IdPartido = @idPartido)
+			IF EXISTS (SELECT 1 FROM nucleo.fn_PartidoTieneRegistros(@idPartido) WHERE TieneDesignaciones = 1)
 				SET @errores += N'- El partido tiene designaciones arbitrales asociadas.' + @salto;
 
-			IF EXISTS (SELECT 1
-			           FROM nucleo.Sancion AS sa
-			           INNER JOIN nucleo.DesignacionArbitral AS d ON d.IdDesignacionArbitral = sa.IdDesignacionArbitral
-			           WHERE d.IdPartido = @idPartido)
+			IF EXISTS (SELECT 1 FROM nucleo.fn_PartidoTieneRegistros(@idPartido) WHERE TieneSanciones = 1)
 				SET @errores += N'- El partido tiene sanciones arbitrales asociadas.' + @salto;
 
-			IF EXISTS (SELECT 1 FROM publicidad.EspacioPublicitario WHERE IdPartido = @idPartido)
+			IF EXISTS (SELECT 1 FROM nucleo.fn_PartidoTieneRegistros(@idPartido) WHERE TieneEspacios = 1)
 				SET @errores += N'- El partido tiene espacios publicitarios asignados.' + @salto;
 		END;
 

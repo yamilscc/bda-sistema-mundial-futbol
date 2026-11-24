@@ -9,7 +9,8 @@ Torczuk, Elías Alexei
 Canseco Carrizo, Yamil Simón
 Objetivo:
 	- Probar las funciones creadas en 07_Funciones_Nucleo.sql:
-		  nucleo.fn_SeleccionesDelPartido y nucleo.fn_MercadosEnPrimeTime
+		  nucleo.fn_SeleccionesDelPartido, nucleo.fn_MercadosEnPrimeTime,
+		  nucleo.fn_SeleccionConPartidoCercano y nucleo.fn_PartidoTieneRegistros
 	- Requiere haber ejecutado 01_Tablas_Nucleo.sql y 07_Funciones_Nucleo.sql.
 	- Los datos de prueba se insertan directamente (sin usar SP), con prefijo 'TEST' y
 	  números de partido en el rango reservado 240-255 (el torneo real no los usa).
@@ -293,6 +294,85 @@ IF (SELECT COUNT(*) FROM nucleo.fn_MercadosEnPrimeTime(-1)) = 0
 	PRINT 'TEST 2.M OK: 0 filas con partido inexistente.';
 ELSE
 	PRINT 'TEST 2.M FALLÓ: devolvió filas con partido inexistente.';
+
+-- =========================================================================
+-- TEST 3: nucleo.fn_SeleccionConPartidoCercano (descanso de 48 horas entre partidos de una selección)
+-- Partidos de las selecciones: 248 (Sel1 vs Sel2, 2026-06-21 17:30 UTC) y 251 (Sel1, 2026-06-20 01:00 UTC).
+-- =========================================================================
+
+-- 3.A Partido a programar el 2026-06-22 18:00 UTC (24 h 30 min después del 248) para Sel1 y Sel2.
+-- Esperado: 2 filas, una por selección, con IdPartidoCercano = 248 y HorasDescanso = 48
+--           (el 251 está a 65 horas y no cuenta).
+IF (SELECT COUNT(*) FROM nucleo.fn_SeleccionConPartidoCercano(@idSel1, @idSel2, '2026-06-22 18:00', NULL)) = 2
+   AND EXISTS (SELECT 1 FROM nucleo.fn_SeleccionConPartidoCercano(@idSel1, @idSel2, '2026-06-22 18:00', NULL)
+               WHERE IdSeleccion = @idSel1 AND IdPartidoCercano = @p248 AND HorasDescanso = 48)
+   AND EXISTS (SELECT 1 FROM nucleo.fn_SeleccionConPartidoCercano(@idSel1, @idSel2, '2026-06-22 18:00', NULL)
+               WHERE IdSeleccion = @idSel2 AND IdPartidoCercano = @p248 AND HorasDescanso = 48)
+	PRINT 'TEST 3.A OK: ambas selecciones tienen el partido 248 a menos de 48 horas.';
+ELSE
+	PRINT 'TEST 3.A FALLÓ: no informó el partido 248 para las dos selecciones.';
+
+-- 3.B Borde: exactamente 48 horas después del 248 (2026-06-23 17:30:00 UTC).
+-- Esperado: 0 filas (a exactamente 48 horas no hay conflicto).
+IF (SELECT COUNT(*) FROM nucleo.fn_SeleccionConPartidoCercano(@idSel1, @idSel2, '2026-06-23 17:30:00', NULL)) = 0
+	PRINT 'TEST 3.B OK: a exactamente 48 horas no hay conflicto.';
+ELSE
+	PRINT 'TEST 3.B FALLÓ: informó un conflicto a exactamente 48 horas.';
+
+-- 3.C Borde: un segundo antes de cumplirse las 48 horas (2026-06-23 17:29:59 UTC).
+-- Esperado: 2 filas (el 248 queda a 47 h 59 min 59 s).
+IF (SELECT COUNT(*) FROM nucleo.fn_SeleccionConPartidoCercano(@idSel1, @idSel2, '2026-06-23 17:29:59', NULL)) = 2
+	PRINT 'TEST 3.C OK: a un segundo de las 48 horas hay conflicto.';
+ELSE
+	PRINT 'TEST 3.C FALLÓ: no informó el conflicto a 47 h 59 min 59 s.';
+
+-- 3.D Excluir el propio partido: se evalúa el mismo horario del 248 (2026-06-21 17:30) excluyéndolo.
+-- Esperado: 1 fila: Sel1 con el partido 251 (a 40 h 30 min); Sel2 no tiene otros partidos cercanos.
+IF (SELECT COUNT(*) FROM nucleo.fn_SeleccionConPartidoCercano(@idSel1, @idSel2, '2026-06-21 17:30', @p248)) = 1
+   AND EXISTS (SELECT 1 FROM nucleo.fn_SeleccionConPartidoCercano(@idSel1, @idSel2, '2026-06-21 17:30', @p248)
+               WHERE IdSeleccion = @idSel1 AND IdPartidoCercano = @p251)
+	PRINT 'TEST 3.D OK: excluido el 248, solo Sel1 tiene cerca el 251.';
+ELSE
+	PRINT 'TEST 3.D FALLÓ: la exclusión del propio partido no se aplicó como se esperaba.';
+
+-- 3.E Una sola selección informada (la visitante es NULL).
+-- Esperado: 1 fila (Sel1 con el 248) para el 2026-06-22 18:00.
+IF (SELECT COUNT(*) FROM nucleo.fn_SeleccionConPartidoCercano(@idSel1, NULL, '2026-06-22 18:00', NULL)) = 1
+	PRINT 'TEST 3.E OK: con una sola selección informada devuelve una fila.';
+ELSE
+	PRINT 'TEST 3.E FALLÓ: no devolvió exactamente una fila con una sola selección.';
+
+-- 3.F Ambas selecciones NULL, y una fecha lejana sin partidos.
+-- Esperado: 0 filas en los dos casos.
+IF (SELECT COUNT(*) FROM nucleo.fn_SeleccionConPartidoCercano(NULL, NULL, '2026-06-22 18:00', NULL)) = 0
+   AND (SELECT COUNT(*) FROM nucleo.fn_SeleccionConPartidoCercano(@idSel1, @idSel2, '2030-01-01 00:00', NULL)) = 0
+	PRINT 'TEST 3.F OK: sin selecciones o sin partidos cercanos no hay filas.';
+ELSE
+	PRINT 'TEST 3.F FALLÓ: devolvió filas sin selecciones o con una fecha lejana.';
+
+-- =========================================================================
+-- TEST 4: nucleo.fn_PartidoTieneRegistros
+-- (los casos con registros asociados se prueban en 09_Test_SP_Sedes_Partidos.sql, caso 3.L1, y a través de
+--  los SP de partidos que la usan: 3.L en la baja, 3.G y siguientes en la modificación)
+-- =========================================================================
+
+-- 4.A Partido 245 sin ningún registro asociado.
+-- Esperado: 1 fila con los 7 indicadores y TieneAlguno en 0.
+IF (SELECT COUNT(*) FROM nucleo.fn_PartidoTieneRegistros(@p245)) = 1
+   AND EXISTS (SELECT 1 FROM nucleo.fn_PartidoTieneRegistros(@p245)
+               WHERE TieneFormaciones = 0 AND TieneSustituciones = 0 AND TieneGoles = 0 AND TieneAmonestaciones = 0
+                 AND TieneDesignaciones = 0 AND TieneSanciones = 0 AND TieneEspacios = 0 AND TieneAlguno = 0)
+	PRINT 'TEST 4.A OK: un partido sin registros devuelve todos los indicadores en 0.';
+ELSE
+	PRINT 'TEST 4.A FALLÓ: los indicadores del partido 245 no son todos 0.';
+
+-- 4.B Partido inexistente.
+-- Esperado: igualmente 1 fila con todo en 0 (la función no distingue un partido inexistente).
+IF (SELECT COUNT(*) FROM nucleo.fn_PartidoTieneRegistros(-1)) = 1
+   AND EXISTS (SELECT 1 FROM nucleo.fn_PartidoTieneRegistros(-1) WHERE TieneAlguno = 0)
+	PRINT 'TEST 4.B OK: un partido inexistente devuelve una fila con todo en 0.';
+ELSE
+	PRINT 'TEST 4.B FALLÓ: un partido inexistente no devolvió una fila con todo en 0.';
 GO
 
 -- =========================================================================

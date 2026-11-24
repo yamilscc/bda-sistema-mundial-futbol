@@ -48,6 +48,11 @@ GO
 -- =========================================================================
 -- LIMPIEZA PREVIA
 -- =========================================================================
+DELETE FROM nucleo.Sancion
+WHERE IdDesignacionArbitral IN (SELECT d.IdDesignacionArbitral FROM nucleo.DesignacionArbitral AS d
+                                INNER JOIN nucleo.Partido AS p ON p.IdPartido = d.IdPartido
+                                INNER JOIN nucleo.Sede AS s ON s.IdSede = p.IdSede
+                                WHERE s.NombreEstadio LIKE 'TEST%');
 DELETE FROM jugadores.Formacion
 WHERE IdPartido IN (SELECT p.IdPartido FROM nucleo.Partido AS p
                     INNER JOIN nucleo.Sede AS s ON s.IdSede = p.IdSede
@@ -862,6 +867,28 @@ BEGIN CATCH
 		PRINT 'TEST 3.L FALLÓ: error inesperado -> ' + @msg;
 END CATCH;
 
+-- 3.L1 nucleo.fn_PartidoTieneRegistros (script 07) sobre el partido 241: tiene formación y designación
+--      arbitral; se le agrega una sanción a esa designación. El partido 245 no tiene ningún registro.
+-- Esperado: antes de la sanción, TieneFormaciones = 1, TieneDesignaciones = 1, TieneSanciones = 0 y
+--           TieneAlguno = 1; después, TieneSanciones = 1. Para el 245 todos los indicadores son 0.
+IF EXISTS (SELECT 1 FROM nucleo.fn_PartidoTieneRegistros(@p241)
+           WHERE TieneFormaciones = 1 AND TieneDesignaciones = 1 AND TieneSanciones = 0 AND TieneAlguno = 1)
+   AND EXISTS (SELECT 1 FROM nucleo.fn_PartidoTieneRegistros(@p245)
+               WHERE TieneFormaciones = 0 AND TieneSustituciones = 0 AND TieneGoles = 0 AND TieneAmonestaciones = 0
+                 AND TieneDesignaciones = 0 AND TieneSanciones = 0 AND TieneEspacios = 0 AND TieneAlguno = 0)
+BEGIN
+	INSERT INTO nucleo.Sancion (Tipo, Descripcion, IdDesignacionArbitral)
+	SELECT 'Advertencia', 'TEST Sancion', d.IdDesignacionArbitral
+	FROM nucleo.DesignacionArbitral AS d WHERE d.IdPartido = @p241;
+
+	IF EXISTS (SELECT 1 FROM nucleo.fn_PartidoTieneRegistros(@p241) WHERE TieneSanciones = 1 AND TieneAlguno = 1)
+		PRINT 'TEST 3.L1 OK: fn_PartidoTieneRegistros informa formación, designación y sanción.';
+	ELSE
+		PRINT 'TEST 3.L1 FALLÓ: no informó la sanción del partido 241.';
+END
+ELSE
+	PRINT 'TEST 3.L1 FALLÓ: los indicadores de los partidos 241 y 245 no son los esperados.';
+
 -- 3.M Baja de un partido inexistente.
 -- Esperado: Bloqueado: "El partido indicado no existe".
 BEGIN TRY
@@ -1028,6 +1055,11 @@ GO
 -- =========================================================================
 -- LIMPIEZA FINAL
 -- =========================================================================
+DELETE FROM nucleo.Sancion
+WHERE IdDesignacionArbitral IN (SELECT d.IdDesignacionArbitral FROM nucleo.DesignacionArbitral AS d
+                                INNER JOIN nucleo.Partido AS p ON p.IdPartido = d.IdPartido
+                                INNER JOIN nucleo.Sede AS s ON s.IdSede = p.IdSede
+                                WHERE s.NombreEstadio LIKE 'TEST%');
 DELETE FROM jugadores.Formacion
 WHERE IdPartido IN (SELECT p.IdPartido FROM nucleo.Partido AS p
                     INNER JOIN nucleo.Sede AS s ON s.IdSede = p.IdSede

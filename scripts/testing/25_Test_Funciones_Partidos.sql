@@ -9,7 +9,8 @@ Torczuk, Elías Alexei
 Canseco Carrizo, Yamil Simón
 Objetivo:
 	- Probar nucleo.fn_DefinicionPartido, nucleo.fn_SeleccionesClasificadas,
-	  nucleo.fn_FaseEliminatoriaInicial y nucleo.vw_PartidoResultado (script 25).
+	  nucleo.fn_FaseEliminatoriaInicial, nucleo.fn_ValidarFaseGruposCompleta y
+	  nucleo.vw_PartidoResultado (script 25).
 	- Requiere ejecutados los scripts 01 a 25 sobre una base recién creada con 00_Reset_Total.sql
 	  (el escenario consume 48 valores de IDENTITY de nucleo.Seleccion, que es TINYINT).
 	- Todo se inserta directo (sin SP). Datos con prefijo 'TEST FP' / 'TEST_FP', borrados al inicio
@@ -522,6 +523,47 @@ IF EXISTS (SELECT 1 FROM nucleo.vw_PartidoResultado
 	PRINT 'TEST 5.C OK: el partido Programado no muestra resultado.';
 ELSE
 	PRINT 'TEST 5.C FALLÓ: el partido Programado muestra resultado o ganador.';
+
+-- =========================================================================
+-- TEST 6: nucleo.fn_ValidarFaseGruposCompleta
+-- (a esta altura del test solo quedan los grupos M a T: el TEST 4 quitó las selecciones de U a X)
+-- =========================================================================
+IF @hayOtras = 1
+	PRINT 'TEST 6 OMITIDO: la base tiene selecciones que no son de este test.';
+ELSE
+BEGIN
+	DECLARE @msg6 NVARCHAR(MAX) = nucleo.fn_ValidarFaseGruposCompleta();
+
+	-- 6.A Partido 123 sin finalizar.
+	-- Esperado: el texto informa "Hay 1 partido(s) de fase de grupos sin finalizar: 123".
+	IF @msg6 LIKE N'%Hay 1 partido(s) de fase de grupos sin finalizar: 123.%'
+		PRINT 'TEST 6.A OK: informa el partido 123 sin finalizar.';
+	ELSE
+		PRINT 'TEST 6.A FALLÓ: no informó el partido 123 sin finalizar -> ' + ISNULL(@msg6, 'NULL');
+
+	-- 6.B Selecciones con partidos de grupo sin cargar: las 4 del grupo O (c1 y c3 con 2 de 3; c2 y c4 con 1 de 3)
+	--     y las 20 de los grupos P a T (0 de 3).
+	-- Esperado: "Hay 24 selección(es) con partidos de fase de grupos sin cargar", con la lista recortada a 20 y "y 4 más".
+	IF @msg6 LIKE N'%Hay 24 selección(es) con partidos de fase de grupos sin cargar%'
+	   AND @msg6 LIKE N'%y 4 más%'
+		PRINT 'TEST 6.B OK: informa las 24 selecciones con partidos sin cargar (lista de 20 y "y 4 más").';
+	ELSE
+		PRINT 'TEST 6.B FALLÓ: no informó las 24 selecciones -> ' + ISNULL(@msg6, 'NULL');
+
+	-- 6.C Fase de grupos completa: se quitan el grupo O (partidos, goles y convocatorias) y los grupos P a T,
+	--     y quedan solo los grupos M y N, con los 6 partidos de cada uno finalizados.
+	-- Esperado: cadena vacía.
+	SAVE TRANSACTION Caso6C;
+	DELETE FROM eventos.Gol WHERE IdPartido IN (SELECT IdPartido FROM nucleo.Partido WHERE NumeroPartido IN (121, 122, 123, 131));
+	DELETE FROM nucleo.Partido WHERE NumeroPartido IN (121, 122, 123, 131);
+	DELETE FROM jugadores.Convocatoria WHERE IdSeleccion IN (@c1, @c2, @c3, @c4);
+	DELETE FROM nucleo.Seleccion WHERE IdGrupo IN (SELECT IdGrupo FROM nucleo.Grupo WHERE Nombre BETWEEN 'O' AND 'X');
+	IF nucleo.fn_ValidarFaseGruposCompleta() = N''
+		PRINT 'TEST 6.C OK: con los grupos completos la función devuelve una cadena vacía.';
+	ELSE
+		PRINT 'TEST 6.C FALLÓ: devolvió condiciones con la fase de grupos completa -> ' + nucleo.fn_ValidarFaseGruposCompleta();
+	ROLLBACK TRANSACTION Caso6C;
+END;
 
 -- =========================================================================
 -- LIMPIEZA: se deshace todo lo insertado por el test (incluidos los cambios de la regla)
