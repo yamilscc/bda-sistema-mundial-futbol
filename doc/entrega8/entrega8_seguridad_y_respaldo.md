@@ -34,36 +34,37 @@ El presente documento detalla la implementación técnica correspondiente a la *
 ## 2. Cifrado de Datos Sensibles
 
 ### 2.1 Identificación de Datos Sensibles (PII)
-En cumplimiento de las leyes de protección de datos personales y las directivas de seguridad para competencias internacionales, se identificaron los siguientes campos críticos como datos sensibles:
-* **`jugadores.Jugador`:** `Documento` (DNI, Pasaporte o cédula identificatoria del jugador).
-* **`nucleo.Arbitro`:** `NombreApellido` y datos identificatorios del cuerpo arbitral.
-* **`nucleo.StaffTecnico`:** `NombreApellido` de directores técnicos y ayudantes de campo.
+Se cifran los datos personales identificatorios de jugadores, árbitros y cuerpo técnico:
+* **`jugadores.Jugador.Documento`** (DNI, pasaporte o cédula del jugador).
+* **`nucleo.Arbitro.NombreApellido`**.
+* **`nucleo.StaffTecnico.NombreApellido`** (directores técnicos y ayudantes de campo).
 
 ### 2.2 Estrategia Criptográfica Implementada
-Se implementó un esquema de cifrado simétrico mediante funciones y procedimientos almacenados en el esquema `nucleo`:
-* **Algoritmo:** Cifrado simétrico AES a través de la infraestructura criptográfica de SQL Server (`ENCRYPTBYPASSPHRASE` / `DECRYPTBYPASSPHRASE`) gobernado por una clave segura canónica administrada por la función `nucleo.fn_ObtenerClaveCifrado()`.
-* **Funciones escalares auxiliares:**
-  * `nucleo.fn_CifrarTexto(@texto NVARCHAR(MAX)) RETURNS VARBINARY(MAX)`: Transforma el texto plano a representación binaria encriptada.
-  * `nucleo.fn_DescifrarTexto(@cifrado VARBINARY(MAX)) RETURNS NVARCHAR(MAX)`: Reconstruye el texto plano original a partir del dato binario.
-* **Stored Procedures dedicados:**
-  * `nucleo.SP_CIFRAR_DATO`: Procedimiento que encapsula el cifrado mediante parámetros OUTPUT.
-  * `nucleo.SP_DESCIFRAR_DATO`: Procedimiento que encapsula el descifrado mediante parámetros OUTPUT.
+* **Jerarquía de claves de SQL Server:** clave simétrica `ClaveDatosSensibles` (**AES_256**), protegida por el certificado `CertDatosSensibles`, que está protegido por la master key de la base (y esta, por la service master key de la instancia).
+* **Ninguna clave en el código:** la contraseña de la master key se genera al azar en `nucleo.SP_CONFIGURAR_CIFRADO` y no se guarda en ningún lado. Es el único SQL dinámico del script, y es estrictamente necesario: `CREATE MASTER KEY` no acepta una variable como contraseña.
+* **Cifrado:** `nucleo.SP_CIFRAR_DATO` abre la clave, aplica `ENCRYPTBYKEY` y la cierra. Es un SP porque una función no puede abrir claves. El mismo texto cifrado dos veces da bytes distintos.
+* **Descifrado:** `nucleo.fn_DescifrarTexto` (`DECRYPTBYKEYAUTOCERT`, `WITH EXECUTE AS OWNER`) y su envoltorio `nucleo.SP_DESCIFRAR_DATO`. Ningún rol salvo el administrador puede llamarlos directamente: los SP y reportes que descifran lo hacen por cadena de propiedad.
+* **Búsquedas por hash:** como el dato cifrado no se puede comparar, se guarda además un hash SHA2_256 (`nucleo.fn_HashDato`) calculado con un secreto aleatorio de 32 bytes (`nucleo.ConfiguracionCifrado`), en mayúsculas y sin espacios en los extremos. Con el secreto, el hash no se puede recalcular por fuerza bruta a partir de documentos probables.
+* **Columna pública enmascarada:** `***-` más los últimos 4 caracteres del documento, y `***-CONFIDENCIAL-<id>***` para los nombres.
 
-### 2.3 Script Modificatorio y Migración de Datos (`31_Seguridad_Cifrado.sql`)
-Tal como solicita la consigna, la seguridad no se codificó de forma estática en la creación inicial, sino como un **script de modificación progresiva**:
-1. **Alteración de tablas existentes:**
-   * Se agregó la columna `DocumentoCifrado VARBINARY(256) NULL` a la tabla `jugadores.Jugador`.
-   * Se agregaron las columnas `NombreApellidoCifrado VARBINARY(512) NULL` a las tablas `nucleo.Arbitro` y `nucleo.StaffTecnico`.
-2. **Migración criptográfica:**
-   * Se ejecutó un `UPDATE` masivo que encriptó los datos preexistentes en las nuevas columnas binarias.
-3. **Enmascaramiento de datos públicos y ajuste de constraints:**
-   * Se removió la restricción `UQ_Jugador_Documento` sobre el campo en texto plano.
-   * Se aplicó una máscara a las columnas legibles preexistentes (ejemplo: `***-1234` para documentos de jugadores y `***-CONFIDENCIAL-ID***` para árbitros y staff).
-4. **Actualización de Stored Procedures (ALTER PROCEDURE):**
-   * Se actualizaron `jugadores.SP_ABM_Jugador`, `nucleo.SP_ABM_Arbitro` y `nucleo.SP_ABM_StaffTecnico` (junto con sus variantes `SP_ALTA_*` y `SP_MODIFICACION_*`). Los procedimientos reciben el dato sensible en texto plano por parámetro, validan unicidad contra los datos descifrados y almacenan los bytes cifrados en la base de datos junto con la máscara pública.
-5. **Procedimientos de consulta segura:**
-   * Se implementaron `jugadores.SP_CONSULTAR_JUGADOR_DESCIFRADO`, `nucleo.SP_CONSULTAR_ARBITRO_DESCIFRADO` y `nucleo.SP_CONSULTAR_STAFF_DESCIFRADO` para habilitar el consumo descifrado únicamente a través de los canales autorizados.
+### 2.3 Script Modificatorio (`31_Seguridad_Cifrado.sql`)
+Tal como pide la consigna, el cifrado se aplica como **script de modificación** sobre componentes que ya existen:
+1. **Tablas (`ALTER TABLE`):** columnas `DocumentoCifrado`/`DocumentoHash` en `jugadores.Jugador` y `NombreApellidoCifrado`/`NombreApellidoHash` en `nucleo.Arbitro` y `nucleo.StaffTecnico`. La restricción `UQ_Jugador_Documento` (sobre el texto plano) se reemplaza por el índice único filtrado `IX_Jugador_DocumentoHash`.
+2. **Consultas:** redefine las funciones de búsqueda y de nombre visible creadas en los scripts 07 y 14 (`jugadores.fn_IdJugadorPorDocumento`, `nucleo.fn_IdArbitroPorNombre`, `nucleo.fn_IdStaffPorNombre`, `nucleo.fn_NombreArbitro` y `nucleo.fn_NombreStaff`). Las importaciones (23 y 24), los seeds (03, 04 y 06) y los reportes buscan y muestran solo a través de ellas, así que siguen funcionando con los datos cifrados sin modificarse. Primero buscan por hash y, si la fila no tiene hash (cargada directo en texto plano), por la columna pública.
+3. **SP:** redefine `jugadores.fn_ValidarJugador` (unicidad por hash) y los `SP_ALTA_`/`SP_MODIFICACION_` de Jugador, Arbitro y StaffTecnico. Mantienen la firma y las validaciones; cambia cómo guardan el dato.
+4. **Migración (`nucleo.SP_APLICAR_CIFRADO_DATOS_SENSIBLES`):** cifra, calcula el hash y enmascara las filas que estén en texto plano. Es set-based (sin cursores), corre en una sola transacción y es idempotente.
+5. **Consulta descifrada:** `jugadores.SP_CONSULTAR_JUGADOR_DESCIFRADO`, `nucleo.SP_CONSULTAR_ARBITRO_DESCIFRADO` y `nucleo.SP_CONSULTAR_STAFF_DESCIFRADO`, con validación de parámetros, para el rol administrador.
 
+### 2.4 Testing (`31_Test_Seguridad_Cifrado.sql`)
+Verifica con `OK`/`FALLÓ`:
+* que existan las claves y que la configuración sea idempotente;
+* el cifrado no determinista y el descifrado exacto, con acentos;
+* el hash normalizado;
+* los ABM con dato cifrado y documento duplicado rechazado;
+* las búsquedas y los nombres visibles;
+* la migración de filas en texto plano y que una segunda corrida no cambie nada;
+* la consulta descifrada;
+* el impacto en tests previos: una búsqueda directa por la columna pública devuelve 0 filas.
 
 ---
 
@@ -77,47 +78,50 @@ Se establecieron **cuatro (4) roles de base de datos** específicos que modelan 
 3. **`Rol_GestorPublicidad`:** Departamento comercial y de marketing. Autorizado a gestionar anunciantes, campañas, piezas publicitarias y asignación de pauta en los 4 espacios perimetrales por partido.
 4. **`Rol_Consulta`:** Auditores, organismos reguladores, prensa y medios de comunicación. Acceso exclusivo a los reportes estadísticos y vistas informativas consolidadas sin permisos de modificación ni acceso transaccional directo.
 
-### 3.2 Cuadro / Matriz de Permisos Granulares
+### 3.2 Cuadro de Permisos
 
-| Objeto / Esquema / Procedimiento | Rol_Administrador | Rol_OperadorResultados | Rol_GestorPublicidad | Rol_Consulta |
+"—" = sin permiso: el rol no tiene ningún GRANT, así que el motor lo deniega por defecto. "DENY" = denegado explícitamente, aun si otro permiso lo habilitara. El administrador tiene `CONTROL` sobre los cuatro esquemas de negocio, pero no es `db_owner`: no puede crear objetos fuera de ellos ni administrar la base.
+
+| Objeto | Rol_Administrador | Rol_OperadorResultados | Rol_GestorPublicidad | Rol_Consulta |
 |---|:---:|:---:|:---:|:---:|
-| **Control total de Esquemas (nucleo, jugadores, eventos, publicidad)** | **CONTROL** | DENY | DENY | DENY |
-| `eventos.SP_REGISTRAR_GOL` | **GRANT EXECUTE** | **GRANT EXECUTE** | **DENY EXECUTE** | **DENY EXECUTE** |
-| `eventos.SP_REGISTRAR_AMONESTACION` | **GRANT EXECUTE** | **GRANT EXECUTE** | **DENY EXECUTE** | **DENY EXECUTE** |
-| `eventos.SP_ABM_*` | **GRANT EXECUTE** | **GRANT EXECUTE** | **DENY EXECUTE** | **DENY EXECUTE** |
-| `jugadores.SP_REGISTRAR_FORMACION` | **GRANT EXECUTE** | **GRANT EXECUTE** | **DENY EXECUTE** | **DENY EXECUTE** |
-| `jugadores.SP_AGREGAR_JUGADOR_FORMACION`| **GRANT EXECUTE** | **GRANT EXECUTE** | **DENY EXECUTE** | **DENY EXECUTE** |
-| `jugadores.SP_REGISTRAR_SUSTITUCION` | **GRANT EXECUTE** | **GRANT EXECUTE** | **DENY EXECUTE** | **DENY EXECUTE** |
-| `jugadores.SP_CONVOCAR_JUGADOR` | **GRANT EXECUTE** | **GRANT EXECUTE** | **DENY EXECUTE** | **DENY EXECUTE** |
-| `jugadores.SP_REGISTRAR_BAJA_CONVOCATORIA`| **GRANT EXECUTE** | **GRANT EXECUTE** | **DENY EXECUTE** | **DENY EXECUTE** |
-| `nucleo.SP_CONTROL_ARBITRAL` | **GRANT EXECUTE** | **GRANT EXECUTE** | **DENY EXECUTE** | **DENY EXECUTE** |
-| `publicidad.SP_ASIGNAR_PUBLICIDAD` | **GRANT EXECUTE** | **DENY EXECUTE** | **GRANT EXECUTE** | **DENY EXECUTE** |
-| `nucleo.SP_ABM_Anunciante` / `Pieza` / `Espacio` | **GRANT EXECUTE** | **DENY EXECUTE** | **GRANT EXECUTE** | **DENY EXECUTE** |
-| `nucleo.SP_ABM_Arbitro` / `StaffTecnico` | **GRANT EXECUTE** | **DENY EXECUTE** | **DENY EXECUTE** | **DENY EXECUTE** |
-| `jugadores.SP_ABM_Jugador` | **GRANT EXECUTE** | **DENY EXECUTE** | **DENY EXECUTE** | **DENY EXECUTE** |
-| **Reportes Entrega 7** (`eventos.SP_REPORTE_*`, `nucleo.SP_REPORTE_*`, etc.) | **GRANT EXECUTE** | **GRANT EXECUTE** | **GRANT EXECUTE** | **GRANT EXECUTE** |
-| **Tablas nucleo, jugadores, eventos (SELECT)** | **GRANT SELECT** | **GRANT SELECT** | **DENY / SELECT Parcial** | **GRANT SELECT** |
-| **Modificación directa (INSERT, UPDATE, DELETE en tablas)** | **GRANT** | **DENY** | **DENY** | **DENY** |
-| **Procedimientos de Backup** (`nucleo.SP_BACKUP_*`) | **GRANT EXECUTE** | **DENY EXECUTE** | **DENY EXECUTE** | **DENY EXECUTE** |
+| Esquemas `nucleo`, `jugadores`, `eventos`, `publicidad` | CONTROL | — | — | — |
+| SELECT sobre `nucleo`, `jugadores` y `eventos` | (CONTROL) | GRANT | Solo `Partido`, `vw_PartidoResultado`, `Sede`, `Ciudad`, `Seleccion`, `Pais`, `Fase` y `fn_MercadosEnPrimeTime` | Solo vistas y funciones de lectura (`vw_PartidoResultado`, `fn_SeleccionesDelPartido`, `fn_MercadosEnPrimeTime`, `fn_DefinicionPartido`, `fn_SeleccionesClasificadas`, `fn_ResultadoPartido`) |
+| SELECT y EXECUTE sobre `publicidad` (ABM, asignación, importaciones y reportes) | (CONTROL) | DENY EXECUTE | GRANT | Solo los 2 reportes de publicidad |
+| EXECUTE sobre `eventos` (goles, tarjetas, ABM y reportes) | (CONTROL) | GRANT | DENY | Solo los 2 reportes; DENY `SP_REGISTRAR_GOL` y `SP_REGISTRAR_AMONESTACION` |
+| EXECUTE sobre `jugadores` (convocatoria, formaciones, sustituciones, ABM) | (CONTROL) | GRANT | DENY | Solo el reporte de plantillas; DENY ABM de jugadores |
+| `nucleo.SP_CONTROL_ARBITRAL`, `SP_FINALIZAR_PARTIDO`, `SP_CALCULO_DE_SELECCIONES_CLASIFICADAS`, `SP_DEFINIR_CRUCE_ELIMINATORIO` | (CONTROL) | GRANT | DENY | DENY (salvo control arbitral, que queda en —) |
+| Reportes de `nucleo` (designaciones y resultados) | (CONTROL) | GRANT | — | GRANT |
+| ABM de árbitros (`SP_ALTA_`/`SP_MODIFICACION_`/`SP_BAJA_Arbitro`) | (CONTROL) | — | — | DENY |
+| Importaciones (`SP_IMPORTAR_*`) | (CONTROL) | — | Solo las de `publicidad` | DENY |
+| INSERT, UPDATE y DELETE directo en tablas | (CONTROL) | — | — | DENY |
+| Descifrado (`fn_DescifrarTexto`, `SP_DESCIFRAR_DATO`, `SP_CONSULTAR_*_DESCIFRADO`) y secreto del hash (`ConfiguracionCifrado`) | (CONTROL) | DENY | DENY | DENY |
+| Backups (`nucleo.SP_BACKUP_*`) | (CONTROL) | — | — | DENY |
+
+Las altas y modificaciones que cifran (por ejemplo `SP_ALTA_Jugador` ejecutado por el operador) y los reportes que descifran funcionan para los roles autorizados por **cadena de propiedad**: todos los objetos tienen el mismo dueño, así que el motor no vuelve a verificar permisos sobre el SP de cifrado ni la función de descifrado que usan por dentro.
 
 ### 3.3 Implementación Mediante Stored Procedures (`32_Seguridad_Roles_Permisos.sql`)
-La gestión de seguridad se encuentra 100% automatizada a través de procedimientos en el esquema `nucleo`:
-* `nucleo.SP_CREAR_ROLES_SISTEMA`: Script idempotente que valida y crea los cuatro roles y aplica los `GRANT` y `DENY` correspondientes.
-* `nucleo.SP_ASIGNAR_USUARIO_ROL`: Procedimiento parametrizado que valida la existencia del usuario y rol para ejecutar `ALTER ROLE ... ADD MEMBER ...`.
-* `nucleo.SP_REVOCAR_USUARIO_ROL`: Procedimiento parametrizado para ejecutar `ALTER ROLE ... DROP MEMBER ...`.
-* `nucleo.SP_CREAR_USUARIOS_PRUEBA`: Instancia usuarios de prueba `WITHOUT LOGIN` para permitir la verificación automatizada en cualquier entorno:
-  * `usr_admin_test`
-  * `usr_resultados_test`
-  * `usr_publicidad_test`
-  * `usr_consulta_test`
+* `nucleo.SP_CREAR_ROLES_SISTEMA`: crea los cuatro roles y aplica los GRANT y DENY del cuadro. Es idempotente. El script 33 lo vuelve a ejecutar para cubrir los SP de backup.
+* `nucleo.SP_ASIGNAR_USUARIO_ROL` / `nucleo.SP_REVOCAR_USUARIO_ROL`: validan con `nucleo.fn_ValidarMembresiaRol` y rechazan en un único mensaje (`THROW 52000`):
+  * rol inexistente, o rol fijo del sistema como `db_owner`;
+  * usuario inexistente;
+  * membresía repetida o inexistente.
 
-### 3.4 Evidencia de Testing por Rol (`32_Test_Seguridad_Roles_Permisos.sql`)
-En cumplimiento de la consigna (*"Elaboren un script para cada usuario con el que prueben cada rol"*), se consolidaron las pruebas de los cuatro usuarios en el script unificado `scripts/testing/32_Test_Seguridad_Roles_Permisos.sql`. Mediante bloques independientes de suplantación de identidad (`EXECUTE AS USER = '...'` y `REVERT`), el script verifica tanto las operaciones autorizadas como los bloqueos controlados (capturando el **Error 229** de SQL Server en `TRY/CATCH`):
+  No usan SQL dinámico: llaman a `sp_addrolemember` / `sp_droprolemember`, que reciben el rol y el usuario como parámetros (`ALTER ROLE` no acepta variables).
+* `nucleo.SP_CREAR_USUARIOS_PRUEBA`: crea un usuario `WITHOUT LOGIN` por rol (`usr_admin_test`, `usr_resultados_test`, `usr_publicidad_test`, `usr_consulta_test`).
 
-1. **`usr_admin_test` (`Rol_Administrador`):** Valida el control total en consultas sobre tablas y ejecución de procedimientos deportivos y publicitarios.
-2. **`usr_resultados_test` (`Rol_OperadorResultados`):** Valida la consulta de partidos y reportes deportivos, y comprueba la denegación con **Error 229** al intentar ejecutar `publicidad.SP_ASIGNAR_PUBLICIDAD` o `publicidad.SP_ABM_Anunciante`.
-3. **`usr_publicidad_test` (`Rol_GestorPublicidad`):** Valida la consulta de sedes/partidos y el reporte de ocupación publicitaria, y comprueba el **Error 229** al intentar ejecutar `eventos.SP_REGISTRAR_GOL` o `jugadores.SP_ABM_Jugador`.
-4. **`usr_consulta_test` (`Rol_Consulta`):** Valida la ejecución de reportes oficiales y comprueba la denegación estricta (**Error 229**) ante cualquier `INSERT` directo en tablas o intento de ejecución de SPs transaccionales (`eventos.SP_REGISTRAR_AMONESTACION`).
+### 3.4 Testing: un script por usuario
+Cada script se ejecuta como su usuario (`EXECUTE AS USER`) e imprime `OK`/`FALLÓ` en cada caso:
+* **"Puede":** la instrucción corre, o el SP responde con su propia validación (error 52000 porque el id no existe). Nunca con un error de permisos.
+* **"No puede":** el motor la rechaza por permisos (error 229, o 262 para crear objetos).
+
+| Script | Usuario | Puede | No puede |
+|---|---|---|---|
+| `32_Test_Rol_Administrador.sql` | `usr_admin_test` | Leer todo (incluido el secreto del hash), insertar directo, ejecutar SP de eventos y de publicidad, descifrar | Crear tablas fuera de los esquemas de negocio |
+| `32_Test_Rol_OperadorResultados.sql` | `usr_resultados_test` | Leer partidos y jugadores, registrar goles y tarjetas, convocar, finalizar partidos, ver goleadores | Asignar publicidad, dar de alta anunciantes, insertar directo, leer el secreto del hash, consultar documentos descifrados |
+| `32_Test_Rol_GestorPublicidad.sql` | `usr_publicidad_test` | Leer partidos, sedes y anunciantes, simular la asignación, dar de alta anunciantes, importar campañas, ver la ocupación | Registrar goles, dar de alta jugadores, leer jugadores, finalizar partidos, consultar árbitros descifrados |
+| `32_Test_Rol_Consulta.sql` | `usr_consulta_test` | Ejecutar los 7 reportes (los dos XML incluidos) y leer la vista de resultados | Insertar directo, registrar tarjetas, asignar publicidad, leer la tabla de jugadores, descifrar, ejecutar backups |
+
+`32_Test_Seguridad_Roles_Permisos.sql` prueba los SP: idempotencia, permisos creados, alta y baja de un usuario y las validaciones agrupadas.
 
 ---
 
@@ -143,69 +147,86 @@ Esto asegura que el log de transacciones no se trunque automáticamente y conser
 
 ### 4.3 Estrategia y Cronograma de Respaldos
 
-```mermaid
-flowchart LR
-    A[Backup Completo FULL\nDomingo 02:00 AM] --> B[Backup Diferencial DIFF\nDiario 12:00 PM y 18:00 PM]
-    B --> C[Backup de Log LOG\nCada 5 min en Partidos\nCada 30 min Base]
-```
+| Backup | Frecuencia | Propósito |
+|---|---|---|
+| **Completo (FULL)** | Semanal (domingo 02:00 UTC) y diario nocturno a las 04:00 UTC, fuera de la franja de partidos | Línea base de datos y estructura |
+| **Diferencial (DIFF)** | Dos por día: antes de la primera tanda de partidos (11:00 UTC) y al cerrar la jornada (03:00 UTC del día siguiente) | Acorta la restauración: después del FULL solo hace falta el último DIFF |
+| **Log de transacciones (LOG)** | Cada **5 minutos** durante la franja de partidos (desde una hora antes del primero hasta una hora después del último) y cada **30 minutos** el resto del tiempo | Cumple el RPO y evita que el `.ldf` crezca sin control |
 
-1. **Backup Completo (FULL):**
-   * **Frecuencia:** Semanal (domingos a las 02:00 UTC) o diario nocturno fuera de franja de partidos.
-   * **Propósito:** Genera la línea base completa de todos los datos y la estructura del sistema.
-2. **Backup Diferencial (DIFF):**
-   * **Frecuencia:** Cada 12 horas, programado inmediatamente antes del inicio de la primera tanda de partidos del día (ejemplo: 11:00 UTC).
-   * **Propósito:** Captura únicamente las páginas de datos modificadas desde el último backup completo, reduciendo sustancialmente el RTO al momento de restaurar.
-3. **Backup de Registro de Transacciones (LOG):**
-   * **Frecuencia:**
-     * **Durante horario de partidos:** Cada **5 minutos** (garantiza el RPO de 5 min).
-     * **Fuera de horario de partidos:** Cada **30 minutos**.
-   * **Propósito:** Trunca el registro inactivo, previene el desbordamiento del archivo `.ldf` y permite recuperar el sistema hasta el último bloque de 5 minutos previo a una falla.
+Con log cada 30 minutos fuera de los partidos, la pérdida máxima en esos días es de 30 minutos, menos que el RPO de 1 hora fijado para ellos.
+
+La programación se hace con SQL Server Agent, o con el programador de tareas del sistema que llama a `sqlcmd` en las ediciones sin Agent.
 
 ### 4.4 Stored Procedures de Automatización (`33_Procedimientos_Backups.sql`)
-Se desarrollaron procedimientos en el esquema `nucleo` para la ejecución estandarizada de copias de seguridad con compresión nativa y nombres con timestamp:
-* `nucleo.SP_CONFIGURAR_POLITICA_BACKUP`: Valida y aplica el modo `RECOVERY FULL`.
-* `nucleo.SP_BACKUP_COMPLETO`: Genera el archivo `MundialFutbol_FULL_YYYYMMDD_HHMMSS.bak`.
-* `nucleo.SP_BACKUP_DIFERENCIAL`: Genera el archivo `MundialFutbol_DIFF_YYYYMMDD_HHMMSS.bak`.
-* `nucleo.SP_BACKUP_LOG`: Genera el archivo `MundialFutbol_LOG_YYYYMMDD_HHMMSS.trn`.
-* `nucleo.SP_CONSULTAR_HISTORIAL_BACKUPS`: Procedimiento de auditoría que consulta `msdb.dbo.backupset` para verificar los tiempos, tamaños y ubicación de las copias realizadas.
+* `nucleo.SP_CONFIGURAR_POLITICA_BACKUP`: deja la base en `RECOVERY FULL`.
+* `nucleo.SP_BACKUP_COMPLETO`, `nucleo.SP_BACKUP_DIFERENCIAL` y `nucleo.SP_BACKUP_LOG`: generan `MundialFutbol_<TIPO>_aaaammdd_hhmmss.bak`/`.trn` con `CHECKSUM` y compresión (salvo en Express). Comparten `nucleo.SP_EJECUTAR_BACKUP`, que usa `BACKUP ... TO DISK = @ruta` estático, sin SQL dinámico. Validaciones agrupadas (`THROW 52000`):
+  * tipo de backup inválido;
+  * DIFF o LOG sin un FULL previo;
+  * LOG con un modelo de recuperación distinto de FULL;
+  * directorio de salida inválido.
+* `nucleo.fn_ObtenerRutaBackupPredeterminada`: carpeta de backup de la instancia, con el separador correcto en Windows y en Linux.
+* `nucleo.SP_CONSULTAR_HISTORIAL_BACKUPS`: últimos respaldos registrados en `msdb` (valida que la cantidad pedida esté entre 1 y 1000).
 
-### 4.5 Protocolo de Restauración ante Desastres (Disaster Recovery Plan)
-Ante un incidente crítico que destruya la base de datos, el procedimiento de recuperación para alcanzar el punto en el tiempo (*Point-in-Time*) consiste en:
+`33_Test_Backups.sql` verifica las validaciones, genera un FULL, un DIFF y un LOG y comprueba sus registros en `msdb`.
+
+### 4.5 Respaldo de las Claves de Cifrado
+Los datos cifrados solo se pueden leer con el certificado `CertDatosSensibles`. Restaurar en el mismo servidor no requiere nada extra, porque la master key queda protegida por la service master key. Restaurar en **otro** servidor exige haber respaldado antes la master key y el certificado, cada uno con una contraseña elegida en ese momento que **no se guarda en el repositorio** (va en un gestor de secretos):
 
 ```sql
--- 1. Restaurar el último Backup Completo (dejando la base en recuperación)
-RESTORE DATABASE MundialFutbol 
-FROM DISK = 'C:\Backups\MundialFutbol_FULL_20261123_020000.bak'
-WITH NORECOVERY, REPLACE;
+USE MundialFutbol;
+BACKUP MASTER KEY TO FILE = 'C:\Backups\Claves\MundialFutbol_master.key'
+    ENCRYPTION BY PASSWORD = '<contraseña del gestor de secretos>';
+BACKUP CERTIFICATE CertDatosSensibles TO FILE = 'C:\Backups\Claves\CertDatosSensibles.cer'
+    WITH PRIVATE KEY (FILE = 'C:\Backups\Claves\CertDatosSensibles.pvk',
+                      ENCRYPTION BY PASSWORD = '<contraseña del gestor de secretos>');
+```
 
--- 2. Restaurar el último Backup Diferencial previo al incidente
-RESTORE DATABASE MundialFutbol 
-FROM DISK = 'C:\Backups\MundialFutbol_DIFF_20261123_110000.bak'
-WITH NORECOVERY;
+Se hace una vez al crear las claves y cada vez que se regeneran, y los archivos se guardan separados de los backups de la base.
 
--- 3. Aplicar en cadena todos los Backups de Log hasta el último disponible
-RESTORE LOG MundialFutbol 
-FROM DISK = 'C:\Backups\MundialFutbol_LOG_20261123_110500.trn'
-WITH NORECOVERY;
+### 4.6 Protocolo de Restauración ante Desastres
+Para recuperar hasta el último log disponible (*point in time*):
 
--- ... Aplicar sucesivos logs intermedios ...
+```sql
+-- 1. Si es posible, respaldar la cola del log (lo escrito después del último backup de log).
+BACKUP LOG MundialFutbol TO DISK = 'C:\Backups\MundialFutbol_LOG_cola.trn' WITH NORECOVERY;
 
--- 4. Aplicar el último log disponible dejando la base en estado operacional
-RESTORE LOG MundialFutbol 
-FROM DISK = 'C:\Backups\MundialFutbol_LOG_20261123_142500.trn'
-WITH RECOVERY;
+-- 2. Último FULL, sin recuperar todavía.
+RESTORE DATABASE MundialFutbol FROM DISK = 'C:\Backups\MundialFutbol_FULL_20261123_040000.bak' WITH NORECOVERY, REPLACE;
+
+-- 3. Último DIFF posterior a ese FULL.
+RESTORE DATABASE MundialFutbol FROM DISK = 'C:\Backups\MundialFutbol_DIFF_20261123_110000.bak' WITH NORECOVERY;
+
+-- 4. Todos los LOG posteriores al DIFF, en orden, y la cola del log.
+RESTORE LOG MundialFutbol FROM DISK = 'C:\Backups\MundialFutbol_LOG_20261123_110500.trn' WITH NORECOVERY;
+-- ... logs intermedios ...
+RESTORE LOG MundialFutbol FROM DISK = 'C:\Backups\MundialFutbol_LOG_cola.trn' WITH RECOVERY;
+
+-- 5. En otro servidor: restaurar antes la master key y el certificado (sección 4.5).
 ```
 
 ---
 
-## 5. Resumen de Archivos Incorporados al Repositorio
+## 5. Impacto del Cifrado en el Testing Previo
+
+La consigna anticipa que, una vez aplicado el cifrado, algunos tests de entregas anteriores pueden dejar de pasar. Con la suite completa sobre la base con los seeds cargados:
+
+| Test | Caso | Motivo |
+|---|---|---|
+| `02_Test_Tablas_Jugadores.sql` | `TEST 2.A` ("permitió documento duplicado") | El test inserta dos jugadores con el mismo `Documento` directo en la tabla y espera que lo rechace `UQ_Jugador_Documento`. El cifrado reemplaza esa restricción por el índice único sobre `DocumentoHash`, porque la columna pública pasa a ser una máscara que puede repetirse (`***-D-01` en varias selecciones). Los duplicados se siguen rechazando al dar de alta por `SP_ALTA_Jugador` (probado en el test 31, caso 3.B). |
+
+El resto de la suite pasa. Los tests que cargan filas directo en texto plano siguen funcionando porque las funciones de búsqueda prueban también la columna pública cuando la fila no tiene hash. Los que dan de alta con los SP y buscan con esas funciones (importaciones, seeds) tampoco se ven afectados.
+
+---
+
+## 6. Resumen de Archivos
 
 | Carpeta | Archivo | Descripción |
 |---|---|---|
-| `scripts/creacion/` | `31_Seguridad_Cifrado.sql` | Cifrado PII, funciones criptográficas, `ALTER TABLE`, migración y adaptación de SPs ABM. |
-| `scripts/creacion/` | `32_Seguridad_Roles_Permisos.sql` | SPs de creación y gestión de 4 roles, asignación granular de permisos y usuarios de prueba. |
-| `scripts/creacion/` | `33_Procedimientos_Backups.sql` | SPs para modo FULL, backups Full, Diferencial y de Log de transacciones. |
-| `scripts/testing/` | `31_Test_Seguridad_Cifrado.sql` | Test de funciones de cifrado, persistencia binaria y validación de impacto en queries previas. |
-| `scripts/testing/` | `32_Test_Seguridad_Roles_Permisos.sql` | Test unificado de permisos y denegaciones (Error 229) para los 4 roles (`usr_admin_test`, `usr_resultados_test`, `usr_publicidad_test`, `usr_consulta_test`). |
-| `scripts/testing/` | `33_Test_Backups.sql` | Validación de ejecución de respaldos Full, Diff, Log y consulta de historial en msdb. |
-| `doc/entrega8/` | `entrega8_seguridad_y_respaldo.md` | Documento técnico formal de la Entrega 8. |
+| `scripts/creacion/` | `31_Seguridad_Cifrado.sql` | Script de modificación del cifrado: tablas, claves, funciones, ABM, migración y consultas descifradas |
+| `scripts/creacion/` | `32_Seguridad_Roles_Permisos.sql` | Roles, permisos y usuarios de prueba |
+| `scripts/creacion/` | `33_Procedimientos_Backups.sql` | Modelo FULL, backups FULL/DIFF/LOG e historial |
+| `scripts/testing/` | `31_Test_Seguridad_Cifrado.sql` | Test del cifrado |
+| `scripts/testing/` | `32_Test_Seguridad_Roles_Permisos.sql` | Test de los SP de roles |
+| `scripts/testing/` | `32_Test_Rol_Administrador.sql`, `32_Test_Rol_OperadorResultados.sql`, `32_Test_Rol_GestorPublicidad.sql`, `32_Test_Rol_Consulta.sql` | Un test por usuario: qué puede y qué no puede hacer |
+| `scripts/testing/` | `33_Test_Backups.sql` | Test de los backups |
+| `doc/entrega8/` | `entrega8_seguridad_y_respaldo.md` | Este documento |
