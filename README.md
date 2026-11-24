@@ -38,7 +38,7 @@ Base de datos en **SQL Server (T-SQL)** para gestionar la operación de los part
 └── scripts/
     ├── creacion/                 # scripts de creación (base, tablas, FK, funciones y SP)
     │   ├── 00_Reset_Total.sql    # maestro: borra y recrea la base, crea schemas y ejecuta el resto
-    │   └── 01_… a 28_…           # un archivo por módulo, con prefijo numérico de orden de ejecución
+    │   └── 01_… a 29_…           # un archivo por módulo, con prefijo numérico de orden de ejecución
     ├── testing/                  # scripts de testing (uno por cada script de creación probado)
     │   └── importacion/          # tests en espejo de scripts/importacion/ (ej. 03_Test_Seed_Jugadores_Eventos.sql)
     └── importacion/              # procesos de importación de datos externos (CSV/XML/API/scraping)
@@ -54,19 +54,19 @@ Base de datos en **SQL Server (T-SQL)** para gestionar la operación de los part
 
 1. Abrir SSMS y activar el **modo SQLCMD** (menú *Consulta → Modo SQLCMD*).
 2. Abrir `scripts/creacion/00_Reset_Total.sql` y editar la línea `:setvar RUTA "..."` con la ruta de la carpeta `scripts\creacion` de la copia local del repositorio (sin barra final).
-3. Ejecutarlo. El script elimina la base `MundialFutbol` si existe, la recrea, crea los schemas y ejecuta en orden los scripts `01` a `28`. Si alguno falla, se corta en ese punto. Al final muestra un resumen de tablas, SP y funciones por schema.
-4. Ejecutar los scripts de carga de datos de `scripts/importacion/` en este orden: `04_Seed_Nucleo_Publicidad.sql`, `05_Importar_Nucleo_Publicidad.sql` (requiere generar antes los archivos de las APIs, ver [Asignación de publicidad](#asignación-de-publicidad)), `06_Seed_Designaciones_Publicidad.sql`, luego `03`, `01` y `02` (jugadores y eventos) y por último `07_Cierre_Resultados_Partidos.sql`. Los que leen archivos llevan su propio `:setvar RUTA_IMP` con la carpeta `scripts\importacion`.
+3. Ejecutarlo. El script elimina la base `MundialFutbol` si existe, la recrea, crea los schemas y ejecuta en orden los scripts `01` a `29`. Si alguno falla, se corta en ese punto. Al final muestra un resumen de tablas, SP y funciones por schema.
+4. Ejecutar los scripts de carga de datos de `scripts/importacion/` en este orden: `04_Seed_Nucleo_Publicidad.sql`, `05_Importar_Nucleo_Publicidad.sql` (requiere generar antes los archivos de las APIs, ver [Asignación de publicidad](#asignación-de-publicidad)), `06_Seed_Designaciones_Publicidad.sql`, luego `03`, `01` y `02` (jugadores y eventos) después `07_Cierre_Resultados_Partidos.sql` y por último `08_Importar_Campanias_Dossier.sql` (campañas del dossier por scraping, ver [Campañas del dossier](#campañas-del-dossier-scraping)). Los que leen archivos llevan su propio `:setvar RUTA_IMP` con la carpeta `scripts\importacion`.
 5. Ejecutar `scripts/testing/00_Ejecutar_Tests.sql` (también en modo SQLCMD, editando su `:setvar RUTA` con la carpeta `scripts\testing`), que corre todos los tests en orden y al final controla que no queden datos de prueba.
 
 Todos los scripts verifican la existencia de los objetos antes de crearlos o borrarlos, por lo que se pueden volver a ejecutar sin errores.
 
 ### Orden de ejecución
 
-Cada archivo empieza con dos dígitos que marcan su orden. Los números 01 a 28 los ejecuta `00_Reset_Total.sql` en ese orden. El responsable es el autor indicado en el encabezado de cada script.
+Cada archivo empieza con dos dígitos que marcan su orden. Los números 01 a 29 los ejecuta `00_Reset_Total.sql` en ese orden. El responsable es el autor indicado en el encabezado de cada script.
 
 | N.º | Script | Contenido | Responsable |
 |---|---|---|---|
-| 00 | `00_Reset_Total.sql` | Borra y recrea la base, crea los schemas y ejecuta los scripts 01 a 28 | Yamil / Elías |
+| 00 | `00_Reset_Total.sql` | Borra y recrea la base, crea los schemas y ejecuta los scripts 01 a 29 | Yamil / Elías |
 | 01 | `01_Tablas_Nucleo.sql` | Tablas del núcleo: países, confederaciones, ciudades, sedes, fases, grupos, selecciones, staff técnico, árbitros, partidos, designaciones y sanciones | Yamil |
 | 02 | `02_Tablas_Jugadores_y_Alineaciones.sql` | Tablas de jugadores, convocatoria, formaciones y sustituciones | Mateo |
 | 03 | `03_Tablas_Eventos.sql` | Tablas de reglas de suspensión, tipos de gol, períodos, goles, tarjetas y amonestaciones | Mateo |
@@ -95,6 +95,7 @@ Cada archivo empieza con dos dígitos que marcan su orden. Los números 01 a 28 
 | 26 | `26_SP_FinalizarPartido.sql` | `SP_FINALIZAR_PARTIDO`: cierra un partido y registra la concurrencia, validando que los goles cargados definan el resultado | Yamil |
 | 27 | `27_SP_CalculoSeleccionesClasificadas.sql` | `SP_CALCULO_DE_SELECCIONES_CLASIFICADAS`: posiciones, clasificados y fase inicial de la eliminación directa | Yamil |
 | 28 | `28_SP_DefinirCruceEliminatorio.sql` | `SP_DEFINIR_CRUCE_ELIMINATORIO`: asigna las selecciones de un partido eliminatorio (ver [Cruces eliminatorios](#cruces-eliminatorios)) | Yamil |
+| 29 | `29_SP_Importacion_Campanias.sql` | `SP_IMPORTAR_CAMPANIAS_CSV` (campañas del dossier de publicidad, por scraping) y la vista de aterrizaje `publicidad.vw_CargaStagingCampania` | Elías |
 
 **Convención de los ABM:** cada tabla tiene un SP por operación: `SP_ALTA_<Tabla>`, `SP_MODIFICACION_<Tabla>` y `SP_BAJA_<Tabla>` (por ejemplo `nucleo.SP_ALTA_Partido`). Las tablas asociativas (`ArbitroIdioma` y `OrientacionPais`) solo tienen alta y baja. Los archivos conservan el nombre `SP_ABM_` del módulo.
 
@@ -129,6 +130,7 @@ Scripts de testing (en `scripts/testing/`):
 | `26_Test_SP_FinalizarPartido.sql` | `SP_FINALIZAR_PARTIDO` | Yamil |
 | `27_Test_SP_CalculoSeleccionesClasificadas.sql` | `SP_CALCULO_DE_SELECCIONES_CLASIFICADAS` | Yamil |
 | `28_Test_SP_DefinirCruceEliminatorio.sql` | `SP_DEFINIR_CRUCE_ELIMINATORIO` | Yamil |
+| `29_Test_SP_Importacion_Campanias.sql` | `SP_IMPORTAR_CAMPANIAS_CSV` (primera y segunda corrida, filas inválidas en el log, acentos, modificación de Marca y Agencia, país inexistente, `@crearPiezas = 0` y cambio de país del anunciante) | Elías |
 | `importacion/03_Test_Seed_Jugadores_Eventos.sql` | Seed de jugadores y eventos: volúmenes mínimos y casos obligatorios (en espejo de `scripts/importacion/03_Seed_Jugadores_Eventos.sql`) | Mateo |
 
 Pendientes: reportes, seguridad y respaldo.
@@ -208,6 +210,30 @@ Ninguna requiere API key. Los archivos se generan con `scripts/importacion/fuent
 El Banco Mundial se cruza por `CodigoISO2` y no por `CodigoISO3` porque varios códigos del torneo son códigos FIFA (NED, GER, ENG, SUI, CHI). Las coordenadas, el huso y el cruce de partidos del fixture salen del propio script; del scraping se toma la capacidad.
 
 > Las claves foráneas que cruzan módulos (por ejemplo, de `Convocatoria` hacia `Seleccion` o de `EspacioPublicitario` hacia `Partido`) se agregan con `ALTER TABLE` en `06_FK_Cruzadas.sql`, una vez creadas todas las tablas.
+
+---
+
+## Campañas del dossier (scraping)
+
+Segundo dataset obtenido por scraping (además del fixture): las campañas de publicidad del Mundial de un dossier público.
+
+| Dato | Detalle |
+|---|---|
+| Página de origen | `https://dossiermundial.netlify.app/` (sitio estático que arma la página en el navegador) |
+| Técnica | La página carga sus datos desde una base Firestore de lectura pública, sin clave. En vez de parsear el HTML renderizado, `scripts/importacion/scraping_dossier.py` hace un `GET` al mismo endpoint REST (`https://firestore.googleapis.com/v1/projects/repositorio2026-61a28/databases/(default)/documents/campanas?pageSize=300`) y convierte el JSON tipado de Firestore (`stringValue`, `arrayValue`) a CSV |
+| Límites de uso | Sin API key. Se hace **1 solo pedido** (hoy son 75 campañas, cabe en una página); solo se pide otra página si la respuesta trae `nextPageToken`. Se envía un `User-Agent` identificatorio del grupo. Solo biblioteca estándar de Python 3 |
+| Datos que se guardan | `Anunciante;Marca;Titulo;Agencia;Productora;Periodo;Categorias` (UTF-8, separador `;`, categorías separadas por `\|`). El campo `creditos` del dossier tiene nombres de personas: **no se lee ni se guarda** |
+| Cómo regenerar el CSV | `python scripts/importacion/scraping_dossier.py` (pisa `scripts/importacion/campanas_dossier.csv`). El repositorio incluye un snapshot para trabajar sin conexión |
+
+**Importación.** `08_Importar_Campanias_Dossier.sql` (modo SQLCMD, editar `RUTA_IMP`) carga el CSV con `BULK INSERT` estático en `publicidad.StagingCampania` (a través de `publicidad.vw_CargaStagingCampania`) y ejecuta `publicidad.SP_IMPORTAR_CAMPANIAS_CSV @nombreArchivo, @filasProcesadas OUTPUT, @filasConError OUTPUT, @codigoISO3Pais = 'ARG', @crearPiezas = 1`. Va después de 06 y 07 para no cambiar la pauta ya asignada en los partidos del seed. Con el snapshot actual crea 63 anunciantes, 75 campañas y 75 piezas; ejecutado después del seed 04 (9 anunciantes, 9 campañas y 12 piezas) la base queda con 72 anunciantes, 84 campañas y 87 piezas.
+
+El SP usa los SP ABM de `20_SP_ABM_Publicidad.sql` y crea, por cada fila (Upsert, sin duplicar y solo modificando lo que cambió, distinguiendo mayúsculas y acentos):
+
+1. **Anunciante** por `Nombre`, con el país de origen indicado en `@codigoISO3Pais` (el dossier son campañas argentinas y no informa país).
+2. **Campania** por (anunciante, título), con `Marca` y `Agencia`. `Productora`, `Periodo` y `Categorias` llegan a staging pero no se guardan: el modelo no tiene dónde. Si la campaña ya existe y cambió la marca o la agencia, se modifica conservando sus fechas.
+3. Con `@crearPiezas = 1`: una **Pieza** en idioma Español con el título de la campaña y su **OrientacionPais** al país indicado, para que la campaña participe de `SP_ASIGNAR_PUBLICIDAD`.
+
+Las filas inválidas (anunciante o título vacío, texto de más de 100 caracteres, país inexistente) no frenan el lote: quedan en `eventos.LogImportacion` con el `IdFila` de staging y los datos crudos. Las validaciones generales (nombre de archivo, archivo sin filas, idioma Español inexistente con `@crearPiezas = 1`) se informan juntas en un único error `THROW 52000`.
 
 ---
 
