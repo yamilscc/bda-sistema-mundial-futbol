@@ -18,6 +18,7 @@ Objetivo: Validar en un escenario aislado (BEGIN TRANSACTION / ROLLBACK) los vol
             siguiente (y rechazado si se intenta agregarlo a la formación).
           - Caso 4: cambio por lesión antes del minuto 20.
           Requiere ejecutados los scripts 01 a 24.
+          Test en espejo de scripts/importacion/03_Seed_Jugadores_Eventos.sql.
 */
 
 USE MundialFutbol;

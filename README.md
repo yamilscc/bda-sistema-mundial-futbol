@@ -40,6 +40,7 @@ Base de datos en **SQL Server (T-SQL)** para gestionar la operación de los part
     │   ├── 00_Reset_Total.sql    # maestro: borra y recrea la base, crea schemas y ejecuta el resto
     │   └── 01_… a 21_…           # un archivo por módulo, con prefijo numérico de orden de ejecución
     ├── testing/                  # scripts de testing (uno por cada script de creación probado)
+    │   └── importacion/          # tests en espejo de scripts/importacion/ (ej. 03_Test_Seed_Jugadores_Eventos.sql)
     └── importacion/              # procesos de importación de datos externos (CSV/XML/API/scraping)
 ```
 
@@ -112,6 +113,7 @@ Scripts de testing (en `scripts/testing/`):
 | `19_Test_SP_ABM_Nucleo.sql` | SP ABM restantes del núcleo | Denis |
 | `20_Test_SP_ABM_Publicidad.sql` | SP ABM de publicidad | Denis |
 | `21_Test_SP_AsignarPublicidad.sql` | `SP_ASIGNAR_PUBLICIDAD` (prime time en más de cuatro mercados, criterios de prioridad y validaciones) | Elías |
+| `importacion/03_Test_Seed_Jugadores_Eventos.sql` | Seed de jugadores y eventos: volúmenes mínimos y casos obligatorios (en espejo de `scripts/importacion/03_Seed_Jugadores_Eventos.sql`) | Mateo |
 
 Pendientes: importación de datos (`scripts/importacion/`), datos de prueba (seed), reportes, seguridad y respaldo.
 
