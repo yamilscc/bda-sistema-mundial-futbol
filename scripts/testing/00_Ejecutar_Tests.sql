@@ -9,7 +9,7 @@ Torczuk, Elías Alexei
 Canseco Carrizo, Yamil Simón
 Objetivo:
 	- Orquestar la ejecución de TODOS los scripts de testing en el orden de su número
-	  (01 a 28 y el test del seed en importacion/), igual que 00_Reset_Total.sql orquesta los scripts de creación.
+	  (01 a 29 y el test del seed en importacion/), igual que 00_Reset_Total.sql orquesta los scripts de creación.
 	- Entre test y test, deshacer cualquier transacción que haya quedado abierta, para que
 	  un test cortado a mitad de camino no arrastre sus datos al siguiente.
 	- Verificar al inicio que la base exista y esté recién creada (el test 01 lo requiere).
@@ -290,6 +290,15 @@ GO
 PRINT '===== TEST 28 SP definir cruce eliminatorio';
 GO
 :r $(RUTA)\28_Test_SP_DefinirCruceEliminatorio.sql
+GO
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
+GO
+USE MundialFutbol;
+GO
+
+PRINT '===== TEST 29 SP importación de campañas del dossier';
+GO
+:r $(RUTA)\29_Test_SP_Importacion_Campanias.sql
 GO
 WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
 GO
