@@ -361,6 +361,14 @@ BEGIN
 
     SET @errores += publicidad.fn_ValidarMoneda(@idMoneda, @codigo, @nombre);
 
+    -- CotizacionMoneda referencia a Moneda por el código ISO: si hay cotizaciones, el código no se puede cambiar.
+    IF EXISTS (SELECT 1
+               FROM publicidad.CotizacionMoneda AS cm
+               INNER JOIN publicidad.Moneda     AS m ON m.Codigo IN (cm.MonedaBase, cm.Moneda)
+               WHERE m.IdMoneda = @idMoneda
+                 AND m.Codigo  <> @codigo)
+        SET @errores += N'- La moneda tiene cotizaciones registradas: no se puede cambiar su código.' + @salto;
+
     IF LEN(@errores) > 0
     BEGIN
         SET @mensaje = LEFT(N'SP_MODIFICACION_Moneda - No se pudo completar la operación:' + @salto + @errores, 2048);
@@ -401,6 +409,12 @@ BEGIN
         SET @errores += N'- La moneda está asociada a espacios publicitarios facturados y no puede eliminarse.' + @salto;
     IF EXISTS (SELECT 1 FROM publicidad.Tarifa WHERE IdMoneda = @idMoneda)
         SET @errores += N'- La moneda está asociada a tarifas y no puede eliminarse.' + @salto;
+    -- CotizacionMoneda referencia a Moneda por el código ISO (no por IdMoneda).
+    IF EXISTS (SELECT 1
+               FROM publicidad.CotizacionMoneda AS cm
+               INNER JOIN publicidad.Moneda     AS m ON m.Codigo IN (cm.MonedaBase, cm.Moneda)
+               WHERE m.IdMoneda = @idMoneda)
+        SET @errores += N'- La moneda tiene cotizaciones registradas y no puede eliminarse.' + @salto;
 
     IF LEN(@errores) > 0
     BEGIN
