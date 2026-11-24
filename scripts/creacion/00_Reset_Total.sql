@@ -228,9 +228,34 @@ GO
 :r $(RUTA)\28_SP_DefinirCruceEliminatorio.sql
 GO
 
-PRINT '--- 33 Consultas del alcance To BE (fixture, goleadores, tarjetas, árbitros, publicidad y BI)';
+PRINT '--- 29 SP importación de campañas del dossier';
 GO
-:r $(RUTA)\33_Consultas_ToBe.sql
+:r $(RUTA)\29_SP_Importacion_Campanias.sql
+GO
+
+PRINT '--- 30 SP Reportes';
+GO
+:r $(RUTA)\30_SP_Reportes.sql
+GO
+
+PRINT '--- 31 Seguridad: Cifrado de Datos Sensibles';
+GO
+:r $(RUTA)\31_Seguridad_Cifrado.sql
+GO
+
+PRINT '--- 32 Seguridad: Roles y Permisos Granulares';
+GO
+:r $(RUTA)\32_Seguridad_Roles_Permisos.sql
+GO
+
+PRINT '--- 33 Procedimientos de Backup y Recuperacion';
+GO
+:r $(RUTA)\33_Procedimientos_Backups.sql
+GO
+
+PRINT '--- 34 Consultas del alcance To BE (fixture, goleadores, tarjetas, árbitros, publicidad y BI)';
+GO
+:r $(RUTA)\34_Consultas_ToBe.sql
 GO
 
 -- Los próximos SP, vistas y funciones se suman acá, siempre en orden numérico.

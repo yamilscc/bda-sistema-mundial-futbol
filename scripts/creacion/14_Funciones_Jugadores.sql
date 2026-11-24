@@ -15,6 +15,9 @@ Objetivo: Funciones del módulo de jugadores, convocatoria y alineaciones:
           - jugadores.fn_JugadoresEnCancha(@idPartido, @minuto): tabla con los jugadores en cancha.
           - jugadores.fn_ValidarConvocatoria, jugadores.fn_ValidarFormacionJugador y
             jugadores.fn_ValidarSustitucion: validaciones compartidas por los SP de negocio y ABM.
+          - jugadores.fn_IdJugadorPorDocumento(@documento): Id del jugador con ese documento (NULL si no
+            existe). Es el único punto por el que importaciones y seeds buscan jugadores por documento:
+            31_Seguridad_Cifrado.sql la redefine para buscar por hash cuando el documento está cifrado.
           Requiere ejecutados los scripts 01 a 10.
           Test correspondiente: testing/14_Test_Funciones_Jugadores.sql.
 */
@@ -588,5 +591,18 @@ BEGIN
     END;
 
     RETURN @errores;
+END;
+GO
+
+-- =========================================================================
+-- jugadores.fn_IdJugadorPorDocumento
+-- Versión inicial (texto plano). 31_Seguridad_Cifrado.sql la redefine para buscar por DocumentoHash.
+-- =========================================================================
+CREATE OR ALTER FUNCTION jugadores.fn_IdJugadorPorDocumento (@documento VARCHAR(20))
+RETURNS INT
+AS
+BEGIN
+    RETURN (SELECT TOP (1) IdJugador FROM jugadores.Jugador
+            WHERE Documento = LTRIM(RTRIM(@documento)) ORDER BY IdJugador);
 END;
 GO

@@ -4,7 +4,7 @@ Esta entrega integra el trabajo de las entregas anteriores en tres piezas que se
 
 | Pieza | Qué es | Dónde está |
 |---|---|---|
-| **Consultas de "To BE"** | Vistas y un procedimiento de consulta que responden lo que pide la sección *To BE* del enunciado (fixture, goleadores, tarjetas, árbitros, publicidad, mapa de sedes) | `scripts/creacion/33_Consultas_ToBe.sql` y su test `scripts/testing/33_Test_Consultas_ToBe.sql` |
+| **Consultas de "To BE"** | Vistas y un procedimiento de consulta que responden lo que pide la sección *To BE* del enunciado (fixture, goleadores, tarjetas, árbitros, publicidad, mapa de sedes) | `scripts/creacion/34_Consultas_ToBe.sql` y su test `scripts/testing/34_Test_Consultas_ToBe.sql` |
 | **Aplicación de ABM** | Aplicación web (Java, Spring Boot) que da de alta, modifica y da de baja sedes | `app/` |
 | **Tablero de BI** | Tablero de Power BI conectado a la base, con gráficos y un mapa de sedes | `doc/entrega9/Mundial.pbix` y capturas en `doc/entrega9/capturas/` |
 
@@ -12,9 +12,9 @@ Esta entrega integra el trabajo de las entregas anteriores en tres piezas que se
 
 - **Entrega 5 (base de datos y lógica de negocio).** La aplicación no escribe en ninguna tabla: toda alta, modificación y baja pasa por los procedimientos `nucleo.SP_ALTA_Sede`, `nucleo.SP_MODIFICACION_Sede` y `nucleo.SP_BAJA_Sede` (script 09). Cuando un procedimiento rechaza una operación, la aplicación muestra su mensaje consolidado, con una condición incumplida por renglón.
 - **Entrega 6 (importación).** Los datos que se ven en las consultas, en el tablero y en la aplicación (sedes, ciudades, 24 partidos, PBI per cápita, cotizaciones y pauta publicitaria) se cargan con los scripts de `scripts/importacion/`.
-- **Entrega 7 (reportes).** Las vistas del script 33 sirven como base de los reportes de goleadores, tarjetas, designaciones arbitrales, ocupación publicitaria y prime time.
+- **Entrega 7 (reportes).** Las vistas del script 34 sirven como base de los reportes de goleadores, tarjetas, designaciones arbitrales, ocupación publicitaria y prime time.
 
-## 1. Consultas de "To BE" (script 33)
+## 1. Consultas de "To BE" (script 34)
 
 | Requisito del enunciado | Objeto que lo cubre |
 |---|---|
@@ -31,7 +31,7 @@ Esta entrega integra el trabajo de las entregas anteriores en tres piezas que se
 | Mapa de sedes (latitud y longitud) | `nucleo.vw_SedesMapa` |
 | Clasificados al terminar la fase de grupos | `nucleo.SP_CALCULO_DE_SELECCIONES_CLASIFICADAS` (script 27) |
 
-**Cómo se prueba.** El test `33_Test_Consultas_ToBe.sql` arma sus propios datos de prueba (prefijo `TEST`), ejecuta cada consulta y compara con el resultado esperado, que está escrito como comentario en cada caso. Se ejecuta con el resto de los tests (ver "Cómo ejecutar las pruebas"). En la última corrida completa no hubo ningún caso con `FALLÓ` en el test 33.
+**Cómo se prueba.** El test `34_Test_Consultas_ToBe.sql` arma sus propios datos de prueba (prefijo `TEST`), ejecuta cada consulta y compara con el resultado esperado, que está escrito como comentario en cada caso. Se ejecuta con el resto de los tests (ver "Cómo ejecutar las pruebas"). En la última corrida completa no hubo ningún caso con `FALLÓ` en el test 34.
 
 ## 2. Aplicación de ABM de sedes (`app/`)
 
@@ -101,7 +101,7 @@ Capturas de la aplicación:
 
 ## 3. Tablero de BI (Power BI)
 
-El tablero se conecta a la base `MundialFutbol` de SQL Server (modo *Importar*, autenticación de Windows, servidor `localhost,1433`) y usa las vistas del script 33:
+El tablero se conecta a la base `MundialFutbol` de SQL Server (modo *Importar*, autenticación de Windows, servidor `localhost,1433`) y usa las vistas del script 34:
 
 | Visual | Vista | Campos |
 |---|---|---|
@@ -113,21 +113,17 @@ Archivo: `doc/entrega9/Mundial.pbix`. Para actualizar los datos: *Inicio → Act
 
 ## Carga de datos
 
-El orden completo desde cero (en modo SQLCMD de SSMS, editando la ruta de cada script) es:
+El orden completo desde cero (en modo SQLCMD de SSMS) es:
 
-1. `scripts/creacion/00_Reset_Total.sql`: borra y recrea la base con todos los objetos.
-2. `scripts/importacion/04_Seed_Nucleo_Publicidad.sql`: países, selecciones, árbitros, anunciantes y piezas.
-3. Generar los archivos de las APIs (requiere internet; no necesitan clave), desde `scripts/importacion/`:
+1. `scripts/creacion/00_Reset_Total.sql`: borra y recrea la base con todos los objetos (editar su `:setvar RUTA`).
+2. Generar los archivos de las APIs (requiere internet; no necesitan clave), desde `scripts/importacion/`. `pbi_banco_mundial.json` y `cotizaciones_frankfurter.json` no vienen en el repositorio:
 
    ```powershell
-   python fuentes_externas.py pbi
-   python fuentes_externas.py cotizaciones
+   python fuentes_externas.py todo
    ```
 
-4. `scripts/importacion/05_Importar_Nucleo_Publicidad.sql`: PBI per cápita, sedes y 24 partidos, cotizaciones y pauta publicitaria. Debe informar 24 filas procesadas del fixture y, en la pauta, 6 procesadas y 3 con error (las 3 filas inválidas están incluidas a propósito para probar la importación con errores parciales; quedan registradas en `eventos.LogImportacion`).
-5. Crear el usuario de la aplicación (ver arriba).
-
-Los scripts `03`, `01`, `02`, `06` y `07` de `scripts/importacion/` completan los datos de jugadores, eventos, designaciones y cierre de partidos.
+3. `scripts/importacion/00_Cargar_Seeds.sql`: lanzador de todos los seeds e importaciones, en el orden en que funcionan (04, 05, 06, 01, 03, 02, 07 y 08). Solo hay que editar su `:setvar RUTA_IMP` con la carpeta `scripts\importacion`. Se corta ante el primer error y se puede volver a ejecutar. En la importación del `05`, el fixture debe informar 24 filas procesadas y la pauta, 6 procesadas y 3 con error (las 3 filas inválidas están incluidas a propósito para probar la importación con errores parciales; quedan registradas en `eventos.LogImportacion`).
+4. Crear el usuario de la aplicación (ver arriba).
 
 **Nota sobre los saltos de línea.** El archivo `fixture_sedes.csv` se importa con `BULK INSERT` y espera saltos de línea tipo LF. Si Git lo descarga con CRLF (configuración `core.autocrlf=true` de Windows), la última columna queda con un carácter extra y las 24 filas se rechazan con "La selección visitante no existe". En ese caso, convertir el archivo a LF antes de importar.
 

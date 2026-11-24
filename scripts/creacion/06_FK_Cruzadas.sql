@@ -2,7 +2,7 @@
 Universidad: Universidad Nacional de La Matanza
 Materia: Bases de Datos Aplicadas - Grupo 05
 Autor: Torczuk, Elías Alexei
-Fecha: 2026-11-15
+Fecha: 2026-11-24
 Integrantes:
 - Casella, Mateo Ezequiel
 - Chungara Tenorio, Denis Abner
@@ -84,4 +84,11 @@ IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_Anunciante_Pais')
     ALTER TABLE publicidad.Anunciante
         ADD CONSTRAINT FK_Anunciante_Pais
         FOREIGN KEY (IdPais) REFERENCES nucleo.Pais (IdPais);
+GO
+
+-- publicidad.Tarifa -> nucleo.Fase (la tarifa de la franja depende de la fase del partido)
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_Tarifa_Fase')
+    ALTER TABLE publicidad.Tarifa
+        ADD CONSTRAINT FK_Tarifa_Fase
+        FOREIGN KEY (IdFase) REFERENCES nucleo.Fase (IdFase);
 GO

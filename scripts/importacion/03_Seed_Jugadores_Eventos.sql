@@ -22,6 +22,8 @@ Objetivo: Carga inicial (Seed Data) idempotente para los módulos de jugadores y
             4) Cambio por lesión antes del minuto 20.
           Requiere ejecutados los scripts 01 a 24 y cargadas previamente las selecciones y
           partidos en estado 'Programado' (módulo nucleo).
+          ORDEN: después de 04, 05 y 06 y de 01_Importar_Convocatoria_XML.sql (que respeta: completa solo los
+          dorsales libres), y antes de 02 y 07. Si el XML se importa después, los dorsales ya están ocupados.
 */
 
 USE MundialFutbol;
@@ -208,7 +210,7 @@ BEGIN
             FROM jugadores.Club
             ORDER BY (IdClub + @dorsal + @idxSel) % 12, IdClub;
 
-            SELECT @idJugNuevo = IdJugador FROM jugadores.Jugador WHERE Documento = @docJug;
+            SET @idJugNuevo = jugadores.fn_IdJugadorPorDocumento(@docJug);   -- NULL si no existe (también con el documento cifrado)
 
             IF @idJugNuevo IS NULL
                 EXEC jugadores.SP_ALTA_Jugador
@@ -325,7 +327,7 @@ DECLARE @idxPart       INT = 1,
         @idAmonOut     INT;
 
 DECLARE @plantilla TABLE (
-    IdOrden     INT IDENTITY(1,1) PRIMARY KEY,
+    IdOrden     INT PRIMARY KEY,   -- sin IDENTITY: DELETE no lo reinicia y el segundo equipo empezaría en 19
     IdJugador   INT         NOT NULL,
     Posicion    VARCHAR(20) NOT NULL
 );
@@ -389,8 +391,8 @@ BEGIN
                 WHERE NOT EXISTS (SELECT 1 FROM Titulares AS t WHERE t.IdJugador = e.IdJugador)
                 ORDER BY e.Dorsal ASC
             )
-            INSERT INTO @plantilla (IdJugador, Posicion)
-            SELECT IdJugador, Posicion
+            INSERT INTO @plantilla (IdOrden, IdJugador, Posicion)
+            SELECT ROW_NUMBER() OVER (ORDER BY u.EsTitular DESC, u.Dorsal ASC), IdJugador, Posicion
             FROM (
                 SELECT IdJugador, Posicion, Dorsal, EsTitular FROM Titulares
                 UNION ALL
