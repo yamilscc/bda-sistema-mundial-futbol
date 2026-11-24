@@ -35,11 +35,61 @@ Objetivo: Crear los Stored Procedures correspondientes a los 7 reportes de la En
               (sin SQL dinámico), respetando la pauta general de la cátedra.
             - Todos los reportes admiten parámetros opcionales de filtrado y devuelven
               resultados representativos aun con datos parciales.
-          Requiere ejecutados los scripts 01 a 24.
+            - Los filtros se validan con nucleo.fn_ValidarFiltrosReporte: un filtro que no existe
+              (selección, fase, sede, partido, árbitro, grupo o estado) se informa con un único
+              mensaje agrupado (THROW 52000), igual que en los demás SP.
+            - Los nombres de árbitros y staff técnico se obtienen con nucleo.fn_NombreArbitro y
+              nucleo.fn_NombreStaff, que 31_Seguridad_Cifrado.sql redefine para descifrarlos.
+            - Publicidad usa el modelo Anunciante 1-N Campania 1-N Pieza y la tarifa guardada en
+              cada EspacioPublicitario (lo facturado), con su conversión a USD por cotización.
+          Requiere ejecutados los scripts 01 a 29.
           Test correspondiente: testing/30_Test_SP_Reportes.sql.
 */
 
 USE MundialFutbol;
+GO
+
+-- =========================================================================
+-- nucleo.fn_ValidarFiltrosReporte
+-- Validación compartida de los filtros opcionales de los reportes (NULL = sin filtro). Devuelve el
+-- texto de las condiciones incumplidas, una por renglón ("- ..."), o cadena vacía.
+-- =========================================================================
+CREATE OR ALTER FUNCTION nucleo.fn_ValidarFiltrosReporte
+(
+    @codigoFIFA CHAR(3),
+    @idFase     INT,
+    @idSede     INT,
+    @idPartido  INT,
+    @idArbitro  INT,
+    @grupo      CHAR(1),
+    @estado     VARCHAR(10)
+)
+RETURNS NVARCHAR(MAX)
+AS
+BEGIN
+    DECLARE @errores NVARCHAR(MAX) = N'',
+            @salto   NVARCHAR(2)   = CHAR(13) + CHAR(10);
+
+    IF @codigoFIFA IS NOT NULL AND NOT EXISTS (SELECT 1 FROM nucleo.Seleccion WHERE CodigoFIFA = @codigoFIFA)
+        SET @errores += N'- La selección indicada (código FIFA) no existe.' + @salto;
+    IF @idFase IS NOT NULL AND NOT EXISTS (SELECT 1 FROM nucleo.Fase WHERE IdFase = @idFase)
+        SET @errores += N'- La fase indicada no existe.' + @salto;
+    IF @idSede IS NOT NULL AND NOT EXISTS (SELECT 1 FROM nucleo.Sede WHERE IdSede = @idSede)
+        SET @errores += N'- La sede indicada no existe.' + @salto;
+    IF @idPartido IS NOT NULL AND NOT EXISTS (SELECT 1 FROM nucleo.Partido WHERE IdPartido = @idPartido)
+        SET @errores += N'- El partido indicado no existe.' + @salto;
+    ELSE IF @idPartido IS NOT NULL AND @idSede IS NOT NULL
+            AND NOT EXISTS (SELECT 1 FROM nucleo.Partido WHERE IdPartido = @idPartido AND IdSede = @idSede)
+        SET @errores += N'- El partido indicado no se juega en la sede indicada.' + @salto;
+    IF @idArbitro IS NOT NULL AND NOT EXISTS (SELECT 1 FROM nucleo.Arbitro WHERE IdArbitro = @idArbitro)
+        SET @errores += N'- El árbitro indicado no existe.' + @salto;
+    IF @grupo IS NOT NULL AND NOT EXISTS (SELECT 1 FROM nucleo.Grupo WHERE Nombre = @grupo)
+        SET @errores += N'- El grupo indicado no existe.' + @salto;
+    IF @estado IS NOT NULL AND @estado NOT IN ('Programado', 'Finalizado')
+        SET @errores += N'- El estado debe ser Programado o Finalizado.' + @salto;
+
+    RETURN @errores;
+END;
 GO
 
 -- =========================================================================
@@ -63,6 +113,14 @@ BEGIN
     SET NOCOUNT ON;
 
     SET @codigoFIFA = UPPER(NULLIF(LTRIM(RTRIM(@codigoFIFA)), ''));
+
+    DECLARE @errores NVARCHAR(MAX) = nucleo.fn_ValidarFiltrosReporte(@codigoFIFA, @idFase, NULL, NULL, NULL, NULL, NULL),
+            @mensaje NVARCHAR(2048);
+    IF LEN(@errores) > 0
+    BEGIN
+        SET @mensaje = LEFT(N'SP_REPORTE_GOLEADORES - No se pudo generar el reporte:' + CHAR(13) + CHAR(10) + @errores, 2048);
+        THROW 52000, @mensaje, 1;
+    END;
 
     WITH GolesPorJugadorYFase AS (
         SELECT
@@ -228,6 +286,14 @@ BEGIN
 
     SET @codigoFIFA = UPPER(NULLIF(LTRIM(RTRIM(@codigoFIFA)), ''));
 
+    DECLARE @errores NVARCHAR(MAX) = nucleo.fn_ValidarFiltrosReporte(@codigoFIFA, NULL, NULL, NULL, NULL, NULL, NULL),
+            @mensaje NVARCHAR(2048);
+    IF LEN(@errores) > 0
+    BEGIN
+        SET @mensaje = LEFT(N'SP_REPORTE_TARJETAS_SUSPENSIONES - No se pudo generar el reporte:' + CHAR(13) + CHAR(10) + @errores, 2048);
+        THROW 52000, @mensaje, 1;
+    END;
+
     WITH AmonestacionesEvaluadas AS (
         SELECT
             s.IdSeleccion,
@@ -381,10 +447,18 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
+    DECLARE @errores NVARCHAR(MAX) = nucleo.fn_ValidarFiltrosReporte(NULL, @idFase, NULL, NULL, @idArbitro, NULL, NULL),
+            @mensaje NVARCHAR(2048);
+    IF LEN(@errores) > 0
+    BEGIN
+        SET @mensaje = LEFT(N'SP_REPORTE_DESIGNACIONES_ARBITRALES - No se pudo generar el reporte:' + CHAR(13) + CHAR(10) + @errores, 2048);
+        THROW 52000, @mensaje, 1;
+    END;
+
     SELECT
         a.IdArbitro                                                         AS [@IdArbitro],
         CASE a.EstaHabilitado WHEN 'Y' THEN 'Si' ELSE 'No' END              AS [@Habilitado],
-        a.NombreApellido                                                    AS [NombreApellido],
+        nucleo.fn_NombreArbitro(a.IdArbitro)                                AS [NombreApellido],
         pais.Nombre                                                         AS [Pais/@Nombre],
         pais.CodigoISO3                                                     AS [Pais/@CodigoISO3],
         cat.Nombre                                                          AS [Categoria],
@@ -453,7 +527,7 @@ BEGIN
                         CASE
                             WHEN am.IdJugador IS NOT NULL
                                 THEN CONCAT(j.Nombre, ' ', j.Apellido)
-                            ELSE CONCAT(st.NombreApellido, ' (', st.Rol, ')')
+                            ELSE CONCAT(nucleo.fn_NombreStaff(st.IdStaffTecnico), ' (', st.Rol, ')')
                         END                                                 AS [Sancionado],
                         COALESCE(selJ.CodigoFIFA, selSt.CodigoFIFA, '-')    AS [Seleccion],
                         am.Motivo                                           AS [Motivo],
@@ -522,7 +596,7 @@ BEGIN
                 AND pF.IdFase = @idFase
           )
       )
-    ORDER BY a.NombreApellido ASC
+    ORDER BY nucleo.fn_NombreArbitro(a.IdArbitro) ASC
     FOR XML PATH('Arbitro'), ROOT('DesignacionesArbitrales'), TYPE;
 END;
 GO
@@ -535,15 +609,30 @@ GO
 --   - Result set 1: Detalle espacio por espacio (1 a 4) de cada partido y sede.
 --   - Result set 2: Resumen consolidado de ocupación e ingresos por sede y
 --                   moneda (evitando sumar importes de monedas distintas).
+-- Los ingresos son la tarifa guardada en cada espacio (lo facturado al asignarlo). Además se
+-- informan convertidos a USD con la cotización (base USD) más reciente a la fecha del partido;
+-- si no hay ninguna anterior se usa la más próxima, y si no hay cotización la conversión queda NULL.
 -- =========================================================================
 CREATE OR ALTER PROCEDURE publicidad.SP_REPORTE_OCUPACION_PUBLICITARIA
     @idSede    TINYINT  = NULL,
-    @idPartido SMALLINT = NULL
+    @idPartido SMALLINT = NULL,
+    @resultado TINYINT  = NULL   -- NULL: los dos result sets; 1: solo el detalle; 2: solo el resumen
 AS
 BEGIN
     SET NOCOUNT ON;
 
+    DECLARE @errores NVARCHAR(MAX) = nucleo.fn_ValidarFiltrosReporte(NULL, NULL, @idSede, @idPartido, NULL, NULL, NULL),
+            @mensaje NVARCHAR(2048);
+    IF @resultado IS NOT NULL AND @resultado NOT IN (1, 2)
+        SET @errores += N'- El resultado debe ser NULL (ambos), 1 (detalle) o 2 (resumen).' + CHAR(13) + CHAR(10);
+    IF LEN(@errores) > 0
+    BEGIN
+        SET @mensaje = LEFT(N'SP_REPORTE_OCUPACION_PUBLICITARIA - No se pudo generar el reporte:' + CHAR(13) + CHAR(10) + @errores, 2048);
+        THROW 52000, @mensaje, 1;
+    END;
+
     -- Result set 1: Detalle de los 4 espacios publicitarios por sede y partido
+    IF @resultado IS NULL OR @resultado = 1
     SELECT
         sede.IdSede,
         sede.NombreEstadio                                                  AS Sede,
@@ -558,10 +647,14 @@ BEGIN
         CASE WHEN ep.IdPieza IS NOT NULL THEN 'Ocupado' ELSE 'Libre' END    AS EstadoEspacio,
         ISNULL(an.Nombre, '-')                                              AS Anunciante,
         ISNULL(paisAn.Nombre, '-')                                          AS PaisAnunciante,
+        ISNULL(cp.Titulo, '-')                                              AS Campania,
         ISNULL(pz.Titulo, '-')                                              AS PiezaPublicitaria,
         ISNULL(idi.Nombre, '-')                                             AS IdiomaPieza,
         ISNULL(ep.TarifaPublicitaria, 0.00)                                 AS TarifaPublicitaria,
         ISNULL(m.Codigo, '-')                                               AS Moneda,
+        CAST(CASE WHEN m.Codigo = 'USD' THEN ep.TarifaPublicitaria
+                  ELSE ep.TarifaPublicitaria / cot.Tasa END AS DECIMAL(14,2)) AS TarifaUSD,
+        ep.CriterioAsignacion,
         COUNT(ep.IdPieza) OVER (PARTITION BY p.IdPartido)                   AS EspaciosOcupadosPartido,
         CAST(COUNT(ep.IdPieza) OVER (PARTITION BY p.IdPartido) * 100.0 / 4 AS DECIMAL(5,2)) AS PorcentajeOcupacionPartido
     FROM nucleo.Sede AS sede
@@ -585,12 +678,22 @@ BEGIN
         ON pz.IdPieza = ep.IdPieza
     LEFT JOIN nucleo.Idioma AS idi
         ON idi.IdIdioma = pz.IdIdioma
+    LEFT JOIN publicidad.Campania AS cp
+        ON cp.IdCampania = pz.IdCampania
     LEFT JOIN publicidad.Anunciante AS an
-        ON an.IdAnunciante = pz.IdAnunciante
+        ON an.IdAnunciante = cp.IdAnunciante
     LEFT JOIN nucleo.Pais AS paisAn
         ON paisAn.IdPais = an.IdPais
     LEFT JOIN publicidad.Moneda AS m
         ON m.IdMoneda = ep.IdMoneda
+    OUTER APPLY (
+        SELECT TOP (1) c.Tasa
+        FROM publicidad.CotizacionMoneda AS c
+        WHERE c.MonedaBase = 'USD' AND c.Moneda = m.Codigo
+        ORDER BY CASE WHEN c.Fecha <= CAST(p.FechaHoraUTC AS DATE) THEN 0 ELSE 1 END,
+                 CASE WHEN c.Fecha <= CAST(p.FechaHoraUTC AS DATE) THEN DATEDIFF(DAY, c.Fecha, CAST(p.FechaHoraUTC AS DATE))
+                      ELSE DATEDIFF(DAY, CAST(p.FechaHoraUTC AS DATE), c.Fecha) END
+    ) AS cot
     WHERE (@idSede IS NULL OR sede.IdSede = @idSede)
       AND (@idPartido IS NULL OR p.IdPartido = @idPartido)
     ORDER BY
@@ -600,6 +703,7 @@ BEGIN
         esp.NumeroEspacio ASC;
 
     -- Result set 2: Resumen consolidado de ocupación e ingresos por sede y moneda
+    IF @resultado IS NULL OR @resultado = 2
     SELECT
         sede.IdSede,
         sede.NombreEstadio                                                  AS Sede,
@@ -617,7 +721,12 @@ BEGIN
         )                                                                   AS PorcentajeOcupacionSede,
         ISNULL(m.Codigo, 'SIN FACTURACION')                                 AS Moneda,
         COUNT(ep.IdPieza)                                                   AS EspaciosEnMoneda,
-        SUM(ISNULL(ep.TarifaPublicitaria, 0.00))                            AS IngresosGenerados
+        SUM(ISNULL(ep.TarifaPublicitaria, 0.00))                            AS IngresosGenerados,
+        CAST(SUM(CASE WHEN m.Codigo = 'USD' THEN ep.TarifaPublicitaria
+                      ELSE ep.TarifaPublicitaria / cot.Tasa END) AS DECIMAL(14,2)) AS IngresosUSD,
+        CAST(SUM(SUM(CASE WHEN m.Codigo = 'USD' THEN ep.TarifaPublicitaria
+                          ELSE ep.TarifaPublicitaria / cot.Tasa END)) OVER (PARTITION BY sede.IdSede)
+             AS DECIMAL(14,2))                                              AS TotalIngresosUSDSede
     FROM nucleo.Sede AS sede
     INNER JOIN nucleo.Ciudad AS ciu
         ON ciu.IdCiudad = sede.IdCiudad
@@ -636,6 +745,14 @@ BEGIN
         ON ep.IdPartido = p.IdPartido
     LEFT JOIN publicidad.Moneda AS m
         ON m.IdMoneda = ep.IdMoneda
+    OUTER APPLY (
+        SELECT TOP (1) c.Tasa
+        FROM publicidad.CotizacionMoneda AS c
+        WHERE c.MonedaBase = 'USD' AND c.Moneda = m.Codigo
+        ORDER BY CASE WHEN c.Fecha <= CAST(p.FechaHoraUTC AS DATE) THEN 0 ELSE 1 END,
+                 CASE WHEN c.Fecha <= CAST(p.FechaHoraUTC AS DATE) THEN DATEDIFF(DAY, c.Fecha, CAST(p.FechaHoraUTC AS DATE))
+                      ELSE DATEDIFF(DAY, CAST(p.FechaHoraUTC AS DATE), c.Fecha) END
+    ) AS cot
     WHERE (@idSede IS NULL OR sede.IdSede = @idSede)
     GROUP BY
         sede.IdSede,
@@ -662,6 +779,10 @@ GO
 --   - 'NO'         : el país está registrado en nucleo.Pais y el partido se
 --                    juega fuera de su franja prime time.
 --   - 'N/D'        : el código ISO3 no fue cargado aún en nucleo.Pais.
+-- Las columnas son los 22 mercados del torneo (países cargados por el seed 04, con los códigos
+-- ISO3/FIFA del modelo: ENG, NED, GER, SUI, CHI). PIVOT estático exige una lista fija: un país
+-- nuevo aparece igual en TotalMercadosPrimeTime y MercadosEnPrimeTimeDetalle, que no dependen de
+-- la lista, y se suma como columna editando el procedimiento (no se usa SQL dinámico).
 -- Además, las columnas TotalMercadosPrimeTime y MercadosEnPrimeTimeDetalle
 -- contabilizan y enumeran la totalidad de países de nucleo.Pais en prime
 -- time para cada partido (incluso si se agregaran países adicionales).
@@ -673,6 +794,14 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
+    DECLARE @errores NVARCHAR(MAX) = nucleo.fn_ValidarFiltrosReporte(NULL, @idFase, NULL, @idPartido, NULL, NULL, NULL),
+            @mensaje NVARCHAR(2048);
+    IF LEN(@errores) > 0
+    BEGIN
+        SET @mensaje = LEFT(N'SP_REPORTE_MATRIZ_PRIME_TIME - No se pudo generar el reporte:' + CHAR(13) + CHAR(10) + @errores, 2048);
+        THROW 52000, @mensaje, 1;
+    END;
+
     SELECT
         IdPartido,
         NumeroPartido,
@@ -681,13 +810,9 @@ BEGIN
         Encuentro,
         TotalMercadosPrimeTime,
         MercadosEnPrimeTimeDetalle,
-        [ALG], [ARG], [AUS], [AUT], [BEL], [BOL], [BRA], [CAN],
-        [CHI], [CHN], [CIV], [CMR], [COL], [CRC], [CRO], [DEN],
-        [ECU], [EGY], [ESP], [FRA], [GBR], [GER], [GHA], [IND],
-        [IRN], [ITA], [JAM], [JPN], [KOR], [MAR], [MEX], [NED],
-        [NGA], [NOR], [NZL], [PAN], [PAR], [PER], [POL], [POR],
-        [QAT], [SAU], [SCO], [SEN], [SRB], [SUI], [SWE], [TUN],
-        [TUR], [UKR], [URU], [USA], [VEN], [WAL]
+        [ARG], [AUS], [BRA], [CAN], [CHI], [COL], [ENG], [ESP],
+        [FRA], [GER], [ITA], [JPN], [KOR], [MAR], [MEX], [NED],
+        [NOR], [POR], [SUI], [SWE], [URU], [USA]
     FROM (
         SELECT
             p.IdPartido,
@@ -723,13 +848,9 @@ BEGIN
             ON sVis.IdSeleccion = p.IdSeleccionVisitante
         CROSS JOIN (
             VALUES
-                ('ALG'), ('ARG'), ('AUS'), ('AUT'), ('BEL'), ('BOL'), ('BRA'), ('CAN'),
-                ('CHI'), ('CHN'), ('CIV'), ('CMR'), ('COL'), ('CRC'), ('CRO'), ('DEN'),
-                ('ECU'), ('EGY'), ('ESP'), ('FRA'), ('GBR'), ('GER'), ('GHA'), ('IND'),
-                ('IRN'), ('ITA'), ('JAM'), ('JPN'), ('KOR'), ('MAR'), ('MEX'), ('NED'),
-                ('NGA'), ('NOR'), ('NZL'), ('PAN'), ('PAR'), ('PER'), ('POL'), ('POR'),
-                ('QAT'), ('SAU'), ('SCO'), ('SEN'), ('SRB'), ('SUI'), ('SWE'), ('TUN'),
-                ('TUR'), ('UKR'), ('URU'), ('USA'), ('VEN'), ('WAL')
+                ('ARG'), ('AUS'), ('BRA'), ('CAN'), ('CHI'), ('COL'), ('ENG'), ('ESP'),
+                ('FRA'), ('GER'), ('ITA'), ('JPN'), ('KOR'), ('MAR'), ('MEX'), ('NED'),
+                ('NOR'), ('POR'), ('SUI'), ('SWE'), ('URU'), ('USA')
         ) AS m (CodigoISO3)
         LEFT JOIN nucleo.Pais AS pais
             ON pais.CodigoISO3 = m.CodigoISO3
@@ -746,13 +867,9 @@ BEGIN
     PIVOT (
         MAX(EstadoPrimeTime)
         FOR MercadoISO3 IN (
-            [ALG], [ARG], [AUS], [AUT], [BEL], [BOL], [BRA], [CAN],
-            [CHI], [CHN], [CIV], [CMR], [COL], [CRC], [CRO], [DEN],
-            [ECU], [EGY], [ESP], [FRA], [GBR], [GER], [GHA], [IND],
-            [IRN], [ITA], [JAM], [JPN], [KOR], [MAR], [MEX], [NED],
-            [NGA], [NOR], [NZL], [PAN], [PAR], [PER], [POL], [POR],
-            [QAT], [SAU], [SCO], [SEN], [SRB], [SUI], [SWE], [TUN],
-            [TUR], [UKR], [URU], [USA], [VEN], [WAL]
+            [ARG], [AUS], [BRA], [CAN], [CHI], [COL], [ENG], [ESP],
+            [FRA], [GER], [ITA], [JPN], [KOR], [MAR], [MEX], [NED],
+            [NOR], [POR], [SUI], [SWE], [URU], [USA]
         )
     ) AS Matriz
     ORDER BY
@@ -777,6 +894,14 @@ BEGIN
     SET @codigoFIFA = UPPER(NULLIF(LTRIM(RTRIM(@codigoFIFA)), ''));
     SET @grupo      = UPPER(NULLIF(LTRIM(RTRIM(@grupo)), ''));
 
+    DECLARE @errores NVARCHAR(MAX) = nucleo.fn_ValidarFiltrosReporte(@codigoFIFA, NULL, NULL, NULL, NULL, @grupo, NULL),
+            @mensaje NVARCHAR(2048);
+    IF LEN(@errores) > 0
+    BEGIN
+        SET @mensaje = LEFT(N'SP_REPORTE_SELECCIONES_PLANTILLAS - No se pudo generar el reporte:' + CHAR(13) + CHAR(10) + @errores, 2048);
+        THROW 52000, @mensaje, 1;
+    END;
+
     SELECT
         s.CodigoFIFA                                                        AS [@CodigoFIFA],
         g.Nombre                                                            AS [@Grupo],
@@ -797,7 +922,7 @@ BEGIN
         (
             SELECT
                 st.Rol                                                      AS [@Rol],
-                st.NombreApellido                                           AS [NombreApellido]
+                nucleo.fn_NombreStaff(st.IdStaffTecnico)                    AS [NombreApellido]
             FROM nucleo.StaffTecnico AS st
             WHERE st.IdSeleccion = s.IdSeleccion
             ORDER BY
@@ -866,6 +991,14 @@ BEGIN
     SET @codigoFIFA = UPPER(NULLIF(LTRIM(RTRIM(@codigoFIFA)), ''));
     SET @estado     = NULLIF(LTRIM(RTRIM(@estado)), '');
 
+    DECLARE @errores NVARCHAR(MAX) = nucleo.fn_ValidarFiltrosReporte(@codigoFIFA, @idFase, NULL, NULL, NULL, NULL, @estado),
+            @mensaje NVARCHAR(2048);
+    IF LEN(@errores) > 0
+    BEGIN
+        SET @mensaje = LEFT(N'SP_REPORTE_RESULTADOS_ENCUENTROS - No se pudo generar el reporte:' + CHAR(13) + CHAR(10) + @errores, 2048);
+        THROW 52000, @mensaje, 1;
+    END;
+
     SELECT
         p.IdPartido,
         p.NumeroPartido,
@@ -903,7 +1036,7 @@ BEGIN
         p.Concurrencia                                                      AS ConcurrenciaPublico,
         sede.Capacidad                                                      AS CapacidadEstadio,
         CAST(p.Concurrencia * 100.0 / NULLIF(sede.Capacidad, 0) AS DECIMAL(5,2)) AS PorcentajeOcupacionEstadio,
-        ISNULL(arb.NombreApellido, 'Sin designar')                          AS ArbitroPrincipal
+        ISNULL(nucleo.fn_NombreArbitro(da.IdArbitro), 'Sin designar')       AS ArbitroPrincipal
     FROM nucleo.vw_PartidoResultado AS p
     INNER JOIN nucleo.Fase AS f
         ON f.IdFase = p.IdFase
@@ -926,8 +1059,6 @@ BEGIN
     LEFT JOIN nucleo.DesignacionArbitral AS da
         ON da.IdPartido = p.IdPartido
        AND da.Rol = 'Principal'
-    LEFT JOIN nucleo.Arbitro AS arb
-        ON arb.IdArbitro = da.IdArbitro
     WHERE (@idFase IS NULL OR p.IdFase = @idFase)
       AND (@estado IS NULL OR p.Estado = @estado)
       AND (
