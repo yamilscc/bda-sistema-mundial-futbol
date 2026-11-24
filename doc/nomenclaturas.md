@@ -59,7 +59,7 @@ Ejemplos:
 | Claves foráneas (FK) | Mismo nombre que la PK referenciada | `IdPartido` |
 | Constraints | Prefijos estandarizados | `PK_Tabla`, `FK_TablaHija_TablaPadre`, `UQ_Tabla_Campo`, `CK_Tabla_Regla`, `DF_Tabla_Campo` |
 | Stored procedures | Prefijo `SP_` en mayúsculas | `SP_CONTROL_ARBITRAL`, `SP_CALCULO_DE_SELECCIONES_CLASIFICADAS` |
-| Procedimientos ABM | Prefijo `SP_ABM_` | `SP_ABM_Partido` |
+| Procedimientos ABM | Un SP por operación y tabla: `SP_ALTA_`, `SP_MODIFICACION_` o `SP_BAJA_` + nombre de la tabla | `SP_ALTA_Partido`, `SP_MODIFICACION_Partido`, `SP_BAJA_Partido` |
 | Funciones | Prefijo `fn_` + PascalCase | `fn_MercadosEnPrimeTime` |
 | Variables y parámetros | `@camelCase` | `@miVariable` |
 | Triggers | `TR_Tabla_Evento` | `TR_Gol_Insert` |

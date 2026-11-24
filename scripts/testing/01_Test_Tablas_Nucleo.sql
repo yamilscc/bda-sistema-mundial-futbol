@@ -12,8 +12,8 @@ Objetivo:
 	  en 01_Tablas_Nucleo.sql:
 		  Confederacion, Pais, Ciudad, Sede, Grupo, Fase, Seleccion, Partido,
 		  StaffTecnico, Idioma, Categoria, Arbitro, ArbitroIdioma,
-		  DesignacionArbitral, Sancion
-	- Verificar los datos de referencia fijos de la tabla Fase
+		  DesignacionArbitral, Sancion, ReglaClasificacion
+	- Verificar los datos de referencia fijos de las tablas Fase y ReglaClasificacion
 	- Requiere haber ejecutado 00_Reset_Total.sql y 01_Tablas_Nucleo.sql (BD sin otros datos
 	  de Grupo, para que las letras de prueba no colisionen).
 	- Los casos de prueba insertan directamente en las tablas porque se testean las
@@ -541,23 +541,24 @@ IF (SELECT COUNT(*) FROM nucleo.Partido WHERE NumeroPartido IN (201, 202)) = 2
 ELSE
 	PRINT 'TEST 8.A FALLÓ: no se insertaron los partidos programados.';
 
--- 8.B Partido Finalizado con resultado y asistencia.
--- Esperado: OK, se inserta el partido 2-1.
-INSERT INTO nucleo.Partido (NumeroPartido, Concurrencia, FechaHoraUTC, Estado, GolesLocal, GolesVisitante, Asistencia, IdFase, IdSede, IdSeleccionLocal, IdSeleccionVisitante)
-VALUES (203, 45000, '2026-06-13 19:00', 'Finalizado', 2, 1, 10, @idFaseGrupos, @idSede1, @idSel1, @idSel3);
-IF EXISTS (SELECT 1 FROM nucleo.Partido WHERE NumeroPartido = 203 AND GolesLocal = 2 AND GolesVisitante = 1)
-	PRINT 'TEST 8.B OK: Partido Finalizado insertado con su resultado.';
+-- 8.B Partido Finalizado con ambas selecciones y concurrencia (el resultado no se guarda en Partido:
+-- se deriva de eventos.Gol con eventos.fn_ResultadoPartido).
+-- Esperado: OK, se inserta el partido Finalizado.
+INSERT INTO nucleo.Partido (NumeroPartido, Concurrencia, FechaHoraUTC, Estado, IdFase, IdSede, IdSeleccionLocal, IdSeleccionVisitante)
+VALUES (203, 45000, '2026-06-13 19:00', 'Finalizado', @idFaseGrupos, @idSede1, @idSel1, @idSel3);
+IF EXISTS (SELECT 1 FROM nucleo.Partido WHERE NumeroPartido = 203 AND Estado = 'Finalizado' AND Concurrencia = 45000)
+	PRINT 'TEST 8.B OK: Partido Finalizado insertado.';
 ELSE
 	PRINT 'TEST 8.B FALLÓ: no se insertó el partido finalizado.';
 
--- 8.C Partido Finalizado empatado con definición por penales válida.
--- Esperado: OK, se inserta 1-1 con penales 4-3.
-INSERT INTO nucleo.Partido (NumeroPartido, FechaHoraUTC, Estado, GolesLocal, GolesVisitante, PenalesLocal, PenalesVisitante, IdFase, IdSede, IdSeleccionLocal, IdSeleccionVisitante)
-VALUES (204, '2026-06-14 19:00', 'Finalizado', 1, 1, 4, 3, @idFaseOctavos, @idSede1, @idSel2, @idSel3);
-IF EXISTS (SELECT 1 FROM nucleo.Partido WHERE NumeroPartido = 204 AND PenalesLocal = 4 AND PenalesVisitante = 3)
-	PRINT 'TEST 8.C OK: Partido empatado con penales insertado.';
+-- 8.C Partido eliminatorio Finalizado con ambas selecciones.
+-- Esperado: OK, se inserta el partido Finalizado de octavos.
+INSERT INTO nucleo.Partido (NumeroPartido, FechaHoraUTC, Estado, IdFase, IdSede, IdSeleccionLocal, IdSeleccionVisitante)
+VALUES (204, '2026-06-14 19:00', 'Finalizado', @idFaseOctavos, @idSede1, @idSel2, @idSel3);
+IF EXISTS (SELECT 1 FROM nucleo.Partido WHERE NumeroPartido = 204 AND Estado = 'Finalizado')
+	PRINT 'TEST 8.C OK: Partido eliminatorio Finalizado insertado.';
 ELSE
-	PRINT 'TEST 8.C FALLÓ: no se insertó el partido con penales.';
+	PRINT 'TEST 8.C FALLÓ: no se insertó el partido eliminatorio finalizado.';
 
 -- 8.D NumeroPartido duplicado.
 -- Esperado: Bloqueado por UQ_Partido_NumeroPartido.
@@ -602,114 +603,70 @@ BEGIN CATCH
 	PRINT 'TEST 8.G OK (Bloqueado): ' + ERROR_MESSAGE();
 END CATCH;
 
--- 8.H Partido Programado con goles informados.
+-- 8.H Partido Finalizado sin selecciones.
 -- Esperado: Bloqueado por CK_Partido_Resultado.
 BEGIN TRY
-	INSERT INTO nucleo.Partido (NumeroPartido, FechaHoraUTC, Estado, GolesLocal, GolesVisitante, IdFase, IdSede)
-	VALUES (206, '2026-06-15 19:00', 'Programado', 1, 0, @idFaseGrupos, @idSede1);
-	PRINT 'TEST 8.H FALLÓ: permitió resultado en un partido Programado.';
+	INSERT INTO nucleo.Partido (NumeroPartido, FechaHoraUTC, Estado, IdFase, IdSede)
+	VALUES (206, '2026-06-15 19:00', 'Finalizado', @idFaseGrupos, @idSede1);
+	PRINT 'TEST 8.H FALLÓ: permitió partido Finalizado sin selecciones.';
 END TRY
 BEGIN CATCH
 	PRINT 'TEST 8.H OK (Bloqueado): ' + ERROR_MESSAGE();
 END CATCH;
 
--- 8.I Partido Programado con asistencia informada.
+-- 8.I Partido Finalizado con una sola selección definida.
 -- Esperado: Bloqueado por CK_Partido_Resultado.
 BEGIN TRY
-	INSERT INTO nucleo.Partido (NumeroPartido, FechaHoraUTC, Estado, Asistencia, IdFase, IdSede)
-	VALUES (206, '2026-06-15 19:00', 'Programado', 5, @idFaseGrupos, @idSede1);
-	PRINT 'TEST 8.I FALLÓ: permitió asistencia en un partido Programado.';
+	INSERT INTO nucleo.Partido (NumeroPartido, FechaHoraUTC, Estado, IdFase, IdSede, IdSeleccionLocal, IdSeleccionVisitante)
+	VALUES (206, '2026-06-15 19:00', 'Finalizado', @idFaseGrupos, @idSede1, @idSel1, NULL);
+	PRINT 'TEST 8.I FALLÓ: permitió partido Finalizado con una sola selección.';
 END TRY
 BEGIN CATCH
 	PRINT 'TEST 8.I OK (Bloqueado): ' + ERROR_MESSAGE();
 END CATCH;
 
--- 8.J Partido Finalizado sin goles.
--- Esperado: Bloqueado por CK_Partido_Resultado.
+-- 8.J Partido no guarda el resultado (3FN): no existen columnas de goles, penales ni asistencia.
+-- Esperado: OK, ninguna de las 5 columnas existe en nucleo.Partido.
+IF COL_LENGTH('nucleo.Partido', 'GolesLocal') IS NULL
+   AND COL_LENGTH('nucleo.Partido', 'GolesVisitante') IS NULL
+   AND COL_LENGTH('nucleo.Partido', 'PenalesLocal') IS NULL
+   AND COL_LENGTH('nucleo.Partido', 'PenalesVisitante') IS NULL
+   AND COL_LENGTH('nucleo.Partido', 'Asistencia') IS NULL
+	PRINT 'TEST 8.J OK: Partido no guarda columnas de resultado.';
+ELSE
+	PRINT 'TEST 8.J FALLÓ: Partido todavía tiene columnas de resultado.';
+
+-- 8.K Una selección contra sí misma.
+-- Esperado: Bloqueado por CK_Partido_Equipos.
 BEGIN TRY
 	INSERT INTO nucleo.Partido (NumeroPartido, FechaHoraUTC, Estado, IdFase, IdSede, IdSeleccionLocal, IdSeleccionVisitante)
-	VALUES (206, '2026-06-15 19:00', 'Finalizado', @idFaseGrupos, @idSede1, @idSel1, @idSel2);
-	PRINT 'TEST 8.J FALLÓ: permitió partido Finalizado sin goles.';
-END TRY
-BEGIN CATCH
-	PRINT 'TEST 8.J OK (Bloqueado): ' + ERROR_MESSAGE();
-END CATCH;
-
--- 8.K Partido Finalizado sin selecciones.
--- Esperado: Bloqueado por CK_Partido_Resultado.
-BEGIN TRY
-	INSERT INTO nucleo.Partido (NumeroPartido, FechaHoraUTC, Estado, GolesLocal, GolesVisitante, IdFase, IdSede)
-	VALUES (206, '2026-06-15 19:00', 'Finalizado', 1, 0, @idFaseGrupos, @idSede1);
-	PRINT 'TEST 8.K FALLÓ: permitió partido Finalizado sin selecciones.';
+	VALUES (206, '2026-06-15 19:00', 'Programado', @idFaseGrupos, @idSede1, @idSel1, @idSel1);
+	PRINT 'TEST 8.K FALLÓ: permitió una selección contra sí misma.';
 END TRY
 BEGIN CATCH
 	PRINT 'TEST 8.K OK (Bloqueado): ' + ERROR_MESSAGE();
 END CATCH;
 
--- 8.L Penales con un partido que no terminó empatado.
--- Esperado: Bloqueado por CK_Partido_Diferencia_Penales.
+-- 8.L Concurrencia negativa.
+-- Esperado: Bloqueado por CK_Partido_Concurrencia_Positiva.
 BEGIN TRY
-	INSERT INTO nucleo.Partido (NumeroPartido, FechaHoraUTC, Estado, GolesLocal, GolesVisitante, PenalesLocal, PenalesVisitante, IdFase, IdSede, IdSeleccionLocal, IdSeleccionVisitante)
-	VALUES (206, '2026-06-15 19:00', 'Finalizado', 2, 1, 4, 3, @idFaseOctavos, @idSede1, @idSel1, @idSel2);
-	PRINT 'TEST 8.L FALLÓ: permitió penales en un partido sin empate.';
+	INSERT INTO nucleo.Partido (NumeroPartido, Concurrencia, FechaHoraUTC, Estado, IdFase, IdSede)
+	VALUES (206, -1, '2026-06-15 19:00', 'Programado', @idFaseGrupos, @idSede1);
+	PRINT 'TEST 8.L FALLÓ: permitió concurrencia negativa.';
 END TRY
 BEGIN CATCH
 	PRINT 'TEST 8.L OK (Bloqueado): ' + ERROR_MESSAGE();
 END CATCH;
 
--- 8.M Tanda de penales empatada.
--- Esperado: Bloqueado por CK_Partido_Diferencia_Penales.
-BEGIN TRY
-	INSERT INTO nucleo.Partido (NumeroPartido, FechaHoraUTC, Estado, GolesLocal, GolesVisitante, PenalesLocal, PenalesVisitante, IdFase, IdSede, IdSeleccionLocal, IdSeleccionVisitante)
-	VALUES (206, '2026-06-15 19:00', 'Finalizado', 1, 1, 3, 3, @idFaseOctavos, @idSede1, @idSel1, @idSel2);
-	PRINT 'TEST 8.M FALLÓ: permitió tanda de penales empatada.';
-END TRY
-BEGIN CATCH
-	PRINT 'TEST 8.M OK (Bloqueado): ' + ERROR_MESSAGE();
-END CATCH;
-
--- 8.N Penales informados solo para un equipo.
--- Esperado: Bloqueado por CK_Partido_Diferencia_Penales.
-BEGIN TRY
-	INSERT INTO nucleo.Partido (NumeroPartido, FechaHoraUTC, Estado, GolesLocal, GolesVisitante, PenalesLocal, PenalesVisitante, IdFase, IdSede, IdSeleccionLocal, IdSeleccionVisitante)
-	VALUES (206, '2026-06-15 19:00', 'Finalizado', 1, 1, 4, NULL, @idFaseOctavos, @idSede1, @idSel1, @idSel2);
-	PRINT 'TEST 8.N FALLÓ: permitió penales de un solo equipo.';
-END TRY
-BEGIN CATCH
-	PRINT 'TEST 8.N OK (Bloqueado): ' + ERROR_MESSAGE();
-END CATCH;
-
--- 8.O Una selección contra sí misma.
--- Esperado: Bloqueado por CK_Partido_Equipos.
-BEGIN TRY
-	INSERT INTO nucleo.Partido (NumeroPartido, FechaHoraUTC, Estado, IdFase, IdSede, IdSeleccionLocal, IdSeleccionVisitante)
-	VALUES (206, '2026-06-15 19:00', 'Programado', @idFaseGrupos, @idSede1, @idSel1, @idSel1);
-	PRINT 'TEST 8.O FALLÓ: permitió una selección contra sí misma.';
-END TRY
-BEGIN CATCH
-	PRINT 'TEST 8.O OK (Bloqueado): ' + ERROR_MESSAGE();
-END CATCH;
-
--- 8.P Concurrencia negativa.
--- Esperado: Bloqueado por CK_Partido_Concurrencia_Positiva.
-BEGIN TRY
-	INSERT INTO nucleo.Partido (NumeroPartido, Concurrencia, FechaHoraUTC, Estado, IdFase, IdSede)
-	VALUES (206, -1, '2026-06-15 19:00', 'Programado', @idFaseGrupos, @idSede1);
-	PRINT 'TEST 8.P FALLÓ: permitió concurrencia negativa.';
-END TRY
-BEGIN CATCH
-	PRINT 'TEST 8.P OK (Bloqueado): ' + ERROR_MESSAGE();
-END CATCH;
-
--- 8.Q Fase inexistente.
+-- 8.M Fase inexistente.
 -- Esperado: Bloqueado por FK_Partido_Fase.
 BEGIN TRY
 	INSERT INTO nucleo.Partido (NumeroPartido, FechaHoraUTC, Estado, IdFase, IdSede)
 	VALUES (206, '2026-06-15 19:00', 'Programado', 250, @idSede1);
-	PRINT 'TEST 8.Q FALLÓ: permitió partido con fase inexistente.';
+	PRINT 'TEST 8.M FALLÓ: permitió partido con fase inexistente.';
 END TRY
 BEGIN CATCH
-	PRINT 'TEST 8.Q OK (Bloqueado): ' + ERROR_MESSAGE();
+	PRINT 'TEST 8.M OK (Bloqueado): ' + ERROR_MESSAGE();
 END CATCH;
 
 -- 8.R Sede inexistente.
@@ -1124,6 +1081,77 @@ BEGIN TRY
 END TRY
 BEGIN CATCH
 	PRINT 'TEST 14.E OK (Bloqueado): ' + ERROR_MESSAGE();
+END CATCH;
+
+-- =========================================================================
+-- TEST 15: ReglaClasificacion (tabla de reglas de una sola fila)
+-- =========================================================================
+
+-- 15.A Valor inicial cargado por 01_Tablas_Nucleo.sql.
+-- Esperado: OK, hay una única fila (IdRegla = 1) con ClasificadosPorGrupo = 2 y MejoresTerceros = 0.
+IF (SELECT COUNT(*) FROM nucleo.ReglaClasificacion) = 1
+   AND EXISTS (SELECT 1 FROM nucleo.ReglaClasificacion
+               WHERE IdRegla = 1 AND ClasificadosPorGrupo = 2 AND MejoresTerceros = 0)
+	PRINT 'TEST 15.A OK: valor inicial (2, 0) cargado en una sola fila.';
+ELSE
+	PRINT 'TEST 15.A FALLÓ: la regla inicial no es (2, 0) o no hay una sola fila.';
+
+-- 15.B Cambio de preset a 2026.
+-- Esperado: OK, la fila pasa a (2, 8).
+UPDATE nucleo.ReglaClasificacion SET ClasificadosPorGrupo = 2, MejoresTerceros = 8 WHERE IdRegla = 1;
+IF EXISTS (SELECT 1 FROM nucleo.ReglaClasificacion WHERE IdRegla = 1 AND ClasificadosPorGrupo = 2 AND MejoresTerceros = 8)
+	PRINT 'TEST 15.B OK: preset 2026 (2, 8) aplicado.';
+ELSE
+	PRINT 'TEST 15.B FALLÓ: no se aplicó el preset 2026.';
+
+-- 15.C Segunda fila con otro IdRegla.
+-- Esperado: Bloqueado por CK_ReglaClasificacion_FilaUnica.
+BEGIN TRY
+	INSERT INTO nucleo.ReglaClasificacion (IdRegla, ClasificadosPorGrupo, MejoresTerceros) VALUES (2, 2, 0);
+	PRINT 'TEST 15.C FALLÓ: permitió una segunda fila.';
+END TRY
+BEGIN CATCH
+	PRINT 'TEST 15.C OK (Bloqueado): ' + ERROR_MESSAGE();
+END CATCH;
+
+-- 15.D Segunda fila con el mismo IdRegla.
+-- Esperado: Bloqueado por PK_ReglaClasificacion.
+BEGIN TRY
+	INSERT INTO nucleo.ReglaClasificacion (IdRegla, ClasificadosPorGrupo, MejoresTerceros) VALUES (1, 2, 0);
+	PRINT 'TEST 15.D FALLÓ: permitió duplicar la fila única.';
+END TRY
+BEGIN CATCH
+	PRINT 'TEST 15.D OK (Bloqueado): ' + ERROR_MESSAGE();
+END CATCH;
+
+-- 15.E ClasificadosPorGrupo en cero.
+-- Esperado: Bloqueado por CK_ReglaClasificacion_ClasificadosPorGrupo.
+BEGIN TRY
+	UPDATE nucleo.ReglaClasificacion SET ClasificadosPorGrupo = 0 WHERE IdRegla = 1;
+	PRINT 'TEST 15.E FALLÓ: permitió ClasificadosPorGrupo = 0.';
+END TRY
+BEGIN CATCH
+	PRINT 'TEST 15.E OK (Bloqueado): ' + ERROR_MESSAGE();
+END CATCH;
+
+-- 15.F MejoresTerceros negativo.
+-- Esperado: Bloqueado por el tipo TINYINT (desbordamiento aritmético; no hay CK porque el tipo ya impide negativos).
+BEGIN TRY
+	UPDATE nucleo.ReglaClasificacion SET MejoresTerceros = -1 WHERE IdRegla = 1;
+	PRINT 'TEST 15.F FALLÓ: permitió MejoresTerceros negativo.';
+END TRY
+BEGIN CATCH
+	PRINT 'TEST 15.F OK (Bloqueado): ' + ERROR_MESSAGE();
+END CATCH;
+
+-- 15.G Valores nulos.
+-- Esperado: Bloqueado por NOT NULL.
+BEGIN TRY
+	UPDATE nucleo.ReglaClasificacion SET ClasificadosPorGrupo = NULL WHERE IdRegla = 1;
+	PRINT 'TEST 15.G FALLÓ: permitió ClasificadosPorGrupo NULL.';
+END TRY
+BEGIN CATCH
+	PRINT 'TEST 15.G OK (Bloqueado): ' + ERROR_MESSAGE();
 END CATCH;
 
 -- =========================================================================

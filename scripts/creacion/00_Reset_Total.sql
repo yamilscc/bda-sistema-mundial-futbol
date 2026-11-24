@@ -203,6 +203,26 @@ GO
 :r $(RUTA)\24_SP_Importacion_Eventos.sql
 GO
 
+PRINT '--- 25 Funciones de partidos (definición, clasificados y fase inicial)';
+GO
+:r $(RUTA)\25_Funciones_Partidos.sql
+GO
+
+PRINT '--- 26 SP finalizar partido';
+GO
+:r $(RUTA)\26_SP_FinalizarPartido.sql
+GO
+
+PRINT '--- 27 SP cálculo de selecciones clasificadas';
+GO
+:r $(RUTA)\27_SP_CalculoSeleccionesClasificadas.sql
+GO
+
+PRINT '--- 28 SP definir cruce eliminatorio';
+GO
+:r $(RUTA)\28_SP_DefinirCruceEliminatorio.sql
+GO
+
 -- Los próximos SP, vistas y funciones se suman acá, siempre en orden numérico.
 
 -- =========================================================================

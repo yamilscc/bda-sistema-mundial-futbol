@@ -348,9 +348,7 @@ END CATCH;
 
 -- 6.E Bloqueo de BAJA de Gol y Amonestación cuando el partido pasa a 'Finalizado'.
 UPDATE nucleo.Partido
-SET Estado         = 'Finalizado',
-    GolesLocal     = 1,
-    GolesVisitante = 0
+SET Estado = 'Finalizado'
 WHERE IdPartido = @p251;
 
 BEGIN TRY

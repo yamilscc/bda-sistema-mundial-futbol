@@ -29,7 +29,7 @@ GO
 --     para ese partido y no expulsados antes del minuto del gol; el asistente debe ser de la
 --     misma selección que el autor y distinto de él.
 -- El resultado del partido se deriva de los goles con eventos.fn_ResultadoPartido; el partido
--- se cierra con nucleo.SP_FINALIZAR_PARTIDO (script 27).
+-- se cierra con nucleo.SP_FINALIZAR_PARTIDO (script 26).
 -- =========================================================================
 CREATE OR ALTER PROCEDURE eventos.SP_REGISTRAR_GOL
     @idPartido           INT,
