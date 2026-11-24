@@ -14,8 +14,9 @@ Objetivo: Completa el seed de nucleo y publicidad una vez cargados los 24 partid
              ninguna de las selecciones del partido.
           2. CASO OBLIGATORIO: designación descartada por conflicto de nacionalidad (árbitro argentino en
              ARG vs BRA); queda registrada en eventos.LogImportacion.
-          3. Completa con publicidad.SP_ASIGNAR_PUBLICIDAD los espacios libres de cada partido (los espacios
-             ya cargados por la pauta importada no se tocan).
+          3. Completa con publicidad.SP_ASIGNAR_PUBLICIDAD los espacios libres de cada partido programado
+             (los espacios ya cargados por la pauta importada no se tocan; la tarifa sale de
+             publicidad.Tarifa según la fase del partido).
           4. CASO OBLIGATORIO: verifica que el partido 1 tenga más de 4 mercados en prime time.
           Idempotente. ORDEN: después de 04 y 05, y antes de los scripts de Mateo.
 */
@@ -75,22 +76,21 @@ BEGIN
 END;
 GO
 
--- ===== 3. Publicidad: completa los espacios libres de cada partido (USD 75.000 por espacio) =====
+-- ===== 3. Publicidad: completa los espacios libres de cada partido programado (tarifa de su fase) =====
 DECLARE @res TABLE (NumeroEspacio TINYINT, IdPieza INT, Titulo VARCHAR(100), Anunciante VARCHAR(100),
-                    TarifaPublicitaria DECIMAL(12,2), Moneda CHAR(3), AsignadoAhora BIT,
+                    TarifaPublicitaria DECIMAL(12,2), Moneda CHAR(3), Estado VARCHAR(10),
                     Criterio VARCHAR(60));
 DECLARE @part TABLE (Id INT IDENTITY(1,1) PRIMARY KEY, IdPartido INT);
 INSERT INTO @part (IdPartido)
 SELECT p.IdPartido FROM nucleo.Partido AS p
-WHERE (SELECT COUNT(*) FROM publicidad.EspacioPublicitario AS e WHERE e.IdPartido = p.IdPartido) < 4
+WHERE p.Estado = 'Programado'   -- los finalizados son histórico de facturación (el SP los rechaza)
+  AND (SELECT COUNT(*) FROM publicidad.EspacioPublicitario AS e WHERE e.IdPartido = p.IdPartido) < 4
 ORDER BY p.NumeroPartido;
-DECLARE @i INT = 1, @n INT = (SELECT COUNT(*) FROM @part), @idPartido INT, @adv VARCHAR(200),
-        @idMoneda INT = (SELECT IdMoneda FROM publicidad.Moneda WHERE Codigo = 'USD');
+DECLARE @i INT = 1, @n INT = (SELECT COUNT(*) FROM @part), @idPartido INT, @adv VARCHAR(200);
 WHILE @i <= @n
 BEGIN
     SELECT @idPartido = IdPartido FROM @part WHERE Id = @i;
-    INSERT INTO @res EXEC publicidad.SP_ASIGNAR_PUBLICIDAD @idPartido = @idPartido, @tarifaPublicitaria = 75000,
-                                                          @idMoneda = @idMoneda, @advertencia = @adv OUTPUT;
+    INSERT INTO @res EXEC publicidad.SP_ASIGNAR_PUBLICIDAD @idPartido = @idPartido, @advertencia = @adv OUTPUT;
     DELETE FROM @res;
     SET @i += 1;
 END;
