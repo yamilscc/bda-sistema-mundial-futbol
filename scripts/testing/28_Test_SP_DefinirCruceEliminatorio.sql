@@ -1,27 +1,27 @@
 /*
 Universidad: Universidad Nacional de La Matanza
 Materia: Bases de Datos Aplicadas - Grupo 05
-Autor: Canseco Carrizo, Yamil Simón
+Autor: Canseco Carrizo, Yamil SimÃ³n
 Integrantes:
 Casella, Mateo Ezequiel
 Chungara Tenorio, Denis Abner
-Torczuk, Elías Alexei
-Canseco Carrizo, Yamil Simón
+Torczuk, ElÃ­as Alexei
+Canseco Carrizo, Yamil SimÃ³n
 Objetivo:
 	- Probar nucleo.SP_DEFINIR_CRUCE_ELIMINATORIO (script 28).
-	- Requiere ejecutados los scripts 01 a 28 sobre una base recién creada con 00_Reset_Total.sql.
+	- Requiere ejecutados los scripts 01 a 28 sobre una base reciÃ©n creada con 00_Reset_Total.sql.
 	  Todo se inserta directo (sin SP). Datos con prefijo 'TEST CR' / 'TEST_CR', borrados al inicio;
-	  el test corre dentro de una transacción que se deshace al final (ROLLBACK) y cada caso que
+	  el test corre dentro de una transacciÃ³n que se deshace al final (ROLLBACK) y cada caso que
 	  modifica datos vuelve a su estado con un savepoint.
-	- Convención de salida: "OK" -> el caso se comportó como se esperaba; "OK (Bloqueado)" -> el SP
-	  rechazó la operación con el mensaje esperado; "FALLÓ" -> no; "OMITIDO" -> el test necesita
+	- ConvenciÃ³n de salida: "OK" -> el caso se comportÃ³ como se esperaba; "OK (Bloqueado)" -> el SP
+	  rechazÃ³ la operaciÃ³n con el mensaje esperado; "FALLÃ“" -> no; "OMITIDO" -> el test necesita
 	  una base sin otras selecciones ni otros partidos de fase de grupos.
 
 Escenario: mismo fixture que el test 27: 4 grupos (M, N, O, P) de 4 selecciones TEST (16), un jugador
-convocado por selección y 24 partidos de fase de grupos finalizados (NumeroPartido 111 a 134); en cada
-partido gana 1-0 la selección de menor IdSeleccion. Con la regla (2, 0) clasifican el 1.º y el 2.º de
-cada grupo (8 selecciones) y la eliminación directa empieza en cuartos de final.
-  Selecciones (DXA = s01 ... DXP = s16; el número de selección es el del país 'TEST CR Pais NN'):
+convocado por selecciÃ³n y 24 partidos de fase de grupos finalizados (NumeroPartido 111 a 134); en cada
+partido gana 1-0 la selecciÃ³n de menor IdSeleccion. Con la regla (2, 0) clasifican el 1.Âº y el 2.Âº de
+cada grupo (8 selecciones) y la eliminaciÃ³n directa empieza en cuartos de final.
+  Selecciones (DXA = s01 ... DXP = s16; el nÃºmero de selecciÃ³n es el del paÃ­s 'TEST CR Pais NN'):
     clasifican s01, s02 (grupo M), s05, s06 (N), s09, s10 (O) y s13, s14 (P); el resto no clasifica.
   Partidos eliminatorios (todos 'Programado', sin selecciones):
     135 octavos (28/01)              136 a 139 cuartos (01/02, 04/02, 07/02, 10/02)
@@ -35,7 +35,7 @@ cada grupo (8 selecciones) y la eliminación directa empieza en cuartos de final.
 USE MundialFutbol;
 GO
 
--- Si una corrida anterior quedó con la transacción abierta, se deshace antes de empezar.
+-- Si una corrida anterior quedÃ³ con la transacciÃ³n abierta, se deshace antes de empezar.
 WHILE @@TRANCOUNT > 0
 	ROLLBACK TRANSACTION;
 
@@ -72,11 +72,11 @@ DECLARE @tgPenal  INT = (SELECT IdTipoGol FROM eventos.TipoGol WHERE Descripcion
 DECLARE @pePT     INT = (SELECT IdPeriodo FROM eventos.Periodo WHERE Descripcion = 'Primer Tiempo');
 DECLARE @peTanda  INT = (SELECT IdPeriodo FROM eventos.Periodo WHERE Descripcion = 'Definicion por Penales');
 
--- Regla inicial del test: 2 por grupo, sin mejores terceros (8 clasificados: la eliminación empieza en cuartos).
+-- Regla inicial del test: 2 por grupo, sin mejores terceros (8 clasificados: la eliminaciÃ³n empieza en cuartos).
 DELETE FROM nucleo.ReglaClasificacion;
 INSERT INTO nucleo.ReglaClasificacion (IdRegla, ClasificadosPorGrupo, MejoresTerceros) VALUES (1, 2, 0);
 
--- 16 países, 4 grupos (M..P) y 16 selecciones (4 por grupo, en orden de IdSeleccion).
+-- 16 paÃ­ses, 4 grupos (M..P) y 16 selecciones (4 por grupo, en orden de IdSeleccion).
 INSERT INTO nucleo.Confederacion (Nombre, Sigla) VALUES ('TEST CR Confederacion', 'TCR');
 DECLARE @idConf TINYINT = (SELECT IdConfederacion FROM nucleo.Confederacion WHERE Sigla = 'TCR');
 
@@ -109,7 +109,7 @@ DECLARE @s10 TINYINT = (SELECT IdSeleccion FROM nucleo.Seleccion WHERE CodigoFIF
 DECLARE @s13 TINYINT = (SELECT IdSeleccion FROM nucleo.Seleccion WHERE CodigoFIFA = 'DXM');
 DECLARE @s14 TINYINT = (SELECT IdSeleccion FROM nucleo.Seleccion WHERE CodigoFIFA = 'DXN');
 
--- Sede y jugadores (el jugador n está convocado en la selección n).
+-- Sede y jugadores (el jugador n estÃ¡ convocado en la selecciÃ³n n).
 DECLARE @idPais1 SMALLINT = (SELECT IdPais FROM nucleo.Pais WHERE Nombre = 'TEST CR Pais 01');
 INSERT INTO nucleo.Ciudad (Nombre, HusoHorario, IdPais) VALUES ('TEST CR Ciudad', 'Argentina Standard Time', @idPais1);
 INSERT INTO nucleo.Sede (NombreEstadio, Capacidad, IdCiudad)
@@ -183,14 +183,14 @@ IF @hayOtras = 1
 ELSE
 BEGIN
 	-- =====================================================================
-	-- TEST 1: cruces válidos y rechazos de la fase inicial (cuartos de final)
+	-- TEST 1: cruces vÃ¡lidos y rechazos de la fase inicial (cuartos de final)
 	-- =====================================================================
-	-- 1.A Descanso: el partido 145 (cuartos, 25/01 20:00) con s13 y s14. s14 jugó el 24/01 18:00, a 26 horas.
-	-- Esperado: Bloqueado: "Tienen otro partido a menos de 48 horas de este: DXN" (y solo esa condición).
+	-- 1.A Descanso: el partido 145 (cuartos, 25/01 20:00) con s13 y s14. s14 jugÃ³ el 24/01 18:00, a 26 horas.
+	-- Esperado: Bloqueado: "Tienen otro partido a menos de 48 horas de este: DXN" (y solo esa condiciÃ³n).
 	SET @id = (SELECT IdPartido FROM nucleo.Partido WHERE NumeroPartido = 145);
 	BEGIN TRY
 		EXEC nucleo.SP_DEFINIR_CRUCE_ELIMINATORIO @idPartido = @id, @idSeleccionLocal = @s13, @idSeleccionVisitante = @s14;
-		PRINT 'TEST 1.A FALLÓ: permitió un cruce con una selección que juega a menos de 48 horas.';
+		PRINT 'TEST 1.A FALLÃ“: permitiÃ³ un cruce con una selecciÃ³n que juega a menos de 48 horas.';
 	END TRY
 	BEGIN CATCH
 		IF ERROR_MESSAGE() LIKE '%Tienen otro partido a menos de 48 horas de este: DXN%'
@@ -198,10 +198,10 @@ BEGIN
 		   AND @@TRANCOUNT = 1
 			PRINT 'TEST 1.A OK (Bloqueado): ' + REPLACE(ERROR_MESSAGE(), CHAR(13) + CHAR(10), ' | ');
 		ELSE
-			PRINT 'TEST 1.A FALLÓ: mensaje inesperado o transacción cerrada -> ' + ERROR_MESSAGE();
+			PRINT 'TEST 1.A FALLÃ“: mensaje inesperado o transacciÃ³n cerrada -> ' + ERROR_MESSAGE();
 	END CATCH;
 
-	-- 1.B Cruce válido en la fase inicial: cuartos 136, s01 (local) contra s05 (visitante).
+	-- 1.B Cruce vÃ¡lido en la fase inicial: cuartos 136, s01 (local) contra s05 (visitante).
 	-- Esperado: OK. El partido queda con IdSeleccionLocal = s01 e IdSeleccionVisitante = s05 (y sigue Programado).
 	SET @id = (SELECT IdPartido FROM nucleo.Partido WHERE NumeroPartido = 136);
 	BEGIN TRY
@@ -209,10 +209,10 @@ BEGIN
 		IF EXISTS (SELECT 1 FROM nucleo.Partido WHERE IdPartido = @id AND IdSeleccionLocal = @s01 AND IdSeleccionVisitante = @s05 AND Estado = 'Programado')
 			PRINT 'TEST 1.B OK: cuartos 136 asignado (s01 contra s05).';
 		ELSE
-			PRINT 'TEST 1.B FALLÓ: el cruce no quedó asignado.';
+			PRINT 'TEST 1.B FALLÃ“: el cruce no quedÃ³ asignado.';
 	END TRY
 	BEGIN CATCH
-		PRINT 'TEST 1.B FALLÓ: error inesperado -> ' + ERROR_MESSAGE();
+		PRINT 'TEST 1.B FALLÃ“: error inesperado -> ' + ERROR_MESSAGE();
 	END CATCH;
 
 	-- 1.C Repetir exactamente el mismo cruce.
@@ -222,10 +222,10 @@ BEGIN
 		IF EXISTS (SELECT 1 FROM nucleo.Partido WHERE IdPartido = @id AND IdSeleccionLocal = @s01 AND IdSeleccionVisitante = @s05)
 			PRINT 'TEST 1.C OK: repetir el mismo cruce no da error.';
 		ELSE
-			PRINT 'TEST 1.C FALLÓ: el cruce cambió al repetirlo.';
+			PRINT 'TEST 1.C FALLÃ“: el cruce cambiÃ³ al repetirlo.';
 	END TRY
 	BEGIN CATCH
-		PRINT 'TEST 1.C FALLÓ: error inesperado -> ' + ERROR_MESSAGE();
+		PRINT 'TEST 1.C FALLÃ“: error inesperado -> ' + ERROR_MESSAGE();
 	END CATCH;
 
 	-- 1.D Invertir local y visitante en un partido sin registros asociados.
@@ -236,10 +236,10 @@ BEGIN
 		IF EXISTS (SELECT 1 FROM nucleo.Partido WHERE IdPartido = @id AND IdSeleccionLocal = @s05 AND IdSeleccionVisitante = @s01)
 			PRINT 'TEST 1.D OK: sin registros asociados se puede cambiar el cruce.';
 		ELSE
-			PRINT 'TEST 1.D FALLÓ: el cruce no cambió.';
+			PRINT 'TEST 1.D FALLÃ“: el cruce no cambiÃ³.';
 	END TRY
 	BEGIN CATCH
-		PRINT 'TEST 1.D FALLÓ: error inesperado -> ' + ERROR_MESSAGE();
+		PRINT 'TEST 1.D FALLÃ“: error inesperado -> ' + ERROR_MESSAGE();
 	END CATCH;
 	ROLLBACK TRANSACTION Caso1D;
 
@@ -250,72 +250,72 @@ BEGIN
 	SELECT @id, j.IdJugador, NULL, @tgJugada, @pePT, 30 FROM jugadores.Jugador AS j WHERE j.Documento = 'TEST_CR_01';
 	BEGIN TRY
 		EXEC nucleo.SP_DEFINIR_CRUCE_ELIMINATORIO @idPartido = @id, @idSeleccionLocal = @s02, @idSeleccionVisitante = @s06;
-		PRINT 'TEST 1.E FALLÓ: permitió cambiar el cruce de un partido con registros.';
+		PRINT 'TEST 1.E FALLÃ“: permitiÃ³ cambiar el cruce de un partido con registros.';
 	END TRY
 	BEGIN CATCH
 		IF ERROR_MESSAGE() LIKE '%tiene registros asociados%no se pueden cambiar sus selecciones%'
 			PRINT 'TEST 1.E OK (Bloqueado): ' + REPLACE(ERROR_MESSAGE(), CHAR(13) + CHAR(10), ' | ');
 		ELSE
-			PRINT 'TEST 1.E FALLÓ: mensaje inesperado -> ' + ERROR_MESSAGE();
+			PRINT 'TEST 1.E FALLÃ“: mensaje inesperado -> ' + ERROR_MESSAGE();
 	END CATCH;
 	BEGIN TRY
 		EXEC nucleo.SP_DEFINIR_CRUCE_ELIMINATORIO @idPartido = @id, @idSeleccionLocal = @s01, @idSeleccionVisitante = @s05;
 		PRINT 'TEST 1.E OK: repetir el mismo cruce con registros asociados no da error.';
 	END TRY
 	BEGIN CATCH
-		PRINT 'TEST 1.E FALLÓ: no permitió repetir el mismo cruce -> ' + ERROR_MESSAGE();
+		PRINT 'TEST 1.E FALLÃ“: no permitiÃ³ repetir el mismo cruce -> ' + ERROR_MESSAGE();
 	END CATCH;
 	ROLLBACK TRANSACTION Caso1E;
 
-	-- 1.F Selección que no clasificó y selección ya asignada a otro partido de cuartos (varias fallas juntas).
-	-- Esperado: Bloqueado con UN mensaje que contiene "No clasificaron ... DXC" y "Ya están asignadas a otro partido
+	-- 1.F SelecciÃ³n que no clasificÃ³ y selecciÃ³n ya asignada a otro partido de cuartos (varias fallas juntas).
+	-- Esperado: Bloqueado con UN mensaje que contiene "No clasificaron ... DXC" y "Ya estÃ¡n asignadas a otro partido
 	--           de Cuartos de final: DXE".
 	SET @id = (SELECT IdPartido FROM nucleo.Partido WHERE NumeroPartido = 137);
 	BEGIN TRY
 		EXEC nucleo.SP_DEFINIR_CRUCE_ELIMINATORIO @idPartido = @id, @idSeleccionLocal = @s03, @idSeleccionVisitante = @s05;
-		PRINT 'TEST 1.F FALLÓ: permitió un cruce con una selección que no clasificó.';
+		PRINT 'TEST 1.F FALLÃ“: permitiÃ³ un cruce con una selecciÃ³n que no clasificÃ³.';
 	END TRY
 	BEGIN CATCH
 		IF ERROR_MESSAGE() LIKE 'SP_DEFINIR_CRUCE_ELIMINATORIO - No se pudo definir el cruce:%'
-		   AND ERROR_MESSAGE() LIKE '%No clasificaron a la eliminación directa: DXC%'
-		   AND ERROR_MESSAGE() LIKE '%Ya están asignadas a otro partido de Cuartos de final: DXE%'
+		   AND ERROR_MESSAGE() LIKE '%No clasificaron a la eliminaciÃ³n directa: DXC%'
+		   AND ERROR_MESSAGE() LIKE '%Ya estÃ¡n asignadas a otro partido de Cuartos de final: DXE%'
 			PRINT 'TEST 1.F OK (Bloqueado): ' + REPLACE(ERROR_MESSAGE(), CHAR(13) + CHAR(10), ' | ');
 		ELSE
-			PRINT 'TEST 1.F FALLÓ: mensaje inesperado -> ' + ERROR_MESSAGE();
+			PRINT 'TEST 1.F FALLÃ“: mensaje inesperado -> ' + ERROR_MESSAGE();
 	END CATCH;
 
 	-- 1.G Fase de grupos incompleta (el partido 115 vuelve a Programado).
-	-- Esperado: Bloqueado: "La fase de grupos no está completa" y "sin finalizar: 115".
+	-- Esperado: Bloqueado: "La fase de grupos no estÃ¡ completa" y "sin finalizar: 115".
 	SAVE TRANSACTION Caso1G;
 	UPDATE nucleo.Partido SET Estado = 'Programado' WHERE NumeroPartido = 115;
 	BEGIN TRY
 		EXEC nucleo.SP_DEFINIR_CRUCE_ELIMINATORIO @idPartido = @id, @idSeleccionLocal = @s09, @idSeleccionVisitante = @s13;
-		PRINT 'TEST 1.G FALLÓ: permitió un cruce de la fase inicial con la fase de grupos incompleta.';
+		PRINT 'TEST 1.G FALLÃ“: permitiÃ³ un cruce de la fase inicial con la fase de grupos incompleta.';
 	END TRY
 	BEGIN CATCH
-		IF ERROR_MESSAGE() LIKE '%La fase de grupos no está completa%' AND ERROR_MESSAGE() LIKE '%sin finalizar: 115%'
+		IF ERROR_MESSAGE() LIKE '%La fase de grupos no estÃ¡ completa%' AND ERROR_MESSAGE() LIKE '%sin finalizar: 115%'
 			PRINT 'TEST 1.G OK (Bloqueado): ' + REPLACE(ERROR_MESSAGE(), CHAR(13) + CHAR(10), ' | ');
 		ELSE
-			PRINT 'TEST 1.G FALLÓ: mensaje inesperado -> ' + ERROR_MESSAGE();
+			PRINT 'TEST 1.G FALLÃ“: mensaje inesperado -> ' + ERROR_MESSAGE();
 	END CATCH;
 	ROLLBACK TRANSACTION Caso1G;
 
-	-- 1.H Fase anterior a la inicial: octavos (135) cuando la eliminación empieza en cuartos.
-	-- Esperado: Bloqueado: "Octavos de final no se juega con la regla de clasificación actual ... empieza en Cuartos de final".
+	-- 1.H Fase anterior a la inicial: octavos (135) cuando la eliminaciÃ³n empieza en cuartos.
+	-- Esperado: Bloqueado: "Octavos de final no se juega con la regla de clasificaciÃ³n actual ... empieza en Cuartos de final".
 	SET @id = (SELECT IdPartido FROM nucleo.Partido WHERE NumeroPartido = 135);
 	BEGIN TRY
 		EXEC nucleo.SP_DEFINIR_CRUCE_ELIMINATORIO @idPartido = @id, @idSeleccionLocal = @s03, @idSeleccionVisitante = @s04;
-		PRINT 'TEST 1.H FALLÓ: permitió un cruce de una fase que no se juega.';
+		PRINT 'TEST 1.H FALLÃ“: permitiÃ³ un cruce de una fase que no se juega.';
 	END TRY
 	BEGIN CATCH
-		IF ERROR_MESSAGE() LIKE '%Octavos de final no se juega con la regla de clasificación actual: la eliminación directa empieza en Cuartos de final%'
+		IF ERROR_MESSAGE() LIKE '%Octavos de final no se juega con la regla de clasificaciÃ³n actual: la eliminaciÃ³n directa empieza en Cuartos de final%'
 			PRINT 'TEST 1.H OK (Bloqueado): ' + REPLACE(ERROR_MESSAGE(), CHAR(13) + CHAR(10), ' | ');
 		ELSE
-			PRINT 'TEST 1.H FALLÓ: mensaje inesperado -> ' + ERROR_MESSAGE();
+			PRINT 'TEST 1.H FALLÃ“: mensaje inesperado -> ' + ERROR_MESSAGE();
 	END CATCH;
 
-	-- 1.I Octavos como fase inicial: con la regla (4, 0) clasifican las 16 selecciones y la eliminación empieza en octavos.
-	-- Esperado: OK. El partido 135 queda asignado (s03 contra s04), que con la regla (2, 0) no habrían clasificado.
+	-- 1.I Octavos como fase inicial: con la regla (4, 0) clasifican las 16 selecciones y la eliminaciÃ³n empieza en octavos.
+	-- Esperado: OK. El partido 135 queda asignado (s03 contra s04), que con la regla (2, 0) no habrÃ­an clasificado.
 	SAVE TRANSACTION Caso1I;
 	UPDATE nucleo.ReglaClasificacion SET ClasificadosPorGrupo = 4, MejoresTerceros = 0 WHERE IdRegla = 1;
 	BEGIN TRY
@@ -323,10 +323,10 @@ BEGIN
 		IF EXISTS (SELECT 1 FROM nucleo.Partido WHERE IdPartido = @id AND IdSeleccionLocal = @s03 AND IdSeleccionVisitante = @s04)
 			PRINT 'TEST 1.I OK: octavos como fase inicial con la regla (4, 0).';
 		ELSE
-			PRINT 'TEST 1.I FALLÓ: el cruce de octavos no quedó asignado.';
+			PRINT 'TEST 1.I FALLÃ“: el cruce de octavos no quedÃ³ asignado.';
 	END TRY
 	BEGIN CATCH
-		PRINT 'TEST 1.I FALLÓ: error inesperado -> ' + ERROR_MESSAGE();
+		PRINT 'TEST 1.I FALLÃ“: error inesperado -> ' + ERROR_MESSAGE();
 	END CATCH;
 	ROLLBACK TRANSACTION Caso1I;
 
@@ -335,61 +335,61 @@ BEGIN
 	SET @id = (SELECT IdPartido FROM nucleo.Partido WHERE NumeroPartido = 111);
 	BEGIN TRY
 		EXEC nucleo.SP_DEFINIR_CRUCE_ELIMINATORIO @idPartido = @id, @idSeleccionLocal = @s01, @idSeleccionVisitante = @s02;
-		PRINT 'TEST 1.J FALLÓ: permitió definir un cruce en un partido de fase de grupos.';
+		PRINT 'TEST 1.J FALLÃ“: permitiÃ³ definir un cruce en un partido de fase de grupos.';
 	END TRY
 	BEGIN CATCH
 		IF ERROR_MESSAGE() LIKE '%El partido no es de una fase eliminatoria%'
 			PRINT 'TEST 1.J OK (Bloqueado): ' + REPLACE(ERROR_MESSAGE(), CHAR(13) + CHAR(10), ' | ');
 		ELSE
-			PRINT 'TEST 1.J FALLÓ: mensaje inesperado -> ' + ERROR_MESSAGE();
+			PRINT 'TEST 1.J FALLÃ“: mensaje inesperado -> ' + ERROR_MESSAGE();
 	END CATCH;
 
 	-- 1.K Partido inexistente.
 	-- Esperado: Bloqueado: "El partido indicado no existe".
 	BEGIN TRY
 		EXEC nucleo.SP_DEFINIR_CRUCE_ELIMINATORIO @idPartido = 32000, @idSeleccionLocal = @s01, @idSeleccionVisitante = @s02;
-		PRINT 'TEST 1.K FALLÓ: permitió definir un cruce en un partido inexistente.';
+		PRINT 'TEST 1.K FALLÃ“: permitiÃ³ definir un cruce en un partido inexistente.';
 	END TRY
 	BEGIN CATCH
 		IF ERROR_MESSAGE() LIKE '%El partido indicado no existe%'
 			PRINT 'TEST 1.K OK (Bloqueado): ' + REPLACE(ERROR_MESSAGE(), CHAR(13) + CHAR(10), ' | ');
 		ELSE
-			PRINT 'TEST 1.K FALLÓ: mensaje inesperado -> ' + ERROR_MESSAGE();
+			PRINT 'TEST 1.K FALLÃ“: mensaje inesperado -> ' + ERROR_MESSAGE();
 	END CATCH;
 
-	-- 1.L Selecciones inválidas: la misma dos veces, inexistente y nula (cuartos 137, todavía sin cruce).
-	-- Esperado: Bloqueado, cada caso con su mensaje: "no puede enfrentarse a sí misma",
-	--           "La selección visitante indicada no existe" y "La selección visitante es obligatoria".
+	-- 1.L Selecciones invÃ¡lidas: la misma dos veces, inexistente y nula (cuartos 137, todavÃ­a sin cruce).
+	-- Esperado: Bloqueado, cada caso con su mensaje: "no puede enfrentarse a sÃ­ misma",
+	--           "La selecciÃ³n visitante indicada no existe" y "La selecciÃ³n visitante es obligatoria".
 	SET @id = (SELECT IdPartido FROM nucleo.Partido WHERE NumeroPartido = 137);
 	BEGIN TRY
 		EXEC nucleo.SP_DEFINIR_CRUCE_ELIMINATORIO @idPartido = @id, @idSeleccionLocal = @s09, @idSeleccionVisitante = @s09;
-		PRINT 'TEST 1.L FALLÓ: permitió una selección contra sí misma.';
+		PRINT 'TEST 1.L FALLÃ“: permitiÃ³ una selecciÃ³n contra sÃ­ misma.';
 	END TRY
 	BEGIN CATCH
-		IF ERROR_MESSAGE() LIKE '%Una selección no puede enfrentarse a sí misma%'
+		IF ERROR_MESSAGE() LIKE '%Una selecciÃ³n no puede enfrentarse a sÃ­ misma%'
 			PRINT 'TEST 1.L.1 OK (Bloqueado): ' + REPLACE(ERROR_MESSAGE(), CHAR(13) + CHAR(10), ' | ');
 		ELSE
-			PRINT 'TEST 1.L.1 FALLÓ: mensaje inesperado -> ' + ERROR_MESSAGE();
+			PRINT 'TEST 1.L.1 FALLÃ“: mensaje inesperado -> ' + ERROR_MESSAGE();
 	END CATCH;
 	BEGIN TRY
 		EXEC nucleo.SP_DEFINIR_CRUCE_ELIMINATORIO @idPartido = @id, @idSeleccionLocal = @s09, @idSeleccionVisitante = 32000;
-		PRINT 'TEST 1.L FALLÓ: permitió una selección inexistente.';
+		PRINT 'TEST 1.L FALLÃ“: permitiÃ³ una selecciÃ³n inexistente.';
 	END TRY
 	BEGIN CATCH
-		IF ERROR_MESSAGE() LIKE '%La selección visitante indicada no existe%'
+		IF ERROR_MESSAGE() LIKE '%La selecciÃ³n visitante indicada no existe%'
 			PRINT 'TEST 1.L.2 OK (Bloqueado): ' + REPLACE(ERROR_MESSAGE(), CHAR(13) + CHAR(10), ' | ');
 		ELSE
-			PRINT 'TEST 1.L.2 FALLÓ: mensaje inesperado -> ' + ERROR_MESSAGE();
+			PRINT 'TEST 1.L.2 FALLÃ“: mensaje inesperado -> ' + ERROR_MESSAGE();
 	END CATCH;
 	BEGIN TRY
 		EXEC nucleo.SP_DEFINIR_CRUCE_ELIMINATORIO @idPartido = @id, @idSeleccionLocal = @s09, @idSeleccionVisitante = NULL;
-		PRINT 'TEST 1.L FALLÓ: permitió una selección nula.';
+		PRINT 'TEST 1.L FALLÃ“: permitiÃ³ una selecciÃ³n nula.';
 	END TRY
 	BEGIN CATCH
-		IF ERROR_MESSAGE() LIKE '%La selección visitante es obligatoria%'
+		IF ERROR_MESSAGE() LIKE '%La selecciÃ³n visitante es obligatoria%'
 			PRINT 'TEST 1.L.3 OK (Bloqueado): ' + REPLACE(ERROR_MESSAGE(), CHAR(13) + CHAR(10), ' | ');
 		ELSE
-			PRINT 'TEST 1.L.3 FALLÓ: mensaje inesperado -> ' + ERROR_MESSAGE();
+			PRINT 'TEST 1.L.3 FALLÃ“: mensaje inesperado -> ' + ERROR_MESSAGE();
 	END CATCH;
 
 	-- 1.M a 1.O Los otros tres cuartos de final.
@@ -405,10 +405,10 @@ BEGIN
 		    WHERE NumeroPartido BETWEEN 136 AND 139 AND IdSeleccionLocal IS NOT NULL AND IdSeleccionVisitante IS NOT NULL) = 4
 			PRINT 'TEST 1.M OK: los cuatro cuartos de final quedaron asignados.';
 		ELSE
-			PRINT 'TEST 1.M FALLÓ: algún cuarto de final no quedó asignado.';
+			PRINT 'TEST 1.M FALLÃ“: algÃºn cuarto de final no quedÃ³ asignado.';
 	END TRY
 	BEGIN CATCH
-		PRINT 'TEST 1.M FALLÓ: error inesperado -> ' + ERROR_MESSAGE();
+		PRINT 'TEST 1.M FALLÃ“: error inesperado -> ' + ERROR_MESSAGE();
 	END CATCH;
 
 	-- =====================================================================
@@ -437,27 +437,27 @@ BEGIN
 	SET @id = (SELECT IdPartido FROM nucleo.Partido WHERE NumeroPartido = 136);
 	BEGIN TRY
 		EXEC nucleo.SP_DEFINIR_CRUCE_ELIMINATORIO @idPartido = @id, @idSeleccionLocal = @s01, @idSeleccionVisitante = @s05;
-		PRINT 'TEST 2.A FALLÓ: permitió definir el cruce de un partido finalizado.';
+		PRINT 'TEST 2.A FALLÃ“: permitiÃ³ definir el cruce de un partido finalizado.';
 	END TRY
 	BEGIN CATCH
 		IF ERROR_MESSAGE() LIKE '%Solo se pueden definir cruces de partidos en estado Programado%'
 			PRINT 'TEST 2.A OK (Bloqueado): ' + REPLACE(ERROR_MESSAGE(), CHAR(13) + CHAR(10), ' | ');
 		ELSE
-			PRINT 'TEST 2.A FALLÓ: mensaje inesperado -> ' + ERROR_MESSAGE();
+			PRINT 'TEST 2.A FALLÃ“: mensaje inesperado -> ' + ERROR_MESSAGE();
 	END CATCH;
 
-	-- 2.B Semifinal con una selección que perdió en cuartos (s05 perdió el 136).
+	-- 2.B Semifinal con una selecciÃ³n que perdiÃ³ en cuartos (s05 perdiÃ³ el 136).
 	-- Esperado: Bloqueado: "No ganaron un partido finalizado de Cuartos de final: DXE".
 	SET @id = (SELECT IdPartido FROM nucleo.Partido WHERE NumeroPartido = 140);
 	BEGIN TRY
 		EXEC nucleo.SP_DEFINIR_CRUCE_ELIMINATORIO @idPartido = @id, @idSeleccionLocal = @s05, @idSeleccionVisitante = @s09;
-		PRINT 'TEST 2.B FALLÓ: permitió una semifinal con un perdedor de cuartos.';
+		PRINT 'TEST 2.B FALLÃ“: permitiÃ³ una semifinal con un perdedor de cuartos.';
 	END TRY
 	BEGIN CATCH
 		IF ERROR_MESSAGE() LIKE '%No ganaron un partido finalizado de Cuartos de final: DXE%'
 			PRINT 'TEST 2.B OK (Bloqueado): ' + REPLACE(ERROR_MESSAGE(), CHAR(13) + CHAR(10), ' | ');
 		ELSE
-			PRINT 'TEST 2.B FALLÓ: mensaje inesperado -> ' + ERROR_MESSAGE();
+			PRINT 'TEST 2.B FALLÃ“: mensaje inesperado -> ' + ERROR_MESSAGE();
 	END CATCH;
 
 	-- 2.C Semifinal 140 con los ganadores s01 y s09.
@@ -467,40 +467,40 @@ BEGIN
 		IF EXISTS (SELECT 1 FROM nucleo.Partido WHERE IdPartido = @id AND IdSeleccionLocal = @s01 AND IdSeleccionVisitante = @s09)
 			PRINT 'TEST 2.C OK: semifinal 140 asignada (s01 contra s09).';
 		ELSE
-			PRINT 'TEST 2.C FALLÓ: la semifinal no quedó asignada.';
+			PRINT 'TEST 2.C FALLÃ“: la semifinal no quedÃ³ asignada.';
 	END TRY
 	BEGIN CATCH
-		PRINT 'TEST 2.C FALLÓ: error inesperado -> ' + ERROR_MESSAGE();
+		PRINT 'TEST 2.C FALLÃ“: error inesperado -> ' + ERROR_MESSAGE();
 	END CATCH;
 
-	-- 2.D Selección ya asignada a otra semifinal (s01 está en la 140).
-	-- Esperado: Bloqueado: "Ya están asignadas a otro partido de Semifinal: DXA".
+	-- 2.D SelecciÃ³n ya asignada a otra semifinal (s01 estÃ¡ en la 140).
+	-- Esperado: Bloqueado: "Ya estÃ¡n asignadas a otro partido de Semifinal: DXA".
 	SET @id = (SELECT IdPartido FROM nucleo.Partido WHERE NumeroPartido = 141);
 	BEGIN TRY
 		EXEC nucleo.SP_DEFINIR_CRUCE_ELIMINATORIO @idPartido = @id, @idSeleccionLocal = @s01, @idSeleccionVisitante = @s14;
-		PRINT 'TEST 2.D FALLÓ: permitió una selección en dos semifinales.';
+		PRINT 'TEST 2.D FALLÃ“: permitiÃ³ una selecciÃ³n en dos semifinales.';
 	END TRY
 	BEGIN CATCH
-		IF ERROR_MESSAGE() LIKE '%Ya están asignadas a otro partido de Semifinal: DXA%'
+		IF ERROR_MESSAGE() LIKE '%Ya estÃ¡n asignadas a otro partido de Semifinal: DXA%'
 			PRINT 'TEST 2.D OK (Bloqueado): ' + REPLACE(ERROR_MESSAGE(), CHAR(13) + CHAR(10), ' | ');
 		ELSE
-			PRINT 'TEST 2.D FALLÓ: mensaje inesperado -> ' + ERROR_MESSAGE();
+			PRINT 'TEST 2.D FALLÃ“: mensaje inesperado -> ' + ERROR_MESSAGE();
 	END CATCH;
 
-	-- 2.E El partido de la fase anterior se jugó después: la semifinal 144 es el 05/02, pero s06 ganó su
+	-- 2.E El partido de la fase anterior se jugÃ³ despuÃ©s: la semifinal 144 es el 05/02, pero s06 ganÃ³ su
 	--     cuarto el 07/02 (138) y s14 el 10/02 (139).
 	-- Esperado: Bloqueado: "no es anterior a este partido" con las dos selecciones (DXF y DXN).
 	SET @id = (SELECT IdPartido FROM nucleo.Partido WHERE NumeroPartido = 144);
 	BEGIN TRY
 		EXEC nucleo.SP_DEFINIR_CRUCE_ELIMINATORIO @idPartido = @id, @idSeleccionLocal = @s06, @idSeleccionVisitante = @s14;
-		PRINT 'TEST 2.E FALLÓ: permitió una semifinal anterior a los cuartos que ganaron las selecciones.';
+		PRINT 'TEST 2.E FALLÃ“: permitiÃ³ una semifinal anterior a los cuartos que ganaron las selecciones.';
 	END TRY
 	BEGIN CATCH
 		IF ERROR_MESSAGE() LIKE '%El partido de Cuartos de final que ganaron no es anterior a este partido:%'
 		   AND ERROR_MESSAGE() LIKE '%DXF%' AND ERROR_MESSAGE() LIKE '%DXN%'
 			PRINT 'TEST 2.E OK (Bloqueado): ' + REPLACE(ERROR_MESSAGE(), CHAR(13) + CHAR(10), ' | ');
 		ELSE
-			PRINT 'TEST 2.E FALLÓ: mensaje inesperado -> ' + ERROR_MESSAGE();
+			PRINT 'TEST 2.E FALLÃ“: mensaje inesperado -> ' + ERROR_MESSAGE();
 	END CATCH;
 
 	-- 2.F Semifinal 141 con los ganadores s06 (visitante en cuartos) y s14 (por penales).
@@ -509,12 +509,12 @@ BEGIN
 	BEGIN TRY
 		EXEC nucleo.SP_DEFINIR_CRUCE_ELIMINATORIO @idPartido = @id, @idSeleccionLocal = @s06, @idSeleccionVisitante = @s14;
 		IF EXISTS (SELECT 1 FROM nucleo.Partido WHERE IdPartido = @id AND IdSeleccionLocal = @s06 AND IdSeleccionVisitante = @s14)
-			PRINT 'TEST 2.F OK: semifinal 141 asignada (s06 contra s14; s14 ganó por penales).';
+			PRINT 'TEST 2.F OK: semifinal 141 asignada (s06 contra s14; s14 ganÃ³ por penales).';
 		ELSE
-			PRINT 'TEST 2.F FALLÓ: la semifinal no quedó asignada.';
+			PRINT 'TEST 2.F FALLÃ“: la semifinal no quedÃ³ asignada.';
 	END TRY
 	BEGIN CATCH
-		PRINT 'TEST 2.F FALLÓ: error inesperado -> ' + ERROR_MESSAGE();
+		PRINT 'TEST 2.F FALLÃ“: error inesperado -> ' + ERROR_MESSAGE();
 	END CATCH;
 
 	-- =====================================================================
@@ -536,27 +536,27 @@ BEGIN
 	SET @id = (SELECT IdPartido FROM nucleo.Partido WHERE NumeroPartido = 142);
 	BEGIN TRY
 		EXEC nucleo.SP_DEFINIR_CRUCE_ELIMINATORIO @idPartido = @id, @idSeleccionLocal = @s01, @idSeleccionVisitante = @s14;
-		PRINT 'TEST 3.A FALLÓ: permitió el tercer puesto con los ganadores de las semifinales.';
+		PRINT 'TEST 3.A FALLÃ“: permitiÃ³ el tercer puesto con los ganadores de las semifinales.';
 	END TRY
 	BEGIN CATCH
 		IF ERROR_MESSAGE() LIKE '%No perdieron un partido finalizado de Semifinal:%'
 		   AND ERROR_MESSAGE() LIKE '%DXA%' AND ERROR_MESSAGE() LIKE '%DXN%'
 			PRINT 'TEST 3.A OK (Bloqueado): ' + REPLACE(ERROR_MESSAGE(), CHAR(13) + CHAR(10), ' | ');
 		ELSE
-			PRINT 'TEST 3.A FALLÓ: mensaje inesperado -> ' + ERROR_MESSAGE();
+			PRINT 'TEST 3.A FALLÃ“: mensaje inesperado -> ' + ERROR_MESSAGE();
 	END CATCH;
 
-	-- 3.B Tercer puesto con los perdedores de las semifinales (s09 perdió la 140 y s06 perdió la 141).
+	-- 3.B Tercer puesto con los perdedores de las semifinales (s09 perdiÃ³ la 140 y s06 perdiÃ³ la 141).
 	-- Esperado: OK.
 	BEGIN TRY
 		EXEC nucleo.SP_DEFINIR_CRUCE_ELIMINATORIO @idPartido = @id, @idSeleccionLocal = @s09, @idSeleccionVisitante = @s06;
 		IF EXISTS (SELECT 1 FROM nucleo.Partido WHERE IdPartido = @id AND IdSeleccionLocal = @s09 AND IdSeleccionVisitante = @s06)
 			PRINT 'TEST 3.B OK: tercer puesto asignado (s09 contra s06).';
 		ELSE
-			PRINT 'TEST 3.B FALLÓ: el tercer puesto no quedó asignado.';
+			PRINT 'TEST 3.B FALLÃ“: el tercer puesto no quedÃ³ asignado.';
 	END TRY
 	BEGIN CATCH
-		PRINT 'TEST 3.B FALLÓ: error inesperado -> ' + ERROR_MESSAGE();
+		PRINT 'TEST 3.B FALLÃ“: error inesperado -> ' + ERROR_MESSAGE();
 	END CATCH;
 
 	-- 3.C Final con los perdedores de las semifinales (el Tercer puesto no cuenta como fase anterior).
@@ -564,27 +564,27 @@ BEGIN
 	SET @id = (SELECT IdPartido FROM nucleo.Partido WHERE NumeroPartido = 143);
 	BEGIN TRY
 		EXEC nucleo.SP_DEFINIR_CRUCE_ELIMINATORIO @idPartido = @id, @idSeleccionLocal = @s09, @idSeleccionVisitante = @s06;
-		PRINT 'TEST 3.C FALLÓ: permitió la final con los perdedores de las semifinales.';
+		PRINT 'TEST 3.C FALLÃ“: permitiÃ³ la final con los perdedores de las semifinales.';
 	END TRY
 	BEGIN CATCH
 		IF ERROR_MESSAGE() LIKE '%No ganaron un partido finalizado de Semifinal:%'
 		   AND ERROR_MESSAGE() LIKE '%DXI%' AND ERROR_MESSAGE() LIKE '%DXF%'
 			PRINT 'TEST 3.C OK (Bloqueado): ' + REPLACE(ERROR_MESSAGE(), CHAR(13) + CHAR(10), ' | ');
 		ELSE
-			PRINT 'TEST 3.C FALLÓ: mensaje inesperado -> ' + ERROR_MESSAGE();
+			PRINT 'TEST 3.C FALLÃ“: mensaje inesperado -> ' + ERROR_MESSAGE();
 	END CATCH;
 
 	-- 3.D Final con los ganadores de las semifinales (s01 contra s14).
-	-- Esperado: OK. La salida (result set) muestra el partido sin resultado todavía (Programado).
+	-- Esperado: OK. La salida (result set) muestra el partido sin resultado todavÃ­a (Programado).
 	BEGIN TRY
 		EXEC nucleo.SP_DEFINIR_CRUCE_ELIMINATORIO @idPartido = @id, @idSeleccionLocal = @s01, @idSeleccionVisitante = @s14;
 		IF EXISTS (SELECT 1 FROM nucleo.Partido WHERE IdPartido = @id AND IdSeleccionLocal = @s01 AND IdSeleccionVisitante = @s14)
 			PRINT 'TEST 3.D OK: final asignada (s01 contra s14).';
 		ELSE
-			PRINT 'TEST 3.D FALLÓ: la final no quedó asignada.';
+			PRINT 'TEST 3.D FALLÃ“: la final no quedÃ³ asignada.';
 	END TRY
 	BEGIN CATCH
-		PRINT 'TEST 3.D FALLÓ: error inesperado -> ' + ERROR_MESSAGE();
+		PRINT 'TEST 3.D FALLÃ“: error inesperado -> ' + ERROR_MESSAGE();
 	END CATCH;
 END;
 
@@ -595,7 +595,7 @@ ROLLBACK TRANSACTION;
 GO
 
 IF EXISTS (SELECT 1 FROM nucleo.Pais WHERE Nombre LIKE 'TEST CR%')
-	PRINT 'ATENCIÓN: quedaron datos de prueba TEST CR en la base.';
+	PRINT 'ATENCIÃ“N: quedaron datos de prueba TEST CR en la base.';
 ELSE
 	PRINT 'Limpieza OK: no quedaron datos de prueba TEST CR.';
 GO

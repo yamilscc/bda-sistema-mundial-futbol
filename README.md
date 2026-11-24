@@ -25,6 +25,8 @@ Base de datos en **SQL Server (T-SQL)** para gestionar la operación de los part
 
 - Microsoft SQL Server 16.x
 - SQL Server Management Studio (SSMS).
+- Python 3 (para generar los archivos de las APIs y del scraping; ver [Asignación de publicidad](#asignación-de-publicidad)).
+- Para la Entrega 9: Java 21 (aplicación de ABM) y Power BI Desktop (tablero). Ver [Entrega 9](#entrega-9).
 
 ---
 
@@ -33,12 +35,14 @@ Base de datos en **SQL Server (T-SQL)** para gestionar la operación de los part
 ```
 .
 ├── README.md
+├── app/                          # aplicación de ABM de sedes (Java 21, Spring Boot) – Entrega 9
 ├── doc/
-│   └── nomenclaturas.md          # encabezado de scripts, commits, ramas y convenciones de nombres
+│   ├── nomenclaturas.md          # encabezado de scripts, commits, ramas y convenciones de nombres
+│   └── entrega9/                 # documentación de la Entrega 9, tablero de Power BI y capturas
 └── scripts/
     ├── creacion/                 # scripts de creación (base, tablas, FK, funciones y SP)
     │   ├── 00_Reset_Total.sql    # maestro: borra y recrea la base, crea schemas y ejecuta el resto
-    │   └── 01_… a 33_…           # un archivo por módulo, con prefijo numérico de orden de ejecución
+    │   └── 01_… a 34_…           # un archivo por módulo, con prefijo numérico de orden de ejecución
     ├── testing/                  # scripts de testing (uno por cada script de creación probado)
     │   └── importacion/          # tests en espejo de scripts/importacion/ (ej. 03_Test_Seed_Jugadores_Eventos.sql)
     └── importacion/              # seeds e importaciones de datos externos (CSV/XML/API/scraping); 00_Cargar_Seeds.sql los lanza en orden
@@ -54,7 +58,7 @@ Base de datos en **SQL Server (T-SQL)** para gestionar la operación de los part
 
 1. Abrir SSMS y activar el **modo SQLCMD** (menú *Consulta → Modo SQLCMD*).
 2. Abrir `scripts/creacion/00_Reset_Total.sql` y editar la línea `:setvar RUTA "..."` con la ruta de la carpeta `scripts\creacion` de la copia local del repositorio (sin barra final).
-3. Ejecutarlo. El script elimina la base `MundialFutbol` si existe, la recrea, crea los schemas y ejecuta en orden los scripts `01` a `33`. Si alguno falla, se corta en ese punto. Al final muestra un resumen de tablas, SP y funciones por schema.
+3. Ejecutarlo. El script elimina la base `MundialFutbol` si existe, la recrea, crea los schemas y ejecuta en orden los scripts `01` a `34`. Si alguno falla, se corta en ese punto. Al final muestra un resumen de tablas, SP, funciones y vistas por schema.
 4. Cargar los datos de `scripts/importacion/` con el lanzador `00_Cargar_Seeds.sql` (modo SQLCMD, editando `:setvar RUTA` con la carpeta `scripts\importacion`), que ejecuta en este orden y se corta ante el primer error: `04_Seed_Nucleo_Publicidad.sql` (también deja la regla de cupos de convocatoria), `05_Importar_Nucleo_Publicidad.sql` (requiere generar antes los archivos de las APIs, ver [Asignación de publicidad](#asignación-de-publicidad)), `06_Seed_Designaciones_Publicidad.sql`, `01_Importar_Convocatoria_XML.sql`, `03_Seed_Jugadores_Eventos.sql`, `02_Importar_Eventos_CSV.sql`, `07_Cierre_Resultados_Partidos.sql` y `08_Importar_Campanias_Dossier.sql` (campañas del dossier por scraping, ver [Campañas del dossier](#campañas-del-dossier-scraping)). El orden importa: el 01 va antes que el 03 porque el 03 completa solo los dorsales que el XML dejó libres, y el 04 va primero porque el 01 necesita la regla de cupos. Es idempotente: se puede ejecutar de nuevo. Si se prefiere correrlos a mano, el orden es el mismo; los que leen archivos llevan su propio `:setvar RUTA_IMP` con la carpeta `scripts\importacion`.
 5. Ejecutar `scripts/testing/00_Ejecutar_Tests.sql` (también en modo SQLCMD, editando su `:setvar RUTA` con la carpeta `scripts\testing`), que corre todos los tests en orden y al final controla que no queden datos de prueba.
 
@@ -62,11 +66,11 @@ Todos los scripts verifican la existencia de los objetos antes de crearlos o bor
 
 ### Orden de ejecución
 
-Cada archivo empieza con dos dígitos que marcan su orden. Los números 01 a 33 los ejecuta `00_Reset_Total.sql` en ese orden. El responsable es el autor indicado en el encabezado de cada script.
+Cada archivo empieza con dos dígitos que marcan su orden. Los números 01 a 34 los ejecuta `00_Reset_Total.sql` en ese orden. El responsable es el autor indicado en el encabezado de cada script.
 
 | N.º | Script | Contenido | Responsable |
 |---|---|---|---|
-| 00 | `00_Reset_Total.sql` | Borra y recrea la base, crea los schemas y ejecuta los scripts 01 a 33 | Yamil / Elías |
+| 00 | `00_Reset_Total.sql` | Borra y recrea la base, crea los schemas y ejecuta los scripts 01 a 34 | Yamil / Elías |
 | 01 | `01_Tablas_Nucleo.sql` | Tablas del núcleo: países, confederaciones, ciudades, sedes, fases, grupos, selecciones, staff técnico, árbitros, partidos, designaciones y sanciones | Yamil |
 | 02 | `02_Tablas_Jugadores_y_Alineaciones.sql` | Tablas de jugadores, convocatoria, formaciones y sustituciones | Mateo |
 | 03 | `03_Tablas_Eventos.sql` | Tablas de reglas de suspensión, tipos de gol, períodos, goles, tarjetas y amonestaciones | Mateo |
@@ -100,6 +104,7 @@ Cada archivo empieza con dos dígitos que marcan su orden. Los números 01 a 33 
 | 31 | `31_Seguridad_Cifrado.sql` | Script de modificación del cifrado: documento de jugadores y nombre de árbitros y staff con AES_256 (certificado y master key), hash para búsquedas, ABM adaptados y migración con `SP_APLICAR_CIFRADO_DATOS_SENSIBLES` | Denis / Elías |
 | 32 | `32_Seguridad_Roles_Permisos.sql` | 4 roles con permisos granulares, asignación y revocación de usuarios y usuarios de prueba, todo con SP | Denis / Elías |
 | 33 | `33_Procedimientos_Backups.sql` | Modelo FULL y backups FULL, DIFF y LOG con SP (sin SQL dinámico) e historial en `msdb` | Denis / Elías |
+| 34 | `34_Consultas_ToBe.sql` | Consultas del alcance *To BE* (solo lectura): `SP_CONSULTAR_FIXTURE` y vistas de fixture, goleadores, titularidad, tarjetas, historial arbitral, publicidad en USD, ocupación por sede, mapa de sedes y prime time (ver [Entrega 9](#entrega-9)) | Yamil |
 
 **Convención de los ABM:** cada tabla tiene un SP por operación: `SP_ALTA_<Tabla>`, `SP_MODIFICACION_<Tabla>` y `SP_BAJA_<Tabla>` (por ejemplo `nucleo.SP_ALTA_Partido`). Las tablas asociativas (`ArbitroIdioma` y `OrientacionPais`) solo tienen alta y baja. Los archivos conservan el nombre `SP_ABM_` del módulo.
 
@@ -143,9 +148,10 @@ Scripts de testing (en `scripts/testing/`):
 | `32_Test_Rol_GestorPublicidad.sql` | Qué puede y qué no puede hacer `usr_publicidad_test` (Rol_GestorPublicidad) | Denis / Elías |
 | `32_Test_Rol_Consulta.sql` | Qué puede y qué no puede hacer `usr_consulta_test` (Rol_Consulta) | Denis / Elías |
 | `33_Test_Backups.sql` | Validaciones, backups FULL, DIFF y LOG registrados en `msdb` e historial | Denis / Elías |
+| `34_Test_Consultas_ToBe.sql` | `SP_CONSULTAR_FIXTURE` (filtros y validaciones) y las vistas del script 34 | Yamil |
 | `importacion/03_Test_Seed_Jugadores_Eventos.sql` | Seed de jugadores y eventos: volúmenes mínimos y casos obligatorios (en espejo de `scripts/importacion/03_Seed_Jugadores_Eventos.sql`) | Mateo |
 
-Pendientes: Entrega 9 (plataforma BI, interfaz gráfica y dashboard analítico).
+La Entrega 9 (consultas del alcance *To BE*, aplicación de ABM y tablero de BI) se describe en [Entrega 9](#entrega-9).
 
 **Casos obligatorios de nucleo y publicidad:** partido 1 (ARG vs BRA, 23:00 UTC) en prime time en 6 mercados (ARG, BRA, URU, CHI, USA, CAN); árbitro argentino rechazado en ARG vs BRA (queda en `eventos.LogImportacion`, archivo `seed_designaciones`); importación de pauta con 6 filas válidas y 3 inválidas.
 
@@ -256,6 +262,24 @@ Las filas inválidas (anunciante o título vacío, texto de más de 100 caracter
 - **Cifrado y carga de datos:** importaciones, seeds y reportes buscan y muestran jugadores, árbitros y staff a través de funciones (`fn_IdJugadorPorDocumento`, `fn_IdArbitroPorNombre`, `fn_NombreArbitro`, etc.). `31_Seguridad_Cifrado.sql` las redefine, y por eso `00_Cargar_Seeds.sql` funciona con los datos cifrados.
 - **Impacto en tests previos (consigna):** el cifrado reemplaza `UQ_Jugador_Documento` por un índice único sobre el hash, así que el caso 2.A de `02_Test_Tablas_Jugadores.sql`, que esperaba esa restricción al insertar directo en la tabla, informa FALLÓ. Es el único caso afectado (ver el documento de la Entrega 8).
 - **Claves:** ninguna clave ni contraseña está en el repositorio. Para restaurar en otro servidor hay que respaldar la master key y el certificado (procedimiento en el documento de la Entrega 8).
+
+---
+
+## Entrega 9
+
+La documentación completa está en [doc/entrega9/README.md](doc/entrega9/README.md): qué consulta cubre cada punto de *To BE*, cómo crear el usuario de la base y levantar la aplicación, los casos probados con sus capturas y el tablero de Power BI.
+
+| Pieza | Dónde está |
+|---|---|
+| Consultas del alcance *To BE* | `scripts/creacion/34_Consultas_ToBe.sql` y `scripts/testing/34_Test_Consultas_ToBe.sql` |
+| Aplicación de ABM de sedes | `app/` (`.\mvnw.cmd spring-boot:run`, con las variables de entorno `DB_USER` y `DB_PASSWORD`) |
+| Tablero de BI | `doc/entrega9/Mundial.pbix` y capturas en `doc/entrega9/capturas/` |
+
+---
+
+## Carga de datos
+
+Los datos se cargan con el lanzador `scripts/importacion/00_Cargar_Seeds.sql`, después de `00_Reset_Total.sql`. El orden de los scripts y los requisitos (modo SQLCMD y archivos de las APIs) están en el paso 4 de [Cómo ejecutar](#cómo-ejecutar-corrida-desde-cero).
 
 ---
 

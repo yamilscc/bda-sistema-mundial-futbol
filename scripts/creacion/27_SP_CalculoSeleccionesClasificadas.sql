@@ -1,16 +1,16 @@
 /*
 Universidad: Universidad Nacional de La Matanza
 Materia: Bases de Datos Aplicadas - Grupo 05
-Autor: Canseco Carrizo, Yamil Simón
+Autor: Canseco Carrizo, Yamil SimÃ³n
 Integrantes:
 Casella, Mateo Ezequiel
 Chungara Tenorio, Denis Abner
-Torczuk, Elías Alexei
-Canseco Carrizo, Yamil Simón
+Torczuk, ElÃ­as Alexei
+Canseco Carrizo, Yamil SimÃ³n
 Objetivo:
-	- Crear nucleo.SP_CALCULO_DE_SELECCIONES_CLASIFICADAS: valida que la fase de grupos esté
+	- Crear nucleo.SP_CALCULO_DE_SELECCIONES_CLASIFICADAS: valida que la fase de grupos estÃ©
 	  completa y devuelve las posiciones, los clasificados y la fase con la que empieza la
-	  eliminación directa.
+	  eliminaciÃ³n directa.
 	- Requiere ejecutados los scripts 01 a 26 (usa nucleo.fn_SeleccionesClasificadas,
 	  nucleo.fn_FaseEliminatoriaInicial y nucleo.fn_ValidarFaseGruposCompleta del script 25).
 	- Test correspondiente: testing/27_Test_SP_CalculoSeleccionesClasificadas.sql.
@@ -23,32 +23,32 @@ GO
 -- nucleo.SP_CALCULO_DE_SELECCIONES_CLASIFICADAS
 -- Solo lectura: no escribe nada (los cruces eliminatorios no se persisten pre-cargados; se
 -- validan al cargar cada partido con nucleo.SP_DEFINIR_CRUCE_ELIMINATORIO, script 28).
--- Parámetros de salida (opcionales, para que otro SP o un test use el resultado sin leer los
+-- ParÃ¡metros de salida (opcionales, para que otro SP o un test use el resultado sin leer los
 -- result sets): @idFaseInicial, @totalClasificados y @avisoDesempate.
--- Validaciones (se informan todas juntas en un único mensaje). Las tres primeras las hace
+-- Validaciones (se informan todas juntas en un Ãºnico mensaje). Las tres primeras las hace
 -- nucleo.fn_ValidarFaseGruposCompleta (script 25), compartida con SP_DEFINIR_CRUCE_ELIMINATORIO:
 --   - Hay partidos de 'Fase de grupos' cargados.
---   - Todos esos partidos están 'Finalizado' (se listan hasta 20 números de partido y "y N más").
---   - Cada selección tiene cargados todos sus partidos de grupo (n - 1, con n = tamaño de su grupo):
+--   - Todos esos partidos estÃ¡n 'Finalizado' (se listan hasta 20 nÃºmeros de partido y "y N mÃ¡s").
+--   - Cada selecciÃ³n tiene cargados todos sus partidos de grupo (n - 1, con n = tamaÃ±o de su grupo):
 --     detecta partidos que nunca se cargaron (se listan hasta 20 selecciones).
 --   - Existe la fila de nucleo.ReglaClasificacion.
 --   - El total de clasificados que da la regla corresponde a una fase (32, 16 u 8).
--- Result sets (cuando todo está bien):
+-- Result sets (cuando todo estÃ¡ bien):
 --   1. Posiciones de todas las selecciones (nucleo.fn_SeleccionesClasificadas), por grupo y puesto.
---   2. Solo los clasificados: primero los directos (por grupo y puesto) y después el cupo adicional
+--   2. Solo los clasificados: primero los directos (por grupo y puesto) y despuÃ©s el cupo adicional
 --      (los "mejores terceros"), en el orden del ranking.
---   3. Fase con la que empieza la eliminación directa (nucleo.fn_FaseEliminatoriaInicial).
+--   3. Fase con la que empieza la eliminaciÃ³n directa (nucleo.fn_FaseEliminatoriaInicial).
 --
 -- AVISO DE DESEMPATE POR IdSeleccion
 -- El desempate de grupos es: puntos, diferencia de gol, goles a favor e IdSeleccion (ver script 25).
--- El último criterio es arbitrario: lo asigna la base al crear la selección. Si el CORTE de
--- clasificación se decide por ese criterio, el SP informa un aviso (PRINT y @avisoDesempate), NO un
--- error: no cambia ningún resultado, pero en un torneo real ese empate se resolvería por sorteo o
+-- El Ãºltimo criterio es arbitrario: lo asigna la base al crear la selecciÃ³n. Si el CORTE de
+-- clasificaciÃ³n se decide por ese criterio, el SP informa un aviso (PRINT y @avisoDesempate), NO un
+-- error: no cambia ningÃºn resultado, pero en un torneo real ese empate se resolverÃ­a por sorteo o
 -- fair play y conviene que el organizador lo note. Se avisa cuando dos selecciones empatan en puntos,
 -- diferencia de gol y goles a favor justo en el corte:
---   - dentro de un grupo, entre el último puesto que clasifica directo y el siguiente;
---   - en el ranking del cupo adicional, entre la última selección que entra y la primera que no.
--- Los empates que no cambian quién clasifica (por ejemplo, entre dos selecciones que igual clasifican)
+--   - dentro de un grupo, entre el Ãºltimo puesto que clasifica directo y el siguiente;
+--   - en el ranking del cupo adicional, entre la Ãºltima selecciÃ³n que entra y la primera que no.
+-- Los empates que no cambian quiÃ©n clasifica (por ejemplo, entre dos selecciones que igual clasifican)
 -- no se avisan.
 -- =========================================================================
 CREATE OR ALTER PROCEDURE nucleo.SP_CALCULO_DE_SELECCIONES_CLASIFICADAS
@@ -76,8 +76,8 @@ BEGIN
 
 	BEGIN TRY
 		-- ---- Validaciones ---------------------------------------------------
-		-- Fase de grupos completa (partidos cargados y finalizados): la validación vive en
-		-- nucleo.fn_ValidarFaseGruposCompleta (script 25), que también usa SP_DEFINIR_CRUCE_ELIMINATORIO.
+		-- Fase de grupos completa (partidos cargados y finalizados): la validaciÃ³n vive en
+		-- nucleo.fn_ValidarFaseGruposCompleta (script 25), que tambiÃ©n usa SP_DEFINIR_CRUCE_ELIMINATORIO.
 		SET @errores += nucleo.fn_ValidarFaseGruposCompleta();
 
 		SELECT @hayRegla = 1,
@@ -86,7 +86,7 @@ BEGIN
 		FROM nucleo.ReglaClasificacion AS rc;
 
 		IF @hayRegla = 0
-			SET @errores += N'- No hay regla de clasificación cargada (nucleo.ReglaClasificacion).' + @salto;
+			SET @errores += N'- No hay regla de clasificaciÃ³n cargada (nucleo.ReglaClasificacion).' + @salto;
 		ELSE
 		BEGIN
 			SELECT @total = COUNT(*) FROM nucleo.fn_SeleccionesClasificadas() WHERE Clasifica = 1;
@@ -94,7 +94,7 @@ BEGIN
 
 			IF @idFase IS NULL
 				SET @errores += N'- El total de clasificados (' + CAST(@total AS NVARCHAR(12))
-				              + N') no corresponde a ninguna fase de eliminación directa: debe ser 8, 16 o 32.' + @salto;
+				              + N') no corresponde a ninguna fase de eliminaciÃ³n directa: debe ser 8, 16 o 32.' + @salto;
 		END;
 
 		IF LEN(@errores) > 0
@@ -105,7 +105,7 @@ BEGIN
 		END;
 
 		-- ---- Aviso de desempate por IdSeleccion en el corte ------------------
-		-- Dentro de un grupo: el último puesto que clasifica directo empata con el siguiente.
+		-- Dentro de un grupo: el Ãºltimo puesto que clasifica directo empata con el siguiente.
 		SELECT @avisoGrupos = STRING_AGG(CAST(N'grupo ' + a.Grupo + N' (' + a.CodigoFIFA + N' y ' + b.CodigoFIFA + N')' AS NVARCHAR(MAX)), N'; ')
 		                      WITHIN GROUP (ORDER BY a.Grupo)
 		FROM nucleo.fn_SeleccionesClasificadas() AS a
@@ -114,7 +114,7 @@ BEGIN
 		       AND b.Pts = a.Pts AND b.DG = a.DG AND b.GF = a.GF
 		WHERE a.Posicion = @clasificadosPorGrupo;
 
-		-- En el ranking del cupo adicional: la última que entra empata con la primera que no.
+		-- En el ranking del cupo adicional: la Ãºltima que entra empata con la primera que no.
 		IF @mejoresTerceros > 0
 		BEGIN
 			WITH Candidatas AS (
@@ -132,7 +132,7 @@ BEGIN
 
 		IF @avisoGrupos IS NOT NULL OR @avisoAdicional IS NOT NULL
 		BEGIN
-			SET @avisoDesempate = N'Aviso: el corte de clasificación se decidió por IdSeleccion (empate en puntos, '
+			SET @avisoDesempate = N'Aviso: el corte de clasificaciÃ³n se decidiÃ³ por IdSeleccion (empate en puntos, '
 			                    + N'diferencia de gol y goles a favor) en: '
 			                    + ISNULL(@avisoGrupos, N'')
 			                    + CASE WHEN @avisoGrupos IS NOT NULL AND @avisoAdicional IS NOT NULL THEN N'; ' ELSE N'' END
@@ -151,7 +151,7 @@ BEGIN
 		FROM nucleo.fn_SeleccionesClasificadas() AS c
 		ORDER BY c.Grupo, c.Posicion;
 
-		-- 2. Clasificados: primero los directos y después el cupo adicional, en el orden del ranking.
+		-- 2. Clasificados: primero los directos y despuÃ©s el cupo adicional, en el orden del ranking.
 		SELECT c.IdGrupo, c.Grupo, c.IdSeleccion, c.CodigoFIFA, c.Posicion, c.Pts, c.DG, c.GF, c.ClasificaComo
 		FROM nucleo.fn_SeleccionesClasificadas() AS c
 		WHERE c.Clasifica = 1
@@ -160,7 +160,7 @@ BEGIN
 		         CASE WHEN c.ClasificaComo = 'Directo' THEN c.Posicion END,
 		         c.Pts DESC, c.DG DESC, c.GF DESC, c.IdSeleccion;
 
-		-- 3. Fase con la que empieza la eliminación directa.
+		-- 3. Fase con la que empieza la eliminaciÃ³n directa.
 		SELECT f.IdFase, f.Nombre, f.TotalClasificados
 		FROM nucleo.fn_FaseEliminatoriaInicial() AS f;
 	END TRY

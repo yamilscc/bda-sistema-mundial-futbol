@@ -9,7 +9,7 @@ Torczuk, Elías Alexei
 Canseco Carrizo, Yamil Simón
 Objetivo:
 	- Orquestar la ejecución de TODOS los scripts de testing en el orden de su número
-	  (01 a 33 y el test del seed en importacion/), igual que 00_Reset_Total.sql orquesta los scripts de creación.
+	  (01 a 34 y el test del seed en importacion/), igual que 00_Reset_Total.sql orquesta los scripts de creación.
 	- Entre test y test, deshacer cualquier transacción que haya quedado abierta, para que
 	  un test cortado a mitad de camino no arrastre sus datos al siguiente.
 	- Verificar al inicio que la base exista y esté recién creada (el test 01 lo requiere).
@@ -388,6 +388,15 @@ GO
 PRINT '===== TEST 33 Procedimientos de Backup (Entrega 8)';
 GO
 :r $(RUTA)\33_Test_Backups.sql
+GO
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
+GO
+USE MundialFutbol;
+GO
+
+PRINT '===== TEST 34 Consultas del alcance To BE (fixture, goleadores, tarjetas, árbitros, publicidad y BI)';
+GO
+:r $(RUTA)\34_Test_Consultas_ToBe.sql
 GO
 WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
 GO

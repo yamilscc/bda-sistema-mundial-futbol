@@ -1,15 +1,15 @@
 /*
 Universidad: Universidad Nacional de La Matanza
 Materia: Bases de Datos Aplicadas - Grupo 05
-Autor: Canseco Carrizo, Yamil SimÛn
+Autor: Canseco Carrizo, Yamil Sim√≥n
 Integrantes:
 Casella, Mateo Ezequiel
 Chungara Tenorio, Denis Abner
-Torczuk, ElÌas Alexei
-Canseco Carrizo, Yamil SimÛn
+Torczuk, El√≠as Alexei
+Canseco Carrizo, Yamil Sim√≥n
 Objetivo:
 	- Crear nucleo.SP_FINALIZAR_PARTIDO: cierra un partido (Programado -> Finalizado) y registra
-	  la concurrencia, despuÈs de validar que los goles cargados permiten definir el resultado.
+	  la concurrencia, despu√©s de validar que los goles cargados permiten definir el resultado.
 	- Requiere ejecutados los scripts 01 a 25.
 	- Test correspondiente: testing/26_Test_SP_FinalizarPartido.sql.
 */
@@ -19,23 +19,23 @@ GO
 
 -- =========================================================================
 -- nucleo.SP_FINALIZAR_PARTIDO
--- Par·metros: @idPartido (partido a cerrar), @concurrencia (p˙blico; opcional).
--- Reglas (se informan todas juntas en un ˙nico mensaje):
---   - El partido existe, est· 'Programado', tiene ambas selecciones definidas y ya se jugÛ
+-- Par√°metros: @idPartido (partido a cerrar), @concurrencia (p√∫blico; opcional).
+-- Reglas (se informan todas juntas en un √∫nico mensaje):
+--   - El partido existe, est√° 'Programado', tiene ambas selecciones definidas y ya se jug√≥
 --     (FechaHoraUTC no futura).
 --   - Concurrencia: si se informa, >= 0 y, cuando la sede tiene capacidad cargada, <= capacidad.
 --     Es opcional porque los datasets externos pueden no traerla (la columna admite NULL).
 --   - Todo gol del partido tiene un autor convocado en una de las dos selecciones del partido
---     (eventos.fn_ResultadoPartido no podrÌa sumarlo a la selecciÛn correcta).
---   - En fase de grupos no hay definiciÛn por penales.
---   - En eliminaciÛn directa el partido tiene ganador (nucleo.fn_DefinicionPartido): gana por
---     goles o, si terminÛ empatado, por la tanda de penales. Se rechazan: empate sin tanda,
---     tanda igualada y tanda cargada en un partido que no terminÛ empatado.
+--     (eventos.fn_ResultadoPartido no podr√≠a sumarlo a la selecci√≥n correcta).
+--   - En fase de grupos no hay definici√≥n por penales.
+--   - En eliminaci√≥n directa el partido tiene ganador (nucleo.fn_DefinicionPartido): gana por
+--     goles o, si termin√≥ empatado, por la tanda de penales. Se rechazan: empate sin tanda,
+--     tanda igualada y tanda cargada en un partido que no termin√≥ empatado.
 -- Efecto: solo cambia Estado a 'Finalizado' y Concurrencia (3FN: el resultado no se guarda en
---         Partido; sigue deriv·ndose de eventos.Gol con eventos.fn_ResultadoPartido).
+--         Partido; sigue deriv√°ndose de eventos.Gol con eventos.fn_ResultadoPartido).
 -- Salida: la fila del partido en nucleo.vw_PartidoResultado.
--- TransacciÛn: abre la propia o, si el llamador ya tiene una abierta, usa un savepoint y no la
---              deshace ante un error de validaciÛn.
+-- Transacci√≥n: abre la propia o, si el llamador ya tiene una abierta, usa un savepoint y no la
+--              deshace ante un error de validaci√≥n.
 -- =========================================================================
 CREATE OR ALTER PROCEDURE nucleo.SP_FINALIZAR_PARTIDO
 	@idPartido    INT,
@@ -45,8 +45,8 @@ BEGIN
 	SET NOCOUNT ON;
 
 	DECLARE @errores NVARCHAR(MAX) = N'',
-	        @tranExterna BIT = IIF(@@TRANCOUNT > 0, 1, 0), -- 1 si el llamador ya abriÛ una transacciÛn
-	        @savepoint   BIT = 0,                          -- 1 cuando se tomÛ el savepoint PuntoSP
+	        @tranExterna BIT = IIF(@@TRANCOUNT > 0, 1, 0), -- 1 si el llamador ya abri√≥ una transacci√≥n
+	        @savepoint   BIT = 0,                          -- 1 cuando se tom√≥ el savepoint PuntoSP
 	        @mensaje NVARCHAR(2048),
 	        @salto   NVARCHAR(2) = CHAR(13) + CHAR(10),
 	        @existe BIT = 0,
@@ -82,13 +82,13 @@ BEGIN
 		ELSE
 		BEGIN
 			IF @estado <> 'Programado'
-				SET @errores += N'- El partido no est· en estado Programado (ya fue finalizado).' + @salto;
+				SET @errores += N'- El partido no est√° en estado Programado (ya fue finalizado).' + @salto;
 
 			IF @idLocal IS NULL OR @idVisitante IS NULL
 				SET @errores += N'- El partido no tiene definidas ambas selecciones.' + @salto;
 
 			IF @fechaHoraUTC > SYSUTCDATETIME()
-				SET @errores += N'- El partido todavÌa no se jugÛ (su fecha y hora UTC es futura).' + @salto;
+				SET @errores += N'- El partido todav√≠a no se jug√≥ (su fecha y hora UTC es futura).' + @salto;
 
 			IF @concurrencia IS NOT NULL
 			BEGIN
@@ -112,7 +112,7 @@ BEGIN
 
 				IF @golesAjenos > 0
 					SET @errores += N'- Hay ' + CAST(@golesAjenos AS NVARCHAR(12))
-					              + N' gol(es) cuyo autor no est· convocado en ninguna de las dos selecciones del partido.' + @salto;
+					              + N' gol(es) cuyo autor no est√° convocado en ninguna de las dos selecciones del partido.' + @salto;
 
 				SELECT @golesLocal = r.GolesLocal, @golesVisitante = r.GolesVisitante,
 				       @penalesLocal = r.PenalesLocal, @penalesVisitante = r.PenalesVisitante
@@ -125,18 +125,18 @@ BEGIN
 				IF @esEliminatoria = 0
 				BEGIN
 					IF @penalesLocal IS NOT NULL
-						SET @errores += N'- En fase de grupos no hay definiciÛn por penales.' + @salto;
+						SET @errores += N'- En fase de grupos no hay definici√≥n por penales.' + @salto;
 				END
 				ELSE
 				BEGIN
 					IF @penalesLocal IS NOT NULL AND @golesLocal <> @golesVisitante
-						SET @errores += N'- Hay goles de la definiciÛn por penales pero el partido no terminÛ empatado.' + @salto;
+						SET @errores += N'- Hay goles de la definici√≥n por penales pero el partido no termin√≥ empatado.' + @salto;
 					ELSE IF @idGanador IS NULL
 					BEGIN
 						IF @penalesLocal IS NULL
-							SET @errores += N'- El partido de eliminaciÛn directa terminÛ empatado y no tiene definiciÛn por penales.' + @salto;
+							SET @errores += N'- El partido de eliminaci√≥n directa termin√≥ empatado y no tiene definici√≥n por penales.' + @salto;
 						ELSE
-							SET @errores += N'- La definiciÛn por penales est· igualada: falta cargar alg˙n penal.' + @salto;
+							SET @errores += N'- La definici√≥n por penales est√° igualada: falta cargar alg√∫n penal.' + @salto;
 					END;
 				END;
 			END;
@@ -148,7 +148,7 @@ BEGIN
 			THROW 52000, @mensaje, 1;
 		END;
 
-		-- ---- OperaciÛn ------------------------------------------------------
+		-- ---- Operaci√≥n ------------------------------------------------------
 		IF @tranExterna = 0
 			BEGIN TRANSACTION;
 		ELSE
@@ -157,7 +157,7 @@ BEGIN
 			SET @savepoint = 1;
 		END;
 
-		-- La condiciÛn Estado = 'Programado' evita pisar un cierre hecho por otra sesiÛn en el medio.
+		-- La condici√≥n Estado = 'Programado' evita pisar un cierre hecho por otra sesi√≥n en el medio.
 		UPDATE nucleo.Partido
 		SET Estado = 'Finalizado',
 		    Concurrencia = @concurrencia
@@ -165,14 +165,14 @@ BEGIN
 		  AND Estado = 'Programado';
 
 		IF @@ROWCOUNT = 0
-			THROW 52000, N'SP_FINALIZAR_PARTIDO - El partido ya fue finalizado por otra operaciÛn.', 1;
+			THROW 52000, N'SP_FINALIZAR_PARTIDO - El partido ya fue finalizado por otra operaci√≥n.', 1;
 
 		IF @tranExterna = 0
 			COMMIT TRANSACTION;
 	END TRY
 	BEGIN CATCH
-		-- Solo se deshace lo propio: la transacciÛn si la abriÛ este SP, o hasta el savepoint
-		-- si corre dentro de una transacciÛn del llamador (que queda abierta y a su cargo).
+		-- Solo se deshace lo propio: la transacci√≥n si la abri√≥ este SP, o hasta el savepoint
+		-- si corre dentro de una transacci√≥n del llamador (que queda abierta y a su cargo).
 		IF @tranExterna = 0 AND @@TRANCOUNT > 0
 			ROLLBACK TRANSACTION;
 		ELSE IF @savepoint = 1 AND XACT_STATE() = 1

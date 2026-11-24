@@ -1,0 +1,21 @@
+# Ejemplo de configuración de la app (src/main/resources/application.properties).
+# No poner credenciales reales en el repositorio: se pasan por variables de entorno.
+#
+# Variables de entorno:
+#   DB_USER      usuario SQL (login con autenticación de SQL Server; requiere el modo mixto habilitado)
+#   DB_PASSWORD  contraseña de ese usuario
+#   DB_URL       (opcional) URL JDBC; por defecto localhost, puerto 1433, base MundialFutbol
+#
+# PowerShell (solo para la sesión actual):
+#   $env:DB_USER = "mundial_app"
+#   $env:DB_PASSWORD = "********"
+#   .\mvnw.cmd spring-boot:run
+#
+# El usuario necesita, como mínimo, leer nucleo.Sede, nucleo.Ciudad y nucleo.Pais y ejecutar
+# nucleo.SP_ALTA_Sede, nucleo.SP_MODIFICACION_Sede y nucleo.SP_BAJA_Sede.
+
+spring.application.name=mundial-app
+
+spring.datasource.url=${DB_URL:jdbc:sqlserver://localhost:1433;databaseName=MundialFutbol;encrypt=true;trustServerCertificate=true}
+spring.datasource.username=${DB_USER:}
+spring.datasource.password=${DB_PASSWORD:}
