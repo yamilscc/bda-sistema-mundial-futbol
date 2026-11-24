@@ -233,6 +233,15 @@ GO
 USE MundialFutbol;
 GO
 
+PRINT '===== TEST 22 Importación de nucleo y publicidad (fixture, PBI, cotizaciones y pauta)';
+GO
+:r $(RUTA)\22_Test_SP_Importacion_Nucleo_Publicidad.sql
+GO
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
+GO
+USE MundialFutbol;
+GO
+
 PRINT '===== TEST 23 SP importación XML de jugadores';
 GO
 :r $(RUTA)\23_Test_SP_Importacion_Jugadores.sql

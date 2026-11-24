@@ -1,0 +1,25 @@
+NumeroPartido;Fase;NombreEstadio;Ciudad;PaisISO3;HusoHorario;Capacidad;Latitud;Longitud;FechaHoraLocal;SeleccionLocal;SeleccionVisitante
+1;Fase de grupos;Estadio Azteca;Ciudad de México;MEX;Central Standard Time (Mexico);83000;19.302778;-99.150556;2026-06-11T17:00:00;ARG;BRA
+2;Fase de grupos;MetLife Stadium;East Rutherford;USA;Eastern Standard Time;82500;40.813611;-74.074444;2026-06-11T15:00:00;USA;JPN
+3;Fase de grupos;SoFi Stadium;Inglewood;USA;Pacific Standard Time;70000;33.953500;-118.339200;2026-06-11T12:00:00;NED;ESP
+4;Fase de grupos;BMO Field;Toronto;CAN;Eastern Standard Time;45000;43.633333;-79.418611;2026-06-11T19:00:00;MAR;KOR
+5;Fase de grupos;AT&T Stadium;Arlington;USA;Central Standard Time;80000;32.747778;-97.092778;2026-06-12T15:00:00;FRA;GER
+6;Fase de grupos;BC Place;Vancouver;CAN;Pacific Standard Time;54000;49.276800;-123.111900;2026-06-12T18:00:00;URU;MEX
+7;Fase de grupos;Estadio Akron;Zapopan;MEX;Central Standard Time (Mexico);48000;20.681944;-103.462500;2026-06-12T13:00:00;ENG;POR
+8;Fase de grupos;Hard Rock Stadium;Miami Gardens;USA;Eastern Standard Time;65000;25.958000;-80.238900;2026-06-12T20:00:00;ITA;COL
+9;Fase de grupos;AT&T Stadium;Arlington;USA;Central Standard Time;80000;32.747778;-97.092778;2026-06-16T18:00:00;ARG;USA
+10;Fase de grupos;Hard Rock Stadium;Miami Gardens;USA;Eastern Standard Time;65000;25.958000;-80.238900;2026-06-16T15:00:00;BRA;JPN
+11;Fase de grupos;MetLife Stadium;East Rutherford;USA;Eastern Standard Time;82500;40.813611;-74.074444;2026-06-16T12:00:00;NED;MAR
+12;Fase de grupos;Estadio BBVA;Guadalupe;MEX;Central Standard Time (Mexico);53500;25.669000;-100.244600;2026-06-16T20:00:00;ESP;KOR
+13;Fase de grupos;Estadio Azteca;Ciudad de México;MEX;Central Standard Time (Mexico);83000;19.302778;-99.150556;2026-06-17T14:00:00;FRA;URU
+14;Fase de grupos;BMO Field;Toronto;CAN;Eastern Standard Time;45000;43.633333;-79.418611;2026-06-17T19:00:00;GER;MEX
+15;Fase de grupos;SoFi Stadium;Inglewood;USA;Pacific Standard Time;70000;33.953500;-118.339200;2026-06-17T17:00:00;ENG;ITA
+16;Fase de grupos;BC Place;Vancouver;CAN;Pacific Standard Time;54000;49.276800;-123.111900;2026-06-17T13:00:00;POR;COL
+17;Fase de grupos;MetLife Stadium;East Rutherford;USA;Eastern Standard Time;82500;40.813611;-74.074444;2026-06-21T20:00:00;ARG;JPN
+18;Fase de grupos;Estadio Akron;Zapopan;MEX;Central Standard Time (Mexico);48000;20.681944;-103.462500;2026-06-21T16:00:00;BRA;USA
+19;Fase de grupos;Estadio BBVA;Guadalupe;MEX;Central Standard Time (Mexico);53500;25.669000;-100.244600;2026-06-21T19:00:00;NED;KOR
+20;Fase de grupos;Estadio Azteca;Ciudad de México;MEX;Central Standard Time (Mexico);83000;19.302778;-99.150556;2026-06-21T13:00:00;ESP;MAR
+21;Fase de grupos;SoFi Stadium;Inglewood;USA;Pacific Standard Time;70000;33.953500;-118.339200;2026-06-22T18:00:00;FRA;MEX
+22;Fase de grupos;Hard Rock Stadium;Miami Gardens;USA;Eastern Standard Time;65000;25.958000;-80.238900;2026-06-22T15:00:00;GER;URU
+23;Fase de grupos;AT&T Stadium;Arlington;USA;Central Standard Time;80000;32.747778;-97.092778;2026-06-22T12:00:00;ENG;COL
+24;Fase de grupos;BMO Field;Toronto;CAN;Eastern Standard Time;45000;43.633333;-79.418611;2026-06-22T20:00:00;POR;ITA

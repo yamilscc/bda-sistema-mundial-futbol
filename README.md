@@ -53,7 +53,7 @@ Base de datos en **SQL Server (T-SQL)** para gestionar la operación de los part
 
 1. Abrir SSMS y activar el **modo SQLCMD** (menú *Consulta → Modo SQLCMD*).
 2. Abrir `scripts/creacion/00_Reset_Total.sql` y editar la línea `:setvar RUTA "..."` con la ruta de la carpeta `scripts\creacion` de la copia local del repositorio (sin barra final).
-3. Ejecutarlo. El script elimina la base `MundialFutbol` si existe, la recrea, crea los schemas y ejecuta en orden los scripts `01` a `21`. Si alguno falla, se corta en ese punto. Al final muestra un resumen de tablas, SP y funciones por schema.
+3. Ejecutarlo. El script elimina la base `MundialFutbol` si existe, la recrea, crea los schemas y ejecuta en orden los scripts `01` a `24`. Si alguno falla, se corta en ese punto. Al final muestra un resumen de tablas, SP y funciones por schema.
 4. Ejecutar los scripts de carga de datos (seed data), cuando estén disponibles.
 5. Ejecutar los scripts de `scripts/testing/` para validar el comportamiento.
 
@@ -66,15 +66,15 @@ Cada archivo empieza con dos dígitos que marcan su orden. Los números 01 a 21 
 | N.º | Script | Contenido | Responsable |
 |---|---|---|---|
 | 00 | `00_Reset_Total.sql` | Borra y recrea la base, crea los schemas y ejecuta los scripts 01 a 21 | Yamil / Elías |
-| 01 | `01_Tablas_Nucleo.sql` | Tablas del núcleo: países, confederaciones, ciudades, sedes, fases, grupos, selecciones, staff técnico, árbitros, partidos, designaciones y sanciones | Yamil |
+| 01 | `01_Tablas_Nucleo.sql` | Tablas del núcleo: países, confederaciones, ciudades, sedes, fases, grupos, selecciones, staff técnico, árbitros, partidos, designaciones y sanciones | Elías (cubre a Yamil) |
 | 02 | `02_Tablas_Jugadores_y_Alineaciones.sql` | Tablas de jugadores, convocatoria, formaciones y sustituciones | Mateo |
 | 03 | `03_Tablas_Eventos.sql` | Tablas de reglas de suspensión, tipos de gol, períodos, goles, tarjetas y amonestaciones | Mateo |
 | 04 | `04_Tablas_Publicidad.sql` | Tablas de monedas, anunciantes, piezas, orientación por país y espacios publicitarios | Elías |
 | 05 | `05_Tablas_Logs_Staging.sql` | Tablas de staging y log de importación | Mateo |
 | 06 | `06_FK_Cruzadas.sql` | Claves foráneas que cruzan módulos (jugadores, eventos y publicidad hacia el núcleo) | Elías |
-| 07 | `07_Funciones_Nucleo.sql` | `fn_SeleccionesDelPartido` y `fn_MercadosEnPrimeTime` | Yamil |
+| 07 | `07_Funciones_Nucleo.sql` | `fn_SeleccionesDelPartido` y `fn_MercadosEnPrimeTime` | Elías |
 | 08 | `08_SP_ControlArbitral.sql` | `SP_CONTROL_ARBITRAL`: designación de árbitros con validación de nacionalidad y advertencia de cruce | Elías |
-| 09 | `09_SP_Sedes_Partidos.sql` | ABM de sedes y partidos, registro de resultados y cálculo de selecciones clasificadas | Yamil |
+| 09 | `09_SP_Sedes_Partidos.sql` | ABM de sedes y partidos, registro de resultados y cálculo de selecciones clasificadas | Elías |
 | 10 | `10_Funciones_Eventos.sql` | `fn_ResultadoPartido` y `fn_EstaSuspendido` | Mateo |
 | 11 | `11_SP_RegistrarGol.sql` | `SP_REGISTRAR_GOL` | Mateo |
 | 12 | `12_SP_RegistrarAmonestacion.sql` | `SP_REGISTRAR_AMONESTACION` con cálculo de suspensión | Mateo |
@@ -87,55 +87,66 @@ Cada archivo empieza con dos dígitos que marcan su orden. Los números 01 a 21 
 | 19 | `19_SP_ABM_Nucleo.sql` | ABM restantes del núcleo: confederaciones, países, ciudades, fases, grupos, selecciones, staff técnico, idiomas, categorías, árbitros, designaciones y sanciones | Denis |
 | 20 | `20_SP_ABM_Publicidad.sql` | ABM de monedas, anunciantes, piezas, orientación por país y espacios publicitarios | Denis |
 | 21 | `21_SP_AsignarPublicidad.sql` | `SP_ASIGNAR_PUBLICIDAD`: asigna las piezas a los espacios libres de un partido según país de las selecciones, PBI y prime time | Elías |
+| 22 | `22_SP_Importacion_Nucleo_Publicidad.sql` | `SP_IMPORTAR_PBI_JSON`, `SP_IMPORTAR_COTIZACIONES_JSON`, `SP_IMPORTAR_PAUTA_JSON` y `SP_IMPORTAR_FIXTURE_CSV` (+ `eventos.StagingFixture`, `eventos.vw_CargaStagingFixture` y `publicidad.CotizacionMoneda`) | Elías |
+| 23 / 24 | `23_SP_Importacion_Jugadores.sql`, `24_SP_Importacion_Eventos.sql` | Importación XML de convocatorias y CSV de eventos | Mateo |
 
 Scripts de testing (en `scripts/testing/`):
 
-| Script | Prueba | Responsable |
-|---|---|---|
-| `00_Ejecutar_Tests.sql` | Ejecuta en orden todos los tests y verifica que no queden datos de prueba | Yamil |
-| `01_Test_Tablas_Nucleo.sql` | Restricciones de las tablas del núcleo | Yamil |
-| `02_Test_Tablas_Jugadores.sql` | Restricciones de las tablas de jugadores, convocatoria, formaciones y sustituciones | Mateo |
-| `03_Test_Tablas_Eventos.sql` | Restricciones de las tablas de eventos | Mateo |
-| `04_Test_Tablas_Publicidad.sql` | Restricciones de las tablas de publicidad | Elías |
-| `07_Test_Funciones_Nucleo.sql` | `fn_SeleccionesDelPartido` y `fn_MercadosEnPrimeTime` | Yamil |
-| `08_Test_SP_ControlArbitral.sql` | `SP_CONTROL_ARBITRAL` | Elías |
-| `09_Test_SP_Sedes_Partidos.sql` | SP de sedes, partidos, resultados y clasificadas | Yamil |
-| `10_Test_Funciones_Eventos.sql` | Funciones de eventos | Mateo |
-| `11_Test_SP_RegistrarGol.sql` | `SP_REGISTRAR_GOL` | Mateo |
-| `12_Test_SP_RegistrarAmonestacion.sql` | `SP_REGISTRAR_AMONESTACION` | Mateo |
-| `13_Test_SP_ABM_Eventos.sql` | SP ABM de eventos | Mateo |
-| `14_Test_Funciones_Jugadores.sql` | Funciones de jugadores | Mateo |
-| `15_Test_SP_Convocatoria_Baja.sql` | `SP_CONVOCAR_JUGADOR` y `SP_REGISTRAR_BAJA_CONVOCATORIA` | Mateo |
-| `16_Test_SP_RegistrarFormacion.sql` | `SP_REGISTRAR_FORMACION` y `SP_AGREGAR_JUGADOR_FORMACION` | Mateo |
-| `17_Test_SP_RegistrarSustitucion.sql` | `SP_REGISTRAR_SUSTITUCION` | Mateo |
-| `18_Test_SP_ABM_Jugadores.sql` | SP ABM de jugadores | Mateo |
-| `19_Test_SP_ABM_Nucleo.sql` | SP ABM restantes del núcleo | Denis |
-| `20_Test_SP_ABM_Publicidad.sql` | SP ABM de publicidad | Denis |
-| `21_Test_SP_AsignarPublicidad.sql` | `SP_ASIGNAR_PUBLICIDAD` (prime time en más de cuatro mercados, criterios de prioridad y validaciones) | Elías |
+| Script | Prueba |
+|---|---|
+| `01_Test_Tablas_Nucleo.sql` | Restricciones de las tablas del núcleo |
+| `02_Test_Tablas_Jugadores.sql` | Restricciones de las tablas de jugadores, convocatoria, formaciones y sustituciones |
+| `03_Test_Tablas_Eventos.sql` | Restricciones de las tablas de eventos |
+| `04_Test_Tablas_Publicidad.sql` | Restricciones de las tablas de publicidad |
+| `07_Test_Funciones_Nucleo.sql` | `fn_SeleccionesDelPartido` y `fn_MercadosEnPrimeTime` |
+| `08_Test_SP_ControlArbitral.sql` | `SP_CONTROL_ARBITRAL` |
+| `09_Test_SP_Sedes_Partidos.sql` | SP de sedes, partidos, resultados y clasificadas |
+| `10_Test_Funciones_Eventos.sql` | Funciones de eventos |
+| `11_Test_SP_RegistrarGol.sql` | `SP_REGISTRAR_GOL` |
+| `12_Test_SP_RegistrarAmonestacion.sql` | `SP_REGISTRAR_AMONESTACION` |
+| `13_Test_SP_ABM_Eventos.sql` | SP ABM de eventos |
+| `14_Test_Funciones_Jugadores.sql` | Funciones de jugadores |
+| `15_Test_SP_Convocatoria_Baja.sql` | `SP_CONVOCAR_JUGADOR` y `SP_REGISTRAR_BAJA_CONVOCATORIA` |
+| `16_Test_SP_RegistrarFormacion.sql` | `SP_REGISTRAR_FORMACION` y `SP_AGREGAR_JUGADOR_FORMACION` |
+| `17_Test_SP_RegistrarSustitucion.sql` | `SP_REGISTRAR_SUSTITUCION` |
+| `18_Test_SP_ABM_Jugadores.sql` | SP ABM de jugadores |
+| `19_Test_SP_ABM_Nucleo.sql` | SP ABM restantes del núcleo |
+| `20_Test_SP_ABM_Publicidad.sql` | SP ABM de publicidad |
+| `21_Test_SP_AsignarPublicidad.sql` | `SP_ASIGNAR_PUBLICIDAD` (prime time en más de cuatro mercados, criterios de prioridad y validaciones) |
+| `22_Test_SP_Importacion_Nucleo_Publicidad.sql` | Importaciones de fixture, PBI, cotizaciones y pauta: errores parciales, idempotencia, conversión de moneda y validaciones |
 
-Pendientes: importación de datos (`scripts/importacion/`), datos de prueba (seed), reportes, seguridad y respaldo.
+Pendientes: reportes, seguridad y respaldo.
+
+### Carga de datos (`scripts/importacion/`)
+
+Orden de ejecución completo (modo SQLCMD; editar `RUTA_IMP` en cada lanzador):
+
+| Paso | Script | Contenido | Responsable |
+|---|---|---|---|
+| 0 | `python fuentes_externas.py todo` | Descarga `pbi_banco_mundial.json`, `cotizaciones_frankfurter.json` y `fixture_sedes.csv` | Elías |
+| 1 | `04_Seed_Nucleo_Publicidad.sql` | Confederaciones, 22 países, 4 grupos, 16 selecciones, staff, idiomas, categorías, 18 árbitros, monedas, 9 anunciantes (9 países) y 12 piezas | Elías |
+| 2 | `05_Importar_Nucleo_Publicidad.sql` | PBI (API), sedes y 24 partidos (scraping), cotizaciones (API) y pauta (`pauta_publicitaria.json`, con 3 filas inválidas a propósito) | Elías |
+| 3 | `06_Seed_Designaciones_Publicidad.sql` | 5 árbitros por partido con `SP_CONTROL_ARBITRAL` (incluye el caso rechazado por nacionalidad) y `SP_ASIGNAR_PUBLICIDAD` en los 24 partidos | Elías |
+| 4 | `03_Seed_Jugadores_Eventos.sql`, `01_Importar_Convocatoria_XML.sql`, `02_Importar_Eventos_CSV.sql` | Convocados, formaciones y eventos | Mateo |
+| 5 | `07_Cierre_Resultados_Partidos.sql` | Cierra los partidos con `SP_REGISTRAR_RESULTADO_PARTIDO` | Elías |
+
+**Casos obligatorios de nucleo y publicidad:** partido 1 (ARG vs BRA, 23:00 UTC) en prime time en 6 mercados (ARG, BRA, URU, CHI, USA, CAN); árbitro argentino rechazado en ARG vs BRA (queda en `eventos.LogImportacion`, archivo `seed_designaciones`); importación de pauta con 6 filas válidas y 3 inválidas.
+
+**Decisiones del fixture:** los 24 partidos son de *Fase de grupos* (4 grupos de 4 = 24 cruces). `SP_ALTA_Partido` no admite selecciones en fases eliminatorias (se asignarían con `SP_DEFINIR_CRUCE_ELIMINATORIO`, que no está en el repositorio) y las formaciones de Mateo exigen las dos selecciones definidas. BRA está en el Grupo A, junto a ARG, porque los partidos de grupos deben ser entre selecciones del mismo grupo. Las selecciones juegan con 5 días de separación (la regla real de descanso del SP es de 48 h).
+
+### Fuentes externas
+
+Ninguna requiere API key. Los archivos se generan con `scripts/importacion/fuentes_externas.py` (Python 3; `pip install requests beautifulsoup4` solo para el scraping).
+
+| Fuente | URL y parámetros | Límites de uso | Destino |
+|---|---|---|---|
+| API Banco Mundial | `https://api.worldbank.org/v2/country/AR;BR;...;AU/indicator/NY.GDP.PCAP.CD?format=json&date=2018:2024&per_page=1000` (países por ISO2) | Pública y gratuita, sin API key; sin cuota publicada (se hace 1 sola consulta) | `nucleo.SP_IMPORTAR_PBI_JSON` -> `Pais.PBIPerCapitaUSD` (último año con dato) |
+| API Frankfurter | `https://api.frankfurter.app/latest?from=USD&to=EUR,BRL,JPY,GBP` | Gratuita, sin API key ni límite fijo (se hace 1 consulta). Usa cotizaciones del BCE: **no publica ARS** | `publicidad.SP_IMPORTAR_COTIZACIONES_JSON` -> `CotizacionMoneda`; `SP_IMPORTAR_PAUTA_JSON` convierte a USD |
+| Scraping Wikipedia | `https://en.wikipedia.org/wiki/2026_FIFA_World_Cup` (tabla de sedes: capacidad) | Sin API key; se envía un `User-Agent` identificatorio y se hace 1 sola descarga. `--offline` usa los datos incluidos en el script | `fixture_sedes.csv` -> `eventos.vw_CargaStagingFixture` -> `nucleo.SP_IMPORTAR_FIXTURE_CSV` |
+
+El Banco Mundial se cruza por `CodigoISO2` y no por `CodigoISO3` porque varios códigos del torneo son códigos FIFA (NED, GER, ENG, SUI, CHI). Las coordenadas, el huso y el cruce de partidos del fixture salen del propio script; del scraping se toma la capacidad.
 
 > Las claves foráneas que cruzan módulos (por ejemplo, de `Convocatoria` hacia `Seleccion` o de `EspacioPublicitario` hacia `Partido`) se agregan con `ALTER TABLE` en `06_FK_Cruzadas.sql`, una vez creadas todas las tablas.
-
----
-
-## Asignación de publicidad
-
-Cada partido tiene exactamente 4 espacios publicitarios. Cada espacio recibe una pieza de `publicidad.Pieza`, elegida al azar entre las que están orientadas a los países que correspondan según `publicidad.OrientacionPais`:
-
-| Espacio | Países considerados |
-|---|---|
-| 1 | País de la selección local |
-| 2 | País de la selección visitante |
-| 3 | Los 3 países con mayor `PBIPerCapitaUSD` |
-| 4 | Países para los que el partido cae en prime time local (19:00 a 23:00) |
-
-Reglas adicionales:
-
-- Las 4 piezas de un partido deben ser distintas.
-- Si no hay piezas orientadas a los países de un espacio, se asigna cualquier pieza que no esté usada en ese partido.
-- El horario local de cada país se calcula a partir de `Partido.FechaHoraUTC` y el huso horario del país (`nucleo.fn_MercadosEnPrimeTime`).
-- La elección al azar se hace una sola vez: la pieza elegida queda guardada en `publicidad.EspacioPublicitario` y no se vuelve a sortear.
 
 ---
 
