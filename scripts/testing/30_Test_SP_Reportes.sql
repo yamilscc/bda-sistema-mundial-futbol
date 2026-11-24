@@ -9,7 +9,7 @@ Integrantes:
 - Torczuk, Elías Alexei
 - Canseco Carrizo, Yamil Simón
 Objetivo: Ejecutar y validar los 7 Stored Procedures de reportes de la Entrega 7
-          (scripts/creacion/29_SP_Reportes.sql), indicando en comentarios el resultado
+          (scripts/creacion/30_SP_Reportes.sql), indicando en comentarios el resultado
           esperado para cada prueba.
           Prerrequisito: tener ejecutados los scripts de creación (00_Reset_Total.sql)
           y los scripts de carga de datos (seed / importación).

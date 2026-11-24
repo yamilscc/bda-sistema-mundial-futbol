@@ -36,7 +36,7 @@ Objetivo: Crear los Stored Procedures correspondientes a los 7 reportes de la En
             - Todos los reportes admiten parámetros opcionales de filtrado y devuelven
               resultados representativos aun con datos parciales.
           Requiere ejecutados los scripts 01 a 24.
-          Test correspondiente: testing/25_Test_SP_Reportes.sql.
+          Test correspondiente: testing/30_Test_SP_Reportes.sql.
 */
 
 USE MundialFutbol;

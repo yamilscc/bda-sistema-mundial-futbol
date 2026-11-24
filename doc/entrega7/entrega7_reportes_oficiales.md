@@ -25,7 +25,7 @@
 
 El presente documento detalla la implementación técnica de la capa analítica de **Reportes Oficiales** correspondiente a la **Entrega 7** de la base de datos `MundialFutbol`.
 
-Se desarrollaron **siete (7) Stored Procedures** en `scripts/creacion/29_SP_Reportes.sql`, implementados íntegramente en **T-SQL estático** (sin uso de SQL dinámico), combinando salidas tabulares, una matriz cruzada mediante `PIVOT` estático y dos estructuras jerárquicas en formato **XML** (`FOR XML PATH`).
+Se desarrollaron **siete (7) Stored Procedures** en `scripts/creacion/30_SP_Reportes.sql`, implementados íntegramente en **T-SQL estático** (sin uso de SQL dinámico), combinando salidas tabulares, una matriz cruzada mediante `PIVOT` estático y dos estructuras jerárquicas en formato **XML** (`FOR XML PATH`).
 
 ---
 
@@ -37,7 +37,7 @@ Se desarrollaron **siete (7) Stored Procedures** en `scripts/creacion/29_SP_Repo
 
 ---
 
-## 3. Detalle de los 7 Reportes Implementados (`29_SP_Reportes.sql`)
+## 3. Detalle de los 7 Reportes Implementados (`30_SP_Reportes.sql`)
 
 ```mermaid
 flowchart LR
@@ -86,9 +86,9 @@ flowchart LR
 
 ---
 
-## 4. Validación y Testing (`29_Test_SP_Reportes.sql`)
+## 4. Validación y Testing (`30_Test_SP_Reportes.sql`)
 
-La verificación funcional se implementó en `scripts/testing/29_Test_SP_Reportes.sql`, integrado en el flujo maestro `00_Ejecutar_Tests.sql`. El script ejecuta y valida los 7 reportes tanto en consultas globales (sin filtros) como con combinaciones de parámetros opcionales (`@codigoFIFA`, `@idFase`, `@incluirEnContra`, `@soloConSuspensionActiva`, `@incluirBajas`, `@idSede`, `@idPartido`, `@estado`), documentando en comentarios el resultado esperado para cada caso.
+La verificación funcional se implementó en `scripts/testing/30_Test_SP_Reportes.sql`, integrado en el flujo maestro `00_Ejecutar_Tests.sql`. El script ejecuta y valida los 7 reportes tanto en consultas globales (sin filtros) como con combinaciones de parámetros opcionales (`@codigoFIFA`, `@idFase`, `@incluirEnContra`, `@soloConSuspensionActiva`, `@incluirBajas`, `@idSede`, `@idPartido`, `@estado`), documentando en comentarios el resultado esperado para cada caso.
 
 ---
 
@@ -96,6 +96,6 @@ La verificación funcional se implementó en `scripts/testing/29_Test_SP_Reporte
 
 | Carpeta | Archivo | Descripción |
 |---|---|---|
-| `scripts/creacion/` | `29_SP_Reportes.sql` | Implementación en T-SQL estático de los 7 reportes oficiales (5 tabulares + 2 XML). |
-| `scripts/testing/` | `29_Test_SP_Reportes.sql` | Pruebas integrales de los 7 reportes oficiales y sus filtros opcionales. |
+| `scripts/creacion/` | `30_SP_Reportes.sql` | Implementación en T-SQL estático de los 7 reportes oficiales (5 tabulares + 2 XML). |
+| `scripts/testing/` | `30_Test_SP_Reportes.sql` | Pruebas integrales de los 7 reportes oficiales y sus filtros opcionales. |
 | `doc/entrega7/` | `entrega7_reportes_oficiales.md` | Documento técnico formal de la Entrega 7 (Reportes Oficiales). |

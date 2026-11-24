@@ -944,5 +944,5 @@ BEGIN
 END;
 GO
 
-PRINT 'Script 30_Seguridad_Cifrado ejecutado correctamente.';
+PRINT 'Script 31_Seguridad_Cifrado ejecutado correctamente.';
 GO

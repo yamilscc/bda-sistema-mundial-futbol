@@ -49,7 +49,7 @@ Se implementó un esquema de cifrado simétrico mediante funciones y procedimien
   * `nucleo.SP_CIFRAR_DATO`: Procedimiento que encapsula el cifrado mediante parámetros OUTPUT.
   * `nucleo.SP_DESCIFRAR_DATO`: Procedimiento que encapsula el descifrado mediante parámetros OUTPUT.
 
-### 2.3 Script Modificatorio y Migración de Datos (`30_Seguridad_Cifrado.sql`)
+### 2.3 Script Modificatorio y Migración de Datos (`31_Seguridad_Cifrado.sql`)
 Tal como solicita la consigna, la seguridad no se codificó de forma estática en la creación inicial, sino como un **script de modificación progresiva**:
 1. **Alteración de tablas existentes:**
    * Se agregó la columna `DocumentoCifrado VARBINARY(256) NULL` a la tabla `jugadores.Jugador`.
@@ -100,7 +100,7 @@ Se establecieron **cuatro (4) roles de base de datos** específicos que modelan 
 | **Modificación directa (INSERT, UPDATE, DELETE en tablas)** | **GRANT** | **DENY** | **DENY** | **DENY** |
 | **Procedimientos de Backup** (`nucleo.SP_BACKUP_*`) | **GRANT EXECUTE** | **DENY EXECUTE** | **DENY EXECUTE** | **DENY EXECUTE** |
 
-### 3.3 Implementación Mediante Stored Procedures (`31_Seguridad_Roles_Permisos.sql`)
+### 3.3 Implementación Mediante Stored Procedures (`32_Seguridad_Roles_Permisos.sql`)
 La gestión de seguridad se encuentra 100% automatizada a través de procedimientos en el esquema `nucleo`:
 * `nucleo.SP_CREAR_ROLES_SISTEMA`: Script idempotente que valida y crea los cuatro roles y aplica los `GRANT` y `DENY` correspondientes.
 * `nucleo.SP_ASIGNAR_USUARIO_ROL`: Procedimiento parametrizado que valida la existencia del usuario y rol para ejecutar `ALTER ROLE ... ADD MEMBER ...`.
@@ -111,8 +111,8 @@ La gestión de seguridad se encuentra 100% automatizada a través de procedimien
   * `usr_publicidad_test`
   * `usr_consulta_test`
 
-### 3.4 Evidencia de Testing por Rol (`31_Test_Seguridad_Roles_Permisos.sql`)
-En cumplimiento de la consigna (*"Elaboren un script para cada usuario con el que prueben cada rol"*), se consolidaron las pruebas de los cuatro usuarios en el script unificado `scripts/testing/31_Test_Seguridad_Roles_Permisos.sql`. Mediante bloques independientes de suplantación de identidad (`EXECUTE AS USER = '...'` y `REVERT`), el script verifica tanto las operaciones autorizadas como los bloqueos controlados (capturando el **Error 229** de SQL Server en `TRY/CATCH`):
+### 3.4 Evidencia de Testing por Rol (`32_Test_Seguridad_Roles_Permisos.sql`)
+En cumplimiento de la consigna (*"Elaboren un script para cada usuario con el que prueben cada rol"*), se consolidaron las pruebas de los cuatro usuarios en el script unificado `scripts/testing/32_Test_Seguridad_Roles_Permisos.sql`. Mediante bloques independientes de suplantación de identidad (`EXECUTE AS USER = '...'` y `REVERT`), el script verifica tanto las operaciones autorizadas como los bloqueos controlados (capturando el **Error 229** de SQL Server en `TRY/CATCH`):
 
 1. **`usr_admin_test` (`Rol_Administrador`):** Valida el control total en consultas sobre tablas y ejecución de procedimientos deportivos y publicitarios.
 2. **`usr_resultados_test` (`Rol_OperadorResultados`):** Valida la consulta de partidos y reportes deportivos, y comprueba la denegación con **Error 229** al intentar ejecutar `publicidad.SP_ASIGNAR_PUBLICIDAD` o `publicidad.SP_ABM_Anunciante`.
@@ -161,7 +161,7 @@ flowchart LR
      * **Fuera de horario de partidos:** Cada **30 minutos**.
    * **Propósito:** Trunca el registro inactivo, previene el desbordamiento del archivo `.ldf` y permite recuperar el sistema hasta el último bloque de 5 minutos previo a una falla.
 
-### 4.4 Stored Procedures de Automatización (`32_Procedimientos_Backups.sql`)
+### 4.4 Stored Procedures de Automatización (`33_Procedimientos_Backups.sql`)
 Se desarrollaron procedimientos en el esquema `nucleo` para la ejecución estandarizada de copias de seguridad con compresión nativa y nombres con timestamp:
 * `nucleo.SP_CONFIGURAR_POLITICA_BACKUP`: Valida y aplica el modo `RECOVERY FULL`.
 * `nucleo.SP_BACKUP_COMPLETO`: Genera el archivo `MundialFutbol_FULL_YYYYMMDD_HHMMSS.bak`.
@@ -202,10 +202,10 @@ WITH RECOVERY;
 
 | Carpeta | Archivo | Descripción |
 |---|---|---|
-| `scripts/creacion/` | `30_Seguridad_Cifrado.sql` | Cifrado PII, funciones criptográficas, `ALTER TABLE`, migración y adaptación de SPs ABM. |
-| `scripts/creacion/` | `31_Seguridad_Roles_Permisos.sql` | SPs de creación y gestión de 4 roles, asignación granular de permisos y usuarios de prueba. |
-| `scripts/creacion/` | `32_Procedimientos_Backups.sql` | SPs para modo FULL, backups Full, Diferencial y de Log de transacciones. |
-| `scripts/testing/` | `30_Test_Seguridad_Cifrado.sql` | Test de funciones de cifrado, persistencia binaria y validación de impacto en queries previas. |
-| `scripts/testing/` | `31_Test_Seguridad_Roles_Permisos.sql` | Test unificado de permisos y denegaciones (Error 229) para los 4 roles (`usr_admin_test`, `usr_resultados_test`, `usr_publicidad_test`, `usr_consulta_test`). |
-| `scripts/testing/` | `32_Test_Backups.sql` | Validación de ejecución de respaldos Full, Diff, Log y consulta de historial en msdb. |
+| `scripts/creacion/` | `31_Seguridad_Cifrado.sql` | Cifrado PII, funciones criptográficas, `ALTER TABLE`, migración y adaptación de SPs ABM. |
+| `scripts/creacion/` | `32_Seguridad_Roles_Permisos.sql` | SPs de creación y gestión de 4 roles, asignación granular de permisos y usuarios de prueba. |
+| `scripts/creacion/` | `33_Procedimientos_Backups.sql` | SPs para modo FULL, backups Full, Diferencial y de Log de transacciones. |
+| `scripts/testing/` | `31_Test_Seguridad_Cifrado.sql` | Test de funciones de cifrado, persistencia binaria y validación de impacto en queries previas. |
+| `scripts/testing/` | `32_Test_Seguridad_Roles_Permisos.sql` | Test unificado de permisos y denegaciones (Error 229) para los 4 roles (`usr_admin_test`, `usr_resultados_test`, `usr_publicidad_test`, `usr_consulta_test`). |
+| `scripts/testing/` | `33_Test_Backups.sql` | Validación de ejecución de respaldos Full, Diff, Log y consulta de historial en msdb. |
 | `doc/entrega8/` | `entrega8_seguridad_y_respaldo.md` | Documento técnico formal de la Entrega 8. |

@@ -233,24 +233,24 @@ GO
 :r $(RUTA)\29_SP_Importacion_Campanias.sql
 GO
 
-PRINT '--- 29 SP Reportes';
+PRINT '--- 30 SP Reportes';
 GO
-:r $(RUTA)\29_SP_Reportes.sql
-GO
-
-PRINT '--- 30 Seguridad: Cifrado de Datos Sensibles';
-GO
-:r $(RUTA)\30_Seguridad_Cifrado.sql
+:r $(RUTA)\30_SP_Reportes.sql
 GO
 
-PRINT '--- 31 Seguridad: Roles y Permisos Granulares';
+PRINT '--- 31 Seguridad: Cifrado de Datos Sensibles';
 GO
-:r $(RUTA)\31_Seguridad_Roles_Permisos.sql
+:r $(RUTA)\31_Seguridad_Cifrado.sql
 GO
 
-PRINT '--- 32 Procedimientos de Backup y Recuperacion';
+PRINT '--- 32 Seguridad: Roles y Permisos Granulares';
 GO
-:r $(RUTA)\32_Procedimientos_Backups.sql
+:r $(RUTA)\32_Seguridad_Roles_Permisos.sql
+GO
+
+PRINT '--- 33 Procedimientos de Backup y Recuperacion';
+GO
+:r $(RUTA)\33_Procedimientos_Backups.sql
 GO
 
 -- Los próximos SP, vistas y funciones se suman acá, siempre en orden numérico.

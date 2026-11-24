@@ -259,5 +259,5 @@ EXEC nucleo.SP_CREAR_ROLES_SISTEMA;
 EXEC nucleo.SP_CREAR_USUARIOS_PRUEBA;
 GO
 
-PRINT 'Script 31_Seguridad_Roles_Permisos ejecutado correctamente.';
+PRINT 'Script 32_Seguridad_Roles_Permisos ejecutado correctamente.';
 GO

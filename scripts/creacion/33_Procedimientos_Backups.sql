@@ -249,5 +249,5 @@ GO
 EXEC nucleo.SP_CONFIGURAR_POLITICA_BACKUP;
 GO
 
-PRINT 'Script 32_Procedimientos_Backups ejecutado correctamente.';
+PRINT 'Script 33_Procedimientos_Backups ejecutado correctamente.';
 GO

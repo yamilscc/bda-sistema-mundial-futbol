@@ -13,7 +13,7 @@ Objetivo: Validar los permisos de los usuarios asociados a los cuatro roles de s
           2. [Rol_OperadorResultados] (usr_resultados_test): permisos de gestión deportiva y denegación en publicidad.
           3. [Rol_GestorPublicidad] (usr_publicidad_test): permisos de gestión publicitaria y denegación en eventos y jugadores.
           4. [Rol_Consulta] (usr_consulta_test): lectura y reportes oficiales, denegación en modificaciones y ABM.
-          Requiere ejecutados los scripts 01 a 31 (usa los usuarios creados en 31_Seguridad_Roles_Permisos.sql).
+          Requiere ejecutados los scripts 01 a 31 (usa los usuarios creados en 32_Seguridad_Roles_Permisos.sql).
 */
 
 USE MundialFutbol;

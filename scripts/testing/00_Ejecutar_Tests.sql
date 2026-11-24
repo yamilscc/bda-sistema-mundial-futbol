@@ -9,7 +9,7 @@ Torczuk, Elías Alexei
 Canseco Carrizo, Yamil Simón
 Objetivo:
 	- Orquestar la ejecución de TODOS los scripts de testing en el orden de su número
-	  (01 a 32 y el test del seed en importacion/), igual que 00_Reset_Total.sql orquesta los scripts de creación.
+	  (01 a 33 y el test del seed en importacion/), igual que 00_Reset_Total.sql orquesta los scripts de creación.
 	- Entre test y test, deshacer cualquier transacción que haya quedado abierta, para que
 	  un test cortado a mitad de camino no arrastre sus datos al siguiente.
 	- Verificar al inicio que la base exista y esté recién creada (el test 01 lo requiere).
@@ -314,36 +314,36 @@ GO
 USE MundialFutbol;
 GO
 
-PRINT '===== TEST 29 Stored Procedures de Reportes (Entrega 7)';
+PRINT '===== TEST 30 Stored Procedures de Reportes (Entrega 7)';
 GO
-:r $(RUTA)\29_Test_SP_Reportes.sql
-GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
-GO
-USE MundialFutbol;
-GO
-
-PRINT '===== TEST 30 Seguridad: Cifrado de Datos Sensibles (Entrega 8)';
-GO
-:r $(RUTA)\30_Test_Seguridad_Cifrado.sql
+:r $(RUTA)\30_Test_SP_Reportes.sql
 GO
 WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
 
-PRINT '===== TEST 31 Seguridad: Roles y Permisos (Entrega 8)';
+PRINT '===== TEST 31 Seguridad: Cifrado de Datos Sensibles (Entrega 8)';
 GO
-:r $(RUTA)\31_Test_Seguridad_Roles_Permisos.sql
+:r $(RUTA)\31_Test_Seguridad_Cifrado.sql
 GO
 WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
 
-PRINT '===== TEST 32 Procedimientos de Backup (Entrega 8)';
+PRINT '===== TEST 32 Seguridad: Roles y Permisos (Entrega 8)';
 GO
-:r $(RUTA)\32_Test_Backups.sql
+:r $(RUTA)\32_Test_Seguridad_Roles_Permisos.sql
+GO
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
+GO
+USE MundialFutbol;
+GO
+
+PRINT '===== TEST 33 Procedimientos de Backup (Entrega 8)';
+GO
+:r $(RUTA)\33_Test_Backups.sql
 GO
 WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
 GO

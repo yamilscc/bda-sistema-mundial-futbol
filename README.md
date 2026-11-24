@@ -38,7 +38,7 @@ Base de datos en **SQL Server (T-SQL)** para gestionar la operación de los part
 └── scripts/
     ├── creacion/                 # scripts de creación (base, tablas, FK, funciones y SP)
     │   ├── 00_Reset_Total.sql    # maestro: borra y recrea la base, crea schemas y ejecuta el resto
-    │   └── 01_… a 29_…           # un archivo por módulo, con prefijo numérico de orden de ejecución
+    │   └── 01_… a 33_…           # un archivo por módulo, con prefijo numérico de orden de ejecución
     ├── testing/                  # scripts de testing (uno por cada script de creación probado)
     │   └── importacion/          # tests en espejo de scripts/importacion/ (ej. 03_Test_Seed_Jugadores_Eventos.sql)
     └── importacion/              # seeds e importaciones de datos externos (CSV/XML/API/scraping); 00_Cargar_Seeds.sql los lanza en orden
@@ -54,7 +54,7 @@ Base de datos en **SQL Server (T-SQL)** para gestionar la operación de los part
 
 1. Abrir SSMS y activar el **modo SQLCMD** (menú *Consulta → Modo SQLCMD*).
 2. Abrir `scripts/creacion/00_Reset_Total.sql` y editar la línea `:setvar RUTA "..."` con la ruta de la carpeta `scripts\creacion` de la copia local del repositorio (sin barra final).
-3. Ejecutarlo. El script elimina la base `MundialFutbol` si existe, la recrea, crea los schemas y ejecuta en orden los scripts `01` a `29`. Si alguno falla, se corta en ese punto. Al final muestra un resumen de tablas, SP y funciones por schema.
+3. Ejecutarlo. El script elimina la base `MundialFutbol` si existe, la recrea, crea los schemas y ejecuta en orden los scripts `01` a `33`. Si alguno falla, se corta en ese punto. Al final muestra un resumen de tablas, SP y funciones por schema.
 4. Cargar los datos de `scripts/importacion/` con el lanzador `00_Cargar_Seeds.sql` (modo SQLCMD, editando `:setvar RUTA` con la carpeta `scripts\importacion`), que ejecuta en este orden y se corta ante el primer error: `04_Seed_Nucleo_Publicidad.sql` (también deja la regla de cupos de convocatoria), `05_Importar_Nucleo_Publicidad.sql` (requiere generar antes los archivos de las APIs, ver [Asignación de publicidad](#asignación-de-publicidad)), `06_Seed_Designaciones_Publicidad.sql`, `01_Importar_Convocatoria_XML.sql`, `03_Seed_Jugadores_Eventos.sql`, `02_Importar_Eventos_CSV.sql`, `07_Cierre_Resultados_Partidos.sql` y `08_Importar_Campanias_Dossier.sql` (campañas del dossier por scraping, ver [Campañas del dossier](#campañas-del-dossier-scraping)). El orden importa: el 01 va antes que el 03 porque el 03 completa solo los dorsales que el XML dejó libres, y el 04 va primero porque el 01 necesita la regla de cupos. Es idempotente: se puede ejecutar de nuevo. Si se prefiere correrlos a mano, el orden es el mismo; los que leen archivos llevan su propio `:setvar RUTA_IMP` con la carpeta `scripts\importacion`.
 5. Ejecutar `scripts/testing/00_Ejecutar_Tests.sql` (también en modo SQLCMD, editando su `:setvar RUTA` con la carpeta `scripts\testing`), que corre todos los tests en orden y al final controla que no queden datos de prueba.
 
@@ -62,11 +62,11 @@ Todos los scripts verifican la existencia de los objetos antes de crearlos o bor
 
 ### Orden de ejecución
 
-Cada archivo empieza con dos dígitos que marcan su orden. Los números 01 a 29 los ejecuta `00_Reset_Total.sql` en ese orden. El responsable es el autor indicado en el encabezado de cada script.
+Cada archivo empieza con dos dígitos que marcan su orden. Los números 01 a 33 los ejecuta `00_Reset_Total.sql` en ese orden. El responsable es el autor indicado en el encabezado de cada script.
 
 | N.º | Script | Contenido | Responsable |
 |---|---|---|---|
-| 00 | `00_Reset_Total.sql` | Borra y recrea la base, crea los schemas y ejecuta los scripts 01 a 29 | Yamil / Elías |
+| 00 | `00_Reset_Total.sql` | Borra y recrea la base, crea los schemas y ejecuta los scripts 01 a 33 | Yamil / Elías |
 | 01 | `01_Tablas_Nucleo.sql` | Tablas del núcleo: países, confederaciones, ciudades, sedes, fases, grupos, selecciones, staff técnico, árbitros, partidos, designaciones y sanciones | Yamil |
 | 02 | `02_Tablas_Jugadores_y_Alineaciones.sql` | Tablas de jugadores, convocatoria, formaciones y sustituciones | Mateo |
 | 03 | `03_Tablas_Eventos.sql` | Tablas de reglas de suspensión, tipos de gol, períodos, goles, tarjetas y amonestaciones | Mateo |
@@ -96,10 +96,10 @@ Cada archivo empieza con dos dígitos que marcan su orden. Los números 01 a 29 
 | 27 | `27_SP_CalculoSeleccionesClasificadas.sql` | `SP_CALCULO_DE_SELECCIONES_CLASIFICADAS`: posiciones, clasificados y fase inicial de la eliminación directa | Yamil |
 | 28 | `28_SP_DefinirCruceEliminatorio.sql` | `SP_DEFINIR_CRUCE_ELIMINATORIO`: asigna las selecciones de un partido eliminatorio (ver [Cruces eliminatorios](#cruces-eliminatorios)) | Yamil |
 | 29 | `29_SP_Importacion_Campanias.sql` | `SP_IMPORTAR_CAMPANIAS_CSV` (campañas del dossier de publicidad, por scraping) y la vista de aterrizaje `publicidad.vw_CargaStagingCampania` | Elías |
-| 29 | `29_SP_Reportes.sql` | Stored Procedures para los 7 reportes oficiales de la Entrega 7 | Denis |
-| 30 | `30_Seguridad_Cifrado.sql` | Cifrado PII, funciones criptográficas y adaptación de SPs para datos sensibles | Denis |
-| 31 | `31_Seguridad_Roles_Permisos.sql` | SPs de creación y gestión de 4 roles de seguridad y permisos granulares | Denis |
-| 32 | `32_Procedimientos_Backups.sql` | SPs de configuración FULL y ejecución de backups (Full, Diff y Log) | Denis |
+| 30 | `30_SP_Reportes.sql` | Stored Procedures para los 7 reportes oficiales de la Entrega 7 | Denis |
+| 31 | `31_Seguridad_Cifrado.sql` | Cifrado PII, funciones criptográficas y adaptación de SPs para datos sensibles | Denis |
+| 32 | `32_Seguridad_Roles_Permisos.sql` | SPs de creación y gestión de 4 roles de seguridad y permisos granulares | Denis |
+| 33 | `33_Procedimientos_Backups.sql` | SPs de configuración FULL y ejecución de backups (Full, Diff y Log) | Denis |
 
 **Convención de los ABM:** cada tabla tiene un SP por operación: `SP_ALTA_<Tabla>`, `SP_MODIFICACION_<Tabla>` y `SP_BAJA_<Tabla>` (por ejemplo `nucleo.SP_ALTA_Partido`). Las tablas asociativas (`ArbitroIdioma` y `OrientacionPais`) solo tienen alta y baja. Los archivos conservan el nombre `SP_ABM_` del módulo.
 
@@ -136,13 +136,13 @@ Scripts de testing (en `scripts/testing/`):
 | `28_Test_SP_DefinirCruceEliminatorio.sql` | `SP_DEFINIR_CRUCE_ELIMINATORIO` | Yamil |
 | `29_Test_SP_Importacion_Campanias.sql` | `SP_IMPORTAR_CAMPANIAS_CSV` (primera y segunda corrida, filas inválidas en el log, acentos, modificación de Marca y Agencia, país inexistente, `@crearPiezas = 0` y cambio de país del anunciante) | Elías |
 | `importacion/03_Test_Seed_Jugadores_Eventos.sql` | Seed de jugadores y eventos: volúmenes mínimos y casos obligatorios (en espejo de `scripts/importacion/03_Seed_Jugadores_Eventos.sql`) | Mateo |
-| `29_Test_SP_Reportes.sql` | Validación de los 7 reportes oficiales | Denis |
-| `30_Test_Seguridad_Cifrado.sql` | Test de funciones de cifrado, persistencia binaria y evaluación de impacto | Denis |
-| `31_Test_Rol_Administrador.sql` | Test de permisos de control total (usr_admin_test) | Denis |
-| `31_Test_Rol_OperadorResultados.sql` | Test de permisos deportivos y denegación de publicidad (usr_resultados_test) | Denis |
-| `31_Test_Rol_GestorPublicidad.sql` | Test de permisos comerciales y denegación de eventos (usr_publicidad_test) | Denis |
-| `31_Test_Rol_Consulta.sql` | Test de reportes y denegación de modificaciones (usr_consulta_test) | Denis |
-| `32_Test_Backups.sql` | Test de backups Full, Diff, Log y consulta de historial msdb | Denis |
+| `30_Test_SP_Reportes.sql` | Validación de los 7 reportes oficiales | Denis |
+| `31_Test_Seguridad_Cifrado.sql` | Test de funciones de cifrado, persistencia binaria y evaluación de impacto | Denis |
+| `32_Test_Rol_Administrador.sql` | Test de permisos de control total (usr_admin_test) | Denis |
+| `32_Test_Rol_OperadorResultados.sql` | Test de permisos deportivos y denegación de publicidad (usr_resultados_test) | Denis |
+| `32_Test_Rol_GestorPublicidad.sql` | Test de permisos comerciales y denegación de eventos (usr_publicidad_test) | Denis |
+| `32_Test_Rol_Consulta.sql` | Test de reportes y denegación de modificaciones (usr_consulta_test) | Denis |
+| `33_Test_Backups.sql` | Test de backups Full, Diff, Log y consulta de historial msdb | Denis |
 
 Pendientes: Entrega 9 (plataforma BI, interfaz gráfica y dashboard analítico).
 
