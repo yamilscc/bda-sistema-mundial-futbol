@@ -23,7 +23,7 @@ Objetivo:
 	- 3FN: ningún objeto guarda ni recalcula el resultado de un partido; se lee de
 	  nucleo.vw_PartidoResultado (script 25), que a su vez usa eventos.fn_ResultadoPartido.
 	- Requiere ejecutados los scripts 01 a 28.
-	- Test correspondiente: testing/33_Test_Consultas_ToBe.sql.
+	- Test correspondiente: testing/34_Test_Consultas_ToBe.sql.
 */
 
 USE MundialFutbol;
@@ -417,11 +417,13 @@ Propósito: registro de lo exhibido en cada partido (para facturar) con la tarif
            (To BE, puntos H y J).
 Columnas (una fila por espacio publicitario):
 	IdPartido, NumeroPartido, FechaHoraUTC, Fase, IdSede, Estadio, Ciudad,
-	NumeroEspacio, IdAnunciante, Anunciante, PaisAnunciante, IdPieza, Pieza,
+	NumeroEspacio, IdAnunciante, Anunciante, PaisAnunciante, IdCampania, Campania, IdPieza, Pieza,
 	TarifaPublicitaria, Moneda (código ISO 4217),
 	TarifaUSD       -> tarifa en USD (NULL si no hay cotización para la moneda).
 	FechaCotizacion -> fecha de la cotización usada (NULL si la moneda es USD o no hay cotización).
 Criterios:
+	- El anunciante de la pieza se obtiene a través de su campaña (Anunciante 1-N Campania 1-N Pieza,
+	  script 04).
 	- Conversión con publicidad.CotizacionMoneda (1 MonedaBase = Tasa Moneda): tarifa / tasa(moneda)
 	  * tasa(USD), ambas contra la misma base y fecha, tomando la última fecha que tenga las dos.
 	  Es la misma regla que publicidad.SP_IMPORTAR_PAUTA_JSON (script 22).
@@ -441,6 +443,8 @@ SELECT e.IdPartido,
        an.IdAnunciante,
        an.Nombre        AS Anunciante,
        pan.Nombre       AS PaisAnunciante,
+       ca.IdCampania,
+       ca.Titulo        AS Campania,
        pz.IdPieza,
        pz.Titulo        AS Pieza,
        e.TarifaPublicitaria,
@@ -452,7 +456,8 @@ SELECT e.IdPartido,
 FROM publicidad.EspacioPublicitario AS e
 INNER JOIN publicidad.Moneda     AS m   ON m.IdMoneda      = e.IdMoneda
 INNER JOIN publicidad.Pieza      AS pz  ON pz.IdPieza      = e.IdPieza
-INNER JOIN publicidad.Anunciante AS an  ON an.IdAnunciante = pz.IdAnunciante
+INNER JOIN publicidad.Campania   AS ca  ON ca.IdCampania   = pz.IdCampania
+INNER JOIN publicidad.Anunciante AS an  ON an.IdAnunciante = ca.IdAnunciante
 INNER JOIN nucleo.Pais           AS pan ON pan.IdPais      = an.IdPais
 INNER JOIN nucleo.Partido        AS p   ON p.IdPartido     = e.IdPartido
 INNER JOIN nucleo.Fase           AS fa  ON fa.IdFase       = p.IdFase

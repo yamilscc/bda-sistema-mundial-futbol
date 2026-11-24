@@ -8,12 +8,12 @@ Chungara Tenorio, Denis Abner
 Torczuk, Elías Alexei
 Canseco Carrizo, Yamil Simón
 Objetivo:
-	- Probar las consultas del script 33 (33_Consultas_ToBe.sql): nucleo.SP_CONSULTAR_FIXTURE (casos
+	- Probar las consultas del script 34 (34_Consultas_ToBe.sql): nucleo.SP_CONSULTAR_FIXTURE (casos
 	  exitosos y validaciones fallidas) y las vistas nucleo.vw_Fixture, eventos.vw_Goleadores,
 	  jugadores.vw_HistorialTitularidad, eventos.vw_TarjetasPorSancionado, nucleo.vw_HistorialArbitral,
 	  publicidad.vw_EspaciosPublicitariosUSD, publicidad.vw_OcupacionPublicitariaSede,
 	  nucleo.vw_SedesMapa y publicidad.vw_MercadosPrimeTimePorPartido.
-	- Requiere ejecutados los scripts 01 a 33. Puede correr con o sin el seed cargado: los controles
+	- Requiere ejecutados los scripts 01 a 34. Puede correr con o sin el seed cargado: los controles
 	  miran solo los datos de este test.
 	- Todo se inserta directo (sin SP). Datos con prefijo 'TEST TB' / 'TEST_TB', monedas XTA y XTB y
 	  NumeroPartido 230 a 233; se borran al inicio y el test corre dentro de una transacción que se
@@ -60,6 +60,7 @@ DELETE FROM jugadores.Formacion            WHERE IdPartido IN (SELECT IdPartido 
 DELETE FROM nucleo.Partido                 WHERE NumeroPartido BETWEEN 230 AND 233;
 DELETE FROM publicidad.OrientacionPais     WHERE IdPieza IN (SELECT IdPieza FROM publicidad.Pieza WHERE Titulo LIKE 'TEST TB%');
 DELETE FROM publicidad.Pieza               WHERE Titulo LIKE 'TEST TB%';
+DELETE FROM publicidad.Campania            WHERE Titulo LIKE 'TEST TB%';
 DELETE FROM publicidad.Anunciante          WHERE Nombre LIKE 'TEST TB%';
 DELETE FROM publicidad.CotizacionMoneda    WHERE Moneda IN ('XTA', 'XTB') OR MonedaBase IN ('XTA', 'XTB');
 DELETE FROM publicidad.Moneda              WHERE Codigo IN ('XTA', 'XTB');
@@ -251,12 +252,15 @@ VALUES ('Informe', 'TEST TB informe post-partido', '2030-06-11',
 
 -- Publicidad: 3 espacios en el partido 230 (USD, XTA con cotización y XTB sin cotización).
 INSERT INTO nucleo.Idioma (Nombre) VALUES ('TEST TB Idioma');
+-- Jerarquía del script 04: Anunciante 1-N Campania 1-N Pieza.
 INSERT INTO publicidad.Anunciante (Nombre, IdPais) VALUES ('TEST TB Anunciante', @paisA);
-INSERT INTO publicidad.Pieza (IdAnunciante, IdIdioma, Titulo)
-SELECT an.IdAnunciante, (SELECT IdIdioma FROM nucleo.Idioma WHERE Nombre = 'TEST TB Idioma'), v.t
-FROM publicidad.Anunciante AS an
+INSERT INTO publicidad.Campania (IdAnunciante, Titulo)
+SELECT IdAnunciante, 'TEST TB Campania' FROM publicidad.Anunciante WHERE Nombre = 'TEST TB Anunciante';
+INSERT INTO publicidad.Pieza (IdCampania, IdIdioma, Titulo)
+SELECT ca.IdCampania, (SELECT IdIdioma FROM nucleo.Idioma WHERE Nombre = 'TEST TB Idioma'), v.t
+FROM publicidad.Campania AS ca
 CROSS JOIN (VALUES ('TEST TB Pieza 1'), ('TEST TB Pieza 2'), ('TEST TB Pieza 3')) AS v(t)
-WHERE an.Nombre = 'TEST TB Anunciante';
+WHERE ca.Titulo = 'TEST TB Campania';
 
 INSERT INTO publicidad.EspacioPublicitario (IdPartido, NumeroEspacio, IdPieza, TarifaPublicitaria, IdMoneda)
 VALUES (@p230, 1, (SELECT IdPieza FROM publicidad.Pieza WHERE Titulo = 'TEST TB Pieza 1'), 1000.00, @monUSD),
@@ -618,7 +622,8 @@ FROM nucleo.vw_HistorialArbitral WHERE IdArbitro IN (@arb1, @arb2) ORDER BY Arbi
 -- =========================================================================
 -- 7. publicidad.vw_EspaciosPublicitariosUSD y publicidad.vw_OcupacionPublicitariaSede
 -- Esperado: OK.
---   Espacio 1 (1000 USD) -> 1000.00 USD, sin fecha de cotización.
+--   Espacio 1 (1000 USD) -> 1000.00 USD, sin fecha de cotización; anunciante y campaña TEST TB
+--   (el anunciante se obtiene a través de la campaña de la pieza).
 --   Espacio 2 (1000 XTA) -> 500.00 USD con la cotización más reciente (2030-01-01, 1 USD = 2 XTA).
 --   Espacio 3 (1000 XTB, sin cotización) -> TarifaUSD NULL.
 --   Sede A: 2 partidos, 8 espacios disponibles, 3 ocupados (37.50 %), 1500.00 USD, 1 sin cotización.
@@ -626,7 +631,8 @@ FROM nucleo.vw_HistorialArbitral WHERE IdArbitro IN (@arb1, @arb2) ORDER BY Arbi
 -- =========================================================================
 BEGIN TRY
 	IF EXISTS (SELECT 1 FROM publicidad.vw_EspaciosPublicitariosUSD
-	           WHERE IdPartido = @p230 AND NumeroEspacio = 1 AND TarifaUSD = 1000.00 AND FechaCotizacion IS NULL)
+	           WHERE IdPartido = @p230 AND NumeroEspacio = 1 AND TarifaUSD = 1000.00 AND FechaCotizacion IS NULL
+	             AND Anunciante = 'TEST TB Anunciante' AND Campania = 'TEST TB Campania')
 	   AND EXISTS (SELECT 1 FROM publicidad.vw_EspaciosPublicitariosUSD
 	               WHERE IdPartido = @p230 AND NumeroEspacio = 2 AND Moneda = 'XTA'
 	                 AND TarifaUSD = 500.00 AND FechaCotizacion = '2030-01-01')
@@ -683,12 +689,12 @@ FROM nucleo.vw_SedesMapa WHERE IdSede IN (@sedeA, @sedeC);
 -- =========================================================================
 -- Verificación previa: nucleo.fn_MercadosEnPrimeTime convierte la hora a la zona de TODOS los países;
 -- con un HusoHorarioComercial que no exista en sys.time_zone_info la consulta falla por ese dato
--- (del seed, no del script 33), así que el caso se omite.
--- Esperado (si se omite): "TEST 9 OMITIDO: hay países con huso horario inválido (dato de seed, no del script 33)".
+-- (del seed, no del script 34), así que el caso se omite.
+-- Esperado (si se omite): "TEST 9 OMITIDO: hay países con huso horario inválido (dato de seed, no del script 34)".
 IF EXISTS (SELECT 1 FROM nucleo.Pais AS pa
            WHERE NOT EXISTS (SELECT 1 FROM sys.time_zone_info AS tz
                              WHERE tz.name COLLATE DATABASE_DEFAULT = pa.HusoHorarioComercial))
-	PRINT 'TEST 9 OMITIDO: hay países con huso horario inválido (dato de seed, no del script 33)';
+	PRINT 'TEST 9 OMITIDO: hay países con huso horario inválido (dato de seed, no del script 34)';
 ELSE
 BEGIN
 	BEGIN TRY
