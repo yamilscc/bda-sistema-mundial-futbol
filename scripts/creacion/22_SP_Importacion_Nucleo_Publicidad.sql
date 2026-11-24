@@ -2,7 +2,7 @@
 Universidad: Universidad Nacional de La Matanza
 Materia: Bases de Datos Aplicadas - Grupo 05
 Autor: Torczuk, Elías Alexei
-Fecha: 2026-11-23
+Fecha: 2026-11-24
 Integrantes:
 - Casella, Mateo Ezequiel
 - Chungara Tenorio, Denis Abner
@@ -12,7 +12,7 @@ Objetivo: Procesos de importación de los módulos nucleo y publicidad (sin SQL 
           1. nucleo.SP_IMPORTAR_PBI_JSON          -> API Banco Mundial (NY.GDP.PCAP.CD), actualiza Pais.PBIPerCapitaUSD.
           2. publicidad.SP_IMPORTAR_COTIZACIONES_JSON -> API Frankfurter, carga publicidad.CotizacionMoneda.
           3. publicidad.SP_IMPORTAR_PAUTA_JSON    -> convierte montos a la moneda destino en T-SQL y carga
-                                                    publicidad.EspacioPublicitario con SP_ABM_EspacioPublicitario.
+                                                    publicidad.EspacioPublicitario con SP_ALTA_/SP_MODIFICACION_EspacioPublicitario.
           4. nucleo.SP_IMPORTAR_FIXTURE_CSV       -> web scraping (fixture_sedes.csv): Upsert de Ciudad, Sede y Partido.
           Todos son idempotentes (Upsert por clave natural) y registran los errores por fila en
           eventos.LogImportacion sin abortar el lote válido.
@@ -25,46 +25,13 @@ GO
 -- =========================================================================
 -- Objetos auxiliares
 -- =========================================================================
--- Staging del fixture (CSV). Mismo patrón que eventos.StagingEvento: NombreArchivo con default
--- 'PENDIENTE' para cargar por BULK INSERT estático a través de una vista de aterrizaje.
-IF OBJECT_ID('eventos.StagingFixture', 'U') IS NULL
-CREATE TABLE eventos.StagingFixture (
-    IdFila             INT IDENTITY(1,1) CONSTRAINT PK_StagingFixture PRIMARY KEY,
-    NombreArchivo      VARCHAR(255) NOT NULL CONSTRAINT DF_StagingFixture_NombreArchivo DEFAULT ('PENDIENTE'),
-    NumeroPartido      VARCHAR(20)  NULL,
-    Fase               VARCHAR(50)  NULL,
-    NombreEstadio      VARCHAR(100) NULL,
-    Ciudad             VARCHAR(100) NULL,
-    PaisISO3           VARCHAR(10)  NULL,
-    HusoHorario        VARCHAR(50)  NULL,
-    Capacidad          VARCHAR(20)  NULL,
-    Latitud            VARCHAR(20)  NULL,
-    Longitud           VARCHAR(20)  NULL,
-    FechaHoraLocal     VARCHAR(30)  NULL,
-    SeleccionLocal     VARCHAR(10)  NULL,
-    SeleccionVisitante VARCHAR(10)  NULL
-);
-GO
-
+-- La tabla eventos.StagingFixture se crea en 05_Tablas_Logs_Staging.sql; acá solo la vista de aterrizaje
+-- para el BULK INSERT estático (NombreArchivo toma el default 'PENDIENTE').
 CREATE OR ALTER VIEW eventos.vw_CargaStagingFixture
 AS
 SELECT NumeroPartido, Fase, NombreEstadio, Ciudad, PaisISO3, HusoHorario, Capacidad,
        Latitud, Longitud, FechaHoraLocal, SeleccionLocal, SeleccionVisitante
 FROM eventos.StagingFixture;
-GO
-
--- Cotizaciones de Frankfurter: 1 unidad de MonedaBase = Tasa unidades de Moneda, a la Fecha indicada.
-IF OBJECT_ID('publicidad.CotizacionMoneda', 'U') IS NULL
-CREATE TABLE publicidad.CotizacionMoneda (
-    MonedaBase CHAR(3)       NOT NULL,
-    Moneda     CHAR(3)       NOT NULL,
-    Fecha      DATE          NOT NULL,
-    Tasa       DECIMAL(18,8) NOT NULL,
-    CONSTRAINT PK_CotizacionMoneda PRIMARY KEY (MonedaBase, Moneda, Fecha),
-    CONSTRAINT CK_CotizacionMoneda_Tasa CHECK (Tasa > 0),
-    CONSTRAINT FK_CotizacionMoneda_MonedaBase FOREIGN KEY (MonedaBase) REFERENCES publicidad.Moneda (Codigo),
-    CONSTRAINT FK_CotizacionMoneda_Moneda     FOREIGN KEY (Moneda)     REFERENCES publicidad.Moneda (Codigo)
-);
 GO
 
 -- =========================================================================
@@ -73,7 +40,7 @@ GO
 --          (arreglo de 2 elementos: [metadatos, [registros]]).
 -- Clave natural: country.id del Banco Mundial = Pais.CodigoISO2. (Se usa ISO2 y no ISO3 porque algunos
 --          CodigoISO3 del torneo son códigos FIFA: NED, GER, ENG, SUI, CHI, etc.)
--- Por país toma el último año con valor no nulo y actualiza PBIPerCapitaUSD con SP_ABM_Pais.
+-- Por país toma el último año con valor no nulo y actualiza PBIPerCapitaUSD con SP_MODIFICACION_Pais.
 -- Si el PBI no cambió no vuelve a modificar (idempotente).
 -- =========================================================================
 CREATE OR ALTER PROCEDURE nucleo.SP_IMPORTAR_PBI_JSON
@@ -152,8 +119,8 @@ BEGIN
             END;
 
             IF @pbiActual IS NULL OR @pbiActual <> @pbi
-                EXEC nucleo.SP_ABM_Pais
-                    @operacion = 'MODIFICACION', @idPais = @idPais, @nombre = @nombre,
+                EXEC nucleo.SP_MODIFICACION_Pais
+                    @idPais = @idPais, @nombre = @nombre,
                     @codigoISO2 = @iso2Pais, @codigoISO3 = @iso3, @idConfederacion = @idConf,
                     @husoHorarioComercial = @huso, @pbiPerCapitaUSD = @pbi;
             SET @filasProcesadas += 1;
@@ -266,7 +233,7 @@ GO
 --          "idioma":"...","monto":100000,"moneda":"EUR"}, ...].
 -- Convierte cada monto de su moneda a @monedaDestino en T-SQL con la última cotización disponible de
 -- publicidad.CotizacionMoneda (monto / tasa(origen) * tasa(destino), ambas contra la misma base y fecha) y
--- registra el espacio con SP_ABM_EspacioPublicitario (ALTA, o MODIFICACION si (partido, espacio) ya existe).
+-- registra el espacio con SP_ALTA_EspacioPublicitario (o SP_MODIFICACION_EspacioPublicitario si (partido, espacio) ya existe).
 -- Falla por fila si falta partido, pieza, moneda o cotización (por ejemplo ARS, que Frankfurter no publica).
 -- =========================================================================
 CREATE OR ALTER PROCEDURE publicidad.SP_IMPORTAR_PAUTA_JSON
@@ -328,7 +295,7 @@ BEGIN
     DECLARE @i INT = 1, @total INT = (SELECT COUNT(*) FROM @filas),
             @cruda NVARCHAR(MAX), @numPartido INT, @numEspacio TINYINT, @monto DECIMAL(18,2),
             @monedaOrigen CHAR(3), @idPartido INT, @idPieza INT, @idMonedaOrigen INT,
-            @tarifa DECIMAL(12,2), @existe BIT, @operacion VARCHAR(12);
+            @tarifa DECIMAL(12,2), @existe BIT;
 
     WHILE @i <= @total
     BEGIN
@@ -345,14 +312,18 @@ BEGIN
 
             SELECT @idPartido = IdPartido FROM nucleo.Partido WHERE NumeroPartido = @numPartido;
             SELECT @idMonedaOrigen = IdMoneda FROM publicidad.Moneda WHERE Codigo = @monedaOrigen;
-            SELECT @idPieza = pz.IdPieza
+            -- La pieza cuelga de una campaña del anunciante. Si dos campañas del mismo anunciante tienen una
+            -- pieza con igual título e idioma se toma la de menor IdPieza (el archivo no informa la campaña).
+            SELECT TOP (1) @idPieza = pz.IdPieza
             FROM @filas AS f
             INNER JOIN publicidad.Anunciante AS an ON an.Nombre = LTRIM(RTRIM(f.Anunciante))
             INNER JOIN nucleo.Idioma         AS id ON id.Nombre = LTRIM(RTRIM(f.Idioma))
-            INNER JOIN publicidad.Pieza      AS pz ON pz.IdAnunciante = an.IdAnunciante
-                                                  AND pz.IdIdioma     = id.IdIdioma
-                                                  AND pz.Titulo       = LTRIM(RTRIM(f.Titulo))
-            WHERE f.IdOrden = @i;
+            INNER JOIN publicidad.Campania   AS cp ON cp.IdAnunciante = an.IdAnunciante
+            INNER JOIN publicidad.Pieza      AS pz ON pz.IdCampania = cp.IdCampania
+                                                  AND pz.IdIdioma   = id.IdIdioma
+                                                  AND pz.Titulo     = LTRIM(RTRIM(f.Titulo))
+            WHERE f.IdOrden = @i
+            ORDER BY pz.IdPieza;
 
             IF @idPartido IS NULL        SET @errores += N'- El partido indicado no existe.' + @salto;
             IF @numEspacio IS NULL OR @numEspacio NOT BETWEEN 1 AND 4
@@ -387,15 +358,15 @@ BEGIN
             SET @existe = IIF(EXISTS (SELECT 1 FROM publicidad.EspacioPublicitario
                                       WHERE IdPartido = @idPartido AND NumeroEspacio = @numEspacio), 1, 0);
             IF @existe = 0
-                EXEC publicidad.SP_ABM_EspacioPublicitario
-                    @operacion = 'ALTA', @idPartido = @idPartido, @numeroEspacio = @numEspacio,
+                EXEC publicidad.SP_ALTA_EspacioPublicitario
+                    @idPartido = @idPartido, @numeroEspacio = @numEspacio,
                     @idPieza = @idPieza, @tarifaPublicitaria = @tarifa, @idMoneda = @idMonedaDestino;
             ELSE IF NOT EXISTS (SELECT 1 FROM publicidad.EspacioPublicitario
                                 WHERE IdPartido = @idPartido AND NumeroEspacio = @numEspacio
                                   AND IdPieza = @idPieza AND TarifaPublicitaria = @tarifa
                                   AND IdMoneda = @idMonedaDestino)
-                EXEC publicidad.SP_ABM_EspacioPublicitario
-                    @operacion = 'MODIFICACION', @idPartido = @idPartido, @numeroEspacio = @numEspacio,
+                EXEC publicidad.SP_MODIFICACION_EspacioPublicitario
+                    @idPartido = @idPartido, @numeroEspacio = @numEspacio,
                     @idPieza = @idPieza, @tarifaPublicitaria = @tarifa, @idMoneda = @idMonedaDestino;
             SET @filasProcesadas += 1;
         END TRY
@@ -509,12 +480,12 @@ BEGIN
             SELECT @idCiudad = IdCiudad FROM nucleo.Ciudad WHERE Nombre = @ciudad AND IdPais = @idPais;
             IF @idCiudad IS NULL
             BEGIN
-                EXEC nucleo.SP_ABM_Ciudad @operacion = 'ALTA', @nombre = @ciudad, @idPais = @idPais, @husoHorario = @huso;
+                EXEC nucleo.SP_ALTA_Ciudad @nombre = @ciudad, @idPais = @idPais, @husoHorario = @huso;
                 SELECT @idCiudad = IdCiudad FROM nucleo.Ciudad WHERE Nombre = @ciudad AND IdPais = @idPais;
             END
             ELSE IF EXISTS (SELECT 1 FROM nucleo.Ciudad WHERE IdCiudad = @idCiudad AND HusoHorario <> @huso)
-                EXEC nucleo.SP_ABM_Ciudad @operacion = 'MODIFICACION', @idCiudad = @idCiudad, @nombre = @ciudad,
-                                          @idPais = @idPais, @husoHorario = @huso;
+                EXEC nucleo.SP_MODIFICACION_Ciudad @idCiudad = @idCiudad, @nombre = @ciudad,
+                                                   @idPais = @idPais, @husoHorario = @huso;
 
             -- Sede (Upsert)
             SELECT @idSede = IdSede FROM nucleo.Sede WHERE NombreEstadio = @estadio AND IdCiudad = @idCiudad;

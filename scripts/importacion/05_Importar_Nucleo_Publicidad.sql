@@ -17,14 +17,15 @@ Objetivo: Lanzador de las 4 importaciones de nucleo y publicidad (sin SQL dinám
           Es idempotente: se puede re-ejecutar. Las filas inválidas quedan en eventos.LogImportacion.
 
 REQUISITOS PARA EJECUTARLO:
-  - Modo SQLCMD activado en SSMS. Editar RUTA_IMP (carpeta scripts\importacion, sin barra final).
+  - Modo SQLCMD activado en SSMS. Editar RUTA_IMP (carpeta scripts\importacion, sin barra final) (solo si se ejecuta suelto: ver abajo).
   - Haber ejecutado 04_Seed_Nucleo_Publicidad.sql.
   - Haber generado los archivos de las APIs:  python fuentes_externas.py todo
     (fixture_sedes.csv y pauta_publicitaria.json ya vienen en el repositorio).
 */
 
 :on error exit
-:setvar RUTA_IMP "C:\CAMBIAR\bda-sistema-mundial-futbol\scripts\importacion"
+-- Con 00_Cargar_Seeds.sql la ruta se define una sola vez ahí. Si este script se ejecuta suelto, descomentar y editar:
+-- :setvar RUTA_IMP "C:\CAMBIAR\bda-sistema-mundial-futbol\scripts\importacion"
 
 USE MundialFutbol;
 GO

@@ -296,6 +296,15 @@ GO
 USE MundialFutbol;
 GO
 
+PRINT '===== TEST 29 SP importación de campañas del dossier';
+GO
+:r $(RUTA)\29_Test_SP_Importacion_Campanias.sql
+GO
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
+GO
+USE MundialFutbol;
+GO
+
 PRINT '===== TEST importacion/03 Seed de jugadores y eventos (escenario aislado)';
 GO
 :r $(RUTA)\importacion\03_Test_Seed_Jugadores_Eventos.sql
