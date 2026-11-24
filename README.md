@@ -25,6 +25,8 @@ Base de datos en **SQL Server (T-SQL)** para gestionar la operación de los part
 
 - Microsoft SQL Server 16.x
 - SQL Server Management Studio (SSMS).
+- Python 3 con `requests` (para generar los archivos de las APIs; ver [Carga de datos](#carga-de-datos)).
+- Para la Entrega 9: Java 21 (aplicación de ABM) y Power BI Desktop (tablero). Ver [Entrega 9](#entrega-9).
 
 ---
 
@@ -33,12 +35,14 @@ Base de datos en **SQL Server (T-SQL)** para gestionar la operación de los part
 ```
 .
 ├── README.md
+├── app/                          # aplicación de ABM de sedes (Java 21, Spring Boot) – Entrega 9
 ├── doc/
-│   └── nomenclaturas.md          # encabezado de scripts, commits, ramas y convenciones de nombres
+│   ├── nomenclaturas.md          # encabezado de scripts, commits, ramas y convenciones de nombres
+│   └── entrega9/                 # documentación de la Entrega 9, tablero de Power BI y capturas
 └── scripts/
     ├── creacion/                 # scripts de creación (base, tablas, FK, funciones y SP)
     │   ├── 00_Reset_Total.sql    # maestro: borra y recrea la base, crea schemas y ejecuta el resto
-    │   └── 01_… a 28_…           # un archivo por módulo, con prefijo numérico de orden de ejecución
+    │   └── 01_… a 28_… y 33_…    # un archivo por módulo, con prefijo numérico de orden de ejecución
     ├── testing/                  # scripts de testing (uno por cada script de creación probado)
     │   └── importacion/          # tests en espejo de scripts/importacion/ (ej. 03_Test_Seed_Jugadores_Eventos.sql)
     └── importacion/              # procesos de importación de datos externos (CSV/XML/API/scraping)
@@ -54,15 +58,15 @@ Base de datos en **SQL Server (T-SQL)** para gestionar la operación de los part
 
 1. Abrir SSMS y activar el **modo SQLCMD** (menú *Consulta → Modo SQLCMD*).
 2. Abrir `scripts/creacion/00_Reset_Total.sql` y editar la línea `:setvar RUTA "..."` con la ruta de la carpeta `scripts\creacion` de la copia local del repositorio (sin barra final).
-3. Ejecutarlo. El script elimina la base `MundialFutbol` si existe, la recrea, crea los schemas y ejecuta en orden los scripts `01` a `28`. Si alguno falla, se corta en ese punto. Al final muestra un resumen de tablas, SP y funciones por schema.
-4. Ejecutar los scripts de carga de datos (seed data), cuando estén disponibles.
+3. Ejecutarlo. El script elimina la base `MundialFutbol` si existe, la recrea, crea los schemas y ejecuta en orden los scripts `01` a `28` y el `33`. Si alguno falla, se corta en ese punto. Al final muestra un resumen de tablas, SP, funciones y vistas por schema.
+4. Cargar los datos en el orden de [Carga de datos](#carga-de-datos).
 5. Ejecutar `scripts/testing/00_Ejecutar_Tests.sql` (también en modo SQLCMD, editando su `:setvar RUTA` con la carpeta `scripts\testing`), que corre todos los tests en orden y al final controla que no queden datos de prueba.
 
 Todos los scripts verifican la existencia de los objetos antes de crearlos o borrarlos, por lo que se pueden volver a ejecutar sin errores.
 
 ### Orden de ejecución
 
-Cada archivo empieza con dos dígitos que marcan su orden. Los números 01 a 28 los ejecuta `00_Reset_Total.sql` en ese orden (el 22 no se usa). El responsable es el autor indicado en el encabezado de cada script.
+Cada archivo empieza con dos dígitos que marcan su orden. Los números 01 a 28 y el 33 los ejecuta `00_Reset_Total.sql` en ese orden. El responsable es el autor indicado en el encabezado de cada script.
 
 | N.º | Script | Contenido | Responsable |
 |---|---|---|---|
@@ -94,6 +98,7 @@ Cada archivo empieza con dos dígitos que marcan su orden. Los números 01 a 28 
 | 26 | `26_SP_FinalizarPartido.sql` | `SP_FINALIZAR_PARTIDO`: cierra un partido y registra la concurrencia, validando que los goles cargados definan el resultado | Yamil |
 | 27 | `27_SP_CalculoSeleccionesClasificadas.sql` | `SP_CALCULO_DE_SELECCIONES_CLASIFICADAS`: posiciones, clasificados y fase inicial de la eliminación directa | Yamil |
 | 28 | `28_SP_DefinirCruceEliminatorio.sql` | `SP_DEFINIR_CRUCE_ELIMINATORIO`: asigna las selecciones de un partido eliminatorio (ver [Cruces eliminatorios](#cruces-eliminatorios)) | Yamil |
+| 33 | `33_Consultas_ToBe.sql` | Consultas del alcance *To BE* (solo lectura): `SP_CONSULTAR_FIXTURE` y vistas de fixture, goleadores, titularidad, tarjetas, historial arbitral, publicidad en USD, ocupación por sede, mapa de sedes y prime time (ver [Entrega 9](#entrega-9)) | Yamil |
 
 **Convención de los ABM:** cada tabla tiene un SP por operación: `SP_ALTA_<Tabla>`, `SP_MODIFICACION_<Tabla>` y `SP_BAJA_<Tabla>` (por ejemplo `nucleo.SP_ALTA_Partido`). Las tablas asociativas (`ArbitroIdioma` y `OrientacionPais`) solo tienen alta y baja. Los archivos conservan el nombre `SP_ABM_` del módulo.
 
@@ -127,6 +132,7 @@ Scripts de testing (en `scripts/testing/`):
 | `26_Test_SP_FinalizarPartido.sql` | `SP_FINALIZAR_PARTIDO` | Yamil |
 | `27_Test_SP_CalculoSeleccionesClasificadas.sql` | `SP_CALCULO_DE_SELECCIONES_CLASIFICADAS` | Yamil |
 | `28_Test_SP_DefinirCruceEliminatorio.sql` | `SP_DEFINIR_CRUCE_ELIMINATORIO` | Yamil |
+| `33_Test_Consultas_ToBe.sql` | `SP_CONSULTAR_FIXTURE` (filtros y validaciones) y las vistas del script 33 | Yamil |
 | `importacion/03_Test_Seed_Jugadores_Eventos.sql` | Seed de jugadores y eventos: volúmenes mínimos y casos obligatorios (en espejo de `scripts/importacion/03_Seed_Jugadores_Eventos.sql`) | Mateo |
 
 Pendientes: importación de datos (`scripts/importacion/`), datos de prueba (seed), reportes, seguridad y respaldo.
@@ -191,6 +197,25 @@ El Banco Mundial se cruza por `CodigoISO2` y no por `CodigoISO3` porque varios c
 
 ---
 
+## Carga de datos
+
+Después de crear la base con `00_Reset_Total.sql`, los datos se cargan con los scripts de `scripts/importacion/`, en este orden. Los que leen archivos (`05`, `01` y `02`) se ejecutan en modo SQLCMD, editando su `:setvar RUTA_IMP` con la carpeta `scripts\importacion` (sin barra final).
+
+| Paso | Script o comando | Qué carga |
+|---|---|---|
+| 1 | `04_Seed_Nucleo_Publicidad.sql` | Confederaciones, países, grupos, selecciones, cuerpo técnico, idiomas, categorías, árbitros, monedas, anunciantes y piezas |
+| 2 | `python fuentes_externas.py pbi` y `python fuentes_externas.py cotizaciones` (desde `scripts/importacion/`, con internet) | Genera `pbi_banco_mundial.json` y `cotizaciones_frankfurter.json`, que no se versionan |
+| 3 | `05_Importar_Nucleo_Publicidad.sql` (SQLCMD) | PBI per cápita, sedes y 24 partidos, cotizaciones y pauta publicitaria |
+| 4 | `06_Seed_Designaciones_Publicidad.sql` | Designaciones arbitrales y asignación de publicidad |
+| 5 | `03_Seed_Jugadores_Eventos.sql` | Reglas, convocados, formaciones, sustituciones, goles y amonestaciones |
+| 6 | `01_Importar_Convocatoria_XML.sql` (SQLCMD) | Convocatoria desde `planteles_convocatoria.xml` |
+| 7 | `02_Importar_Eventos_CSV.sql` (SQLCMD) | Eventos desde `eventos_partidos.csv` |
+| 8 | `07_Cierre_Resultados_Partidos.sql` | Cierra los partidos con `SP_FINALIZAR_PARTIDO` (va al final: necesita los goles cargados) |
+
+Los resultados esperados de la importación del paso 3 y la nota sobre los saltos de línea de `fixture_sedes.csv` están en [doc/entrega9/README.md](doc/entrega9/README.md#carga-de-datos).
+
+---
+
 ## Datos de prueba (criterios de aceptación)
 
 El juego de datos contempla como mínimo:
@@ -200,6 +225,18 @@ El juego de datos contempla como mínimo:
 - Historial de campañas publicitarias con anunciantes de 6 países o más.
 
 Casos obligatorios: expulsión por doble amarilla y roja directa, jugador suspendido por acumulación fuera de la titular siguiente, cambio por lesión antes del minuto 20, partido en prime time en más de 4 mercados, designación arbitral descartada por conflicto de nacionalidad e importación con errores parciales.
+
+---
+
+## Entrega 9
+
+La documentación completa está en [doc/entrega9/README.md](doc/entrega9/README.md): qué consulta cubre cada punto de *To BE*, cómo crear el usuario de la base y levantar la aplicación, los casos probados con sus capturas y el tablero de Power BI.
+
+| Pieza | Dónde está |
+|---|---|
+| Consultas del alcance *To BE* | `scripts/creacion/33_Consultas_ToBe.sql` y `scripts/testing/33_Test_Consultas_ToBe.sql` |
+| Aplicación de ABM de sedes | `app/` (`.\mvnw.cmd spring-boot:run`, con las variables de entorno `DB_USER` y `DB_PASSWORD`) |
+| Tablero de BI | `doc/entrega9/Mundial.pbix` y capturas en `doc/entrega9/capturas/` |
 
 ---
 
