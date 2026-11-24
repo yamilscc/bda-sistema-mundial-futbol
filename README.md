@@ -96,10 +96,10 @@ Cada archivo empieza con dos dígitos que marcan su orden. Los números 01 a 33 
 | 27 | `27_SP_CalculoSeleccionesClasificadas.sql` | `SP_CALCULO_DE_SELECCIONES_CLASIFICADAS`: posiciones, clasificados y fase inicial de la eliminación directa | Yamil |
 | 28 | `28_SP_DefinirCruceEliminatorio.sql` | `SP_DEFINIR_CRUCE_ELIMINATORIO`: asigna las selecciones de un partido eliminatorio (ver [Cruces eliminatorios](#cruces-eliminatorios)) | Yamil |
 | 29 | `29_SP_Importacion_Campanias.sql` | `SP_IMPORTAR_CAMPANIAS_CSV` (campañas del dossier de publicidad, por scraping) y la vista de aterrizaje `publicidad.vw_CargaStagingCampania` | Elías |
-| 30 | `30_SP_Reportes.sql` | Stored Procedures para los 7 reportes oficiales de la Entrega 7 | Denis |
-| 31 | `31_Seguridad_Cifrado.sql` | Cifrado PII, funciones criptográficas y adaptación de SPs para datos sensibles | Denis |
-| 32 | `32_Seguridad_Roles_Permisos.sql` | SPs de creación y gestión de 4 roles de seguridad y permisos granulares | Denis |
-| 33 | `33_Procedimientos_Backups.sql` | SPs de configuración FULL y ejecución de backups (Full, Diff y Log) | Denis |
+| 30 | `30_SP_Reportes.sql` | Los 7 reportes de la Entrega 7 (2 en XML y una matriz con PIVOT estático), con filtros validados por `fn_ValidarFiltrosReporte` (ver [Reportes, seguridad y respaldo](#reportes-seguridad-y-respaldo)) | Denis / Elías |
+| 31 | `31_Seguridad_Cifrado.sql` | Script de modificación del cifrado: documento de jugadores y nombre de árbitros y staff con AES_256 (certificado y master key), hash para búsquedas, ABM adaptados y migración con `SP_APLICAR_CIFRADO_DATOS_SENSIBLES` | Denis / Elías |
+| 32 | `32_Seguridad_Roles_Permisos.sql` | 4 roles con permisos granulares, asignación y revocación de usuarios y usuarios de prueba, todo con SP | Denis / Elías |
+| 33 | `33_Procedimientos_Backups.sql` | Modelo FULL y backups FULL, DIFF y LOG con SP (sin SQL dinámico) e historial en `msdb` | Denis / Elías |
 
 **Convención de los ABM:** cada tabla tiene un SP por operación: `SP_ALTA_<Tabla>`, `SP_MODIFICACION_<Tabla>` y `SP_BAJA_<Tabla>` (por ejemplo `nucleo.SP_ALTA_Partido`). Las tablas asociativas (`ArbitroIdioma` y `OrientacionPais`) solo tienen alta y baja. Los archivos conservan el nombre `SP_ABM_` del módulo.
 
@@ -135,14 +135,15 @@ Scripts de testing (en `scripts/testing/`):
 | `27_Test_SP_CalculoSeleccionesClasificadas.sql` | `SP_CALCULO_DE_SELECCIONES_CLASIFICADAS` | Yamil |
 | `28_Test_SP_DefinirCruceEliminatorio.sql` | `SP_DEFINIR_CRUCE_ELIMINATORIO` | Yamil |
 | `29_Test_SP_Importacion_Campanias.sql` | `SP_IMPORTAR_CAMPANIAS_CSV` (primera y segunda corrida, filas inválidas en el log, acentos, modificación de Marca y Agencia, país inexistente, `@crearPiezas = 0` y cambio de país del anunciante) | Elías |
+| `30_Test_SP_Reportes.sql` | Los 7 reportes contra las tablas (filas, totales y XML válidos) y sus filtros inexistentes | Denis / Elías |
+| `31_Test_Seguridad_Cifrado.sql` | Claves, cifrado y descifrado, hash, ABM con datos cifrados, búsquedas, migración e impacto en consultas previas | Denis / Elías |
+| `32_Test_Seguridad_Roles_Permisos.sql` | SP de roles: idempotencia, permisos creados, alta y baja de usuarios y validaciones agrupadas | Denis / Elías |
+| `32_Test_Rol_Administrador.sql` | Qué puede y qué no puede hacer `usr_admin_test` (Rol_Administrador) | Denis / Elías |
+| `32_Test_Rol_OperadorResultados.sql` | Qué puede y qué no puede hacer `usr_resultados_test` (Rol_OperadorResultados) | Denis / Elías |
+| `32_Test_Rol_GestorPublicidad.sql` | Qué puede y qué no puede hacer `usr_publicidad_test` (Rol_GestorPublicidad) | Denis / Elías |
+| `32_Test_Rol_Consulta.sql` | Qué puede y qué no puede hacer `usr_consulta_test` (Rol_Consulta) | Denis / Elías |
+| `33_Test_Backups.sql` | Validaciones, backups FULL, DIFF y LOG registrados en `msdb` e historial | Denis / Elías |
 | `importacion/03_Test_Seed_Jugadores_Eventos.sql` | Seed de jugadores y eventos: volúmenes mínimos y casos obligatorios (en espejo de `scripts/importacion/03_Seed_Jugadores_Eventos.sql`) | Mateo |
-| `30_Test_SP_Reportes.sql` | Validación de los 7 reportes oficiales | Denis |
-| `31_Test_Seguridad_Cifrado.sql` | Test de funciones de cifrado, persistencia binaria y evaluación de impacto | Denis |
-| `32_Test_Rol_Administrador.sql` | Test de permisos de control total (usr_admin_test) | Denis |
-| `32_Test_Rol_OperadorResultados.sql` | Test de permisos deportivos y denegación de publicidad (usr_resultados_test) | Denis |
-| `32_Test_Rol_GestorPublicidad.sql` | Test de permisos comerciales y denegación de eventos (usr_publicidad_test) | Denis |
-| `32_Test_Rol_Consulta.sql` | Test de reportes y denegación de modificaciones (usr_consulta_test) | Denis |
-| `33_Test_Backups.sql` | Test de backups Full, Diff, Log y consulta de historial msdb | Denis |
 
 Pendientes: Entrega 9 (plataforma BI, interfaz gráfica y dashboard analítico).
 
@@ -245,6 +246,16 @@ El SP usa los SP ABM de `20_SP_ABM_Publicidad.sql` y crea, por cada fila (Upsert
 3. Con `@crearPiezas = 1`: una **Pieza** en idioma Español con el título de la campaña y su **OrientacionPais** al país indicado, para que la campaña participe de `SP_ASIGNAR_PUBLICIDAD`.
 
 Las filas inválidas (anunciante o título vacío, texto de más de 100 caracteres, país inexistente) no frenan el lote: quedan en `eventos.LogImportacion` con el `IdFila` de staging y los datos crudos. Las validaciones generales (nombre de archivo, archivo sin filas, idioma Español inexistente con `@crearPiezas = 1`) se informan juntas en un único error `THROW 52000`.
+
+---
+
+## Reportes, seguridad y respaldo
+
+- **Entrega 7 (reportes):** detalle de los 7 SP en [doc/entrega7/entrega7_reportes_oficiales.md](doc/entrega7/entrega7_reportes_oficiales.md). Los de designaciones arbitrales y plantillas devuelven XML.
+- **Entrega 8 (seguridad y respaldo):** cifrado, cuadro de permisos, tests por usuario y política de backup con RPO en [doc/entrega8/entrega8_seguridad_y_respaldo.md](doc/entrega8/entrega8_seguridad_y_respaldo.md).
+- **Cifrado y carga de datos:** importaciones, seeds y reportes buscan y muestran jugadores, árbitros y staff a través de funciones (`fn_IdJugadorPorDocumento`, `fn_IdArbitroPorNombre`, `fn_NombreArbitro`, etc.). `31_Seguridad_Cifrado.sql` las redefine, y por eso `00_Cargar_Seeds.sql` funciona con los datos cifrados.
+- **Impacto en tests previos (consigna):** el cifrado reemplaza `UQ_Jugador_Documento` por un índice único sobre el hash, así que el caso 2.A de `02_Test_Tablas_Jugadores.sql`, que esperaba esa restricción al insertar directo en la tabla, informa FALLÓ. Es el único caso afectado (ver el documento de la Entrega 8).
+- **Claves:** ninguna clave ni contraseña está en el repositorio. Para restaurar en otro servidor hay que respaldar la master key y el certificado (procedimiento en el documento de la Entrega 8).
 
 ---
 
