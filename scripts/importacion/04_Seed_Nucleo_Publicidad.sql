@@ -15,6 +15,8 @@ Objetivo: Seed de catálogos y entidades base de nucleo y publicidad (idempotent
           Los grupos respetan el contrato con Mateo, salvo que BRA se ubica en el Grupo A (junto a ARG) porque
           SP_ALTA_Partido exige que los partidos de fase de grupos sean entre selecciones del mismo grupo y el
           partido 1 debe ser ARG vs BRA. Los partidos y sedes los carga 05_Importar_Nucleo_Publicidad.sql.
+          También deja la regla de cupos de convocatoria (23 a 26 jugadores) que necesita
+          01_Importar_Convocatoria_XML.sql antes de 03_Seed_Jugadores_Eventos.sql.
 ORDEN: ejecutar primero (antes de 05, 06 y 07 de esta carpeta y de los scripts de Mateo).
 */
 USE MundialFutbol;
@@ -278,4 +280,12 @@ SELECT 'Seed nucleo/publicidad' AS Resumen,
        (SELECT COUNT(*) FROM publicidad.Campania) AS Campanias_9,
        (SELECT COUNT(*) FROM publicidad.Pieza) AS Piezas_12,
        (SELECT COUNT(*) FROM publicidad.Tarifa) AS Tarifas_7;
+GO
+
+-- ===== Regla de cupos de convocatoria (23 a 26 jugadores) =====
+-- La necesita 01_Importar_Convocatoria_XML.sql, que se ejecuta antes que 03_Seed_Jugadores_Eventos.sql
+-- (03 también la crea si falta, con los mismos valores). Idempotente.
+DECLARE @idReglaConv INT;
+IF NOT EXISTS (SELECT 1 FROM jugadores.ReglaConvocados)
+    EXEC jugadores.SP_ALTA_ReglaConvocados @idRegla = @idReglaConv OUTPUT, @minimo = 23, @maximo = 26;
 GO
