@@ -46,7 +46,7 @@ Base de datos en **SQL Server (T-SQL)** para gestionar la operación de los part
 
 - Cada script empieza con dos dígitos que indican el orden de ejecución y con el encabezado definido en `doc/nomenclaturas.md`.
 - Los scripts de `testing/` llevan el mismo número que el script de `creacion/` que prueban y tienen en comentarios el resultado esperado de cada caso.
-- Schemas de la base `MundialFutbol`: `nucleo` (países, sedes, partidos, árbitros), `jugadores` (convocatoria, alineaciones, sustituciones), `eventos` (goles, tarjetas, suspensiones, staging y logs) y `publicidad` (anunciantes, piezas y espacios).
+- Schemas de la base `MundialFutbol`: `nucleo` (países, sedes, partidos, árbitros), `jugadores` (convocatoria, alineaciones, sustituciones), `eventos` (goles, tarjetas, suspensiones, staging y logs) y `publicidad` (monedas y cotizaciones, anunciantes, campañas, piezas, tarifas y espacios).
 
 ---
 
@@ -55,14 +55,14 @@ Base de datos en **SQL Server (T-SQL)** para gestionar la operación de los part
 1. Abrir SSMS y activar el **modo SQLCMD** (menú *Consulta → Modo SQLCMD*).
 2. Abrir `scripts/creacion/00_Reset_Total.sql` y editar la línea `:setvar RUTA "..."` con la ruta de la carpeta `scripts\creacion` de la copia local del repositorio (sin barra final).
 3. Ejecutarlo. El script elimina la base `MundialFutbol` si existe, la recrea, crea los schemas y ejecuta en orden los scripts `01` a `28`. Si alguno falla, se corta en ese punto. Al final muestra un resumen de tablas, SP y funciones por schema.
-4. Ejecutar los scripts de carga de datos (seed data), cuando estén disponibles.
+4. Ejecutar los scripts de carga de datos de `scripts/importacion/` en este orden: `04_Seed_Nucleo_Publicidad.sql`, `05_Importar_Nucleo_Publicidad.sql` (requiere generar antes los archivos de las APIs, ver [Asignación de publicidad](#asignación-de-publicidad)), `06_Seed_Designaciones_Publicidad.sql`, luego `03`, `01` y `02` (jugadores y eventos) y por último `07_Cierre_Resultados_Partidos.sql`. Los que leen archivos llevan su propio `:setvar RUTA_IMP` con la carpeta `scripts\importacion`.
 5. Ejecutar `scripts/testing/00_Ejecutar_Tests.sql` (también en modo SQLCMD, editando su `:setvar RUTA` con la carpeta `scripts\testing`), que corre todos los tests en orden y al final controla que no queden datos de prueba.
 
 Todos los scripts verifican la existencia de los objetos antes de crearlos o borrarlos, por lo que se pueden volver a ejecutar sin errores.
 
 ### Orden de ejecución
 
-Cada archivo empieza con dos dígitos que marcan su orden. Los números 01 a 28 los ejecuta `00_Reset_Total.sql` en ese orden (el 22 no se usa). El responsable es el autor indicado en el encabezado de cada script.
+Cada archivo empieza con dos dígitos que marcan su orden. Los números 01 a 28 los ejecuta `00_Reset_Total.sql` en ese orden. El responsable es el autor indicado en el encabezado de cada script.
 
 | N.º | Script | Contenido | Responsable |
 |---|---|---|---|
@@ -70,8 +70,8 @@ Cada archivo empieza con dos dígitos que marcan su orden. Los números 01 a 28 
 | 01 | `01_Tablas_Nucleo.sql` | Tablas del núcleo: países, confederaciones, ciudades, sedes, fases, grupos, selecciones, staff técnico, árbitros, partidos, designaciones y sanciones | Yamil |
 | 02 | `02_Tablas_Jugadores_y_Alineaciones.sql` | Tablas de jugadores, convocatoria, formaciones y sustituciones | Mateo |
 | 03 | `03_Tablas_Eventos.sql` | Tablas de reglas de suspensión, tipos de gol, períodos, goles, tarjetas y amonestaciones | Mateo |
-| 04 | `04_Tablas_Publicidad.sql` | Tablas de monedas, anunciantes, piezas, orientación por país y espacios publicitarios | Elías |
-| 05 | `05_Tablas_Logs_Staging.sql` | Tablas de staging y log de importación | Mateo |
+| 04 | `04_Tablas_Publicidad.sql` | Tablas de monedas, cotizaciones, anunciantes, campañas, piezas (cuelgan de la campaña), orientación por país, tarifas por fase y espacios publicitarios (con fecha y criterio de asignación) | Elías |
+| 05 | `05_Tablas_Logs_Staging.sql` | Tablas de staging (eventos y fixture) y log de importación | Mateo |
 | 06 | `06_FK_Cruzadas.sql` | Claves foráneas que cruzan módulos (jugadores, eventos y publicidad hacia el núcleo) | Elías |
 | 07 | `07_Funciones_Nucleo.sql` | `fn_SeleccionesDelPartido`, `fn_MercadosEnPrimeTime`, `fn_SeleccionConPartidoCercano` (descanso de 48 horas) y `fn_PartidoTieneRegistros` | Yamil |
 | 08 | `08_SP_ControlArbitral.sql` | `SP_CONTROL_ARBITRAL`: designación de árbitros con validación de nacionalidad y advertencia de cruce | Elías |
@@ -86,8 +86,9 @@ Cada archivo empieza con dos dígitos que marcan su orden. Los números 01 a 28 
 | 17 | `17_SP_RegistrarSustitucion.sql` | `SP_REGISTRAR_SUSTITUCION` con control de ventanas y cantidad de cambios | Mateo |
 | 18 | `18_SP_ABM_Jugadores.sql` | ABM (`SP_ALTA_`, `SP_MODIFICACION_` y `SP_BAJA_`) del módulo de jugadores: reglas, clubes, jugadores, convocatoria, bajas, formaciones, jugadores de formación y sustituciones | Mateo |
 | 19 | `19_SP_ABM_Nucleo.sql` | ABM restantes del núcleo (`SP_ALTA_`, `SP_MODIFICACION_` y `SP_BAJA_`): confederaciones, países, ciudades, fases, grupos, selecciones, staff técnico, idiomas, categorías, árbitros, idiomas de árbitros (solo alta y baja), designaciones, sanciones y regla de clasificación | Denis |
-| 20 | `20_SP_ABM_Publicidad.sql` | ABM (`SP_ALTA_`, `SP_MODIFICACION_` y `SP_BAJA_`) de monedas, anunciantes, piezas, orientación por país (solo alta y baja) y espacios publicitarios | Denis |
-| 21 | `21_SP_AsignarPublicidad.sql` | `SP_ASIGNAR_PUBLICIDAD`: asigna las piezas a los espacios libres de un partido según país de las selecciones, PBI y prime time | Elías |
+| 20 | `20_SP_ABM_Publicidad.sql` | ABM (`SP_ALTA_`, `SP_MODIFICACION_` y `SP_BAJA_`) de monedas, anunciantes, campañas, piezas, orientación por país (solo alta y baja), tarifas y espacios publicitarios (los de un partido finalizado no se modifican ni se eliminan) | Denis |
+| 21 | `21_SP_AsignarPublicidad.sql` | `SP_ASIGNAR_PUBLICIDAD`: asigna las piezas a los espacios libres de un partido según país de las selecciones, PBI y prime time, y registra el criterio aplicado | Elías |
+| 22 | `22_SP_Importacion_Nucleo_Publicidad.sql` | `SP_IMPORTAR_FIXTURE_CSV`, `SP_IMPORTAR_PBI_JSON`, `SP_IMPORTAR_COTIZACIONES_JSON` y `SP_IMPORTAR_PAUTA_JSON` (con conversión de moneda), y la vista de aterrizaje del fixture | Elías |
 | 23 | `23_SP_Importacion_Jugadores.sql` | Importación XML de jugadores | Mateo |
 | 24 | `24_SP_Importacion_Eventos.sql` | Importación CSV de eventos | Mateo |
 | 25 | `25_Funciones_Partidos.sql` | `fn_DefinicionPartido`, `fn_SeleccionesClasificadas`, `fn_FaseEliminatoriaInicial`, `fn_ValidarFaseGruposCompleta` y la vista `vw_PartidoResultado` (ver [Clasificación](#clasificación)) | Yamil |
@@ -105,7 +106,7 @@ Scripts de testing (en `scripts/testing/`):
 | `01_Test_Tablas_Nucleo.sql` | Restricciones de las tablas del núcleo | Yamil |
 | `02_Test_Tablas_Jugadores.sql` | Restricciones de las tablas de jugadores, convocatoria, formaciones y sustituciones | Mateo |
 | `03_Test_Tablas_Eventos.sql` | Restricciones de las tablas de eventos | Mateo |
-| `04_Test_Tablas_Publicidad.sql` | Restricciones de las tablas de publicidad | Elías |
+| `04_Test_Tablas_Publicidad.sql` | Restricciones de las tablas de publicidad (incluye campañas, tarifas y datos de asignación de los espacios) | Elías |
 | `07_Test_Funciones_Nucleo.sql` | Funciones del núcleo (selecciones del partido, prime time, descanso y registros asociados) | Yamil |
 | `08_Test_SP_ControlArbitral.sql` | `SP_CONTROL_ARBITRAL` | Elías |
 | `09_Test_SP_Sedes_Partidos.sql` | SP de alta, modificación y baja de sedes y partidos | Yamil |
@@ -119,8 +120,9 @@ Scripts de testing (en `scripts/testing/`):
 | `17_Test_SP_RegistrarSustitucion.sql` | `SP_REGISTRAR_SUSTITUCION` | Mateo |
 | `18_Test_SP_ABM_Jugadores.sql` | SP ABM de jugadores | Mateo |
 | `19_Test_SP_ABM_Nucleo.sql` | SP ABM restantes del núcleo | Denis |
-| `20_Test_SP_ABM_Publicidad.sql` | SP ABM de publicidad | Denis |
-| `21_Test_SP_AsignarPublicidad.sql` | `SP_ASIGNAR_PUBLICIDAD` (prime time en más de cuatro mercados, criterios de prioridad y validaciones) | Elías |
+| `20_Test_SP_ABM_Publicidad.sql` | SP ABM de publicidad (incluye campañas, tarifas, monedas con cotizaciones y espacios de partidos finalizados) | Denis |
+| `21_Test_SP_AsignarPublicidad.sql` | `SP_ASIGNAR_PUBLICIDAD` (prime time en más de cuatro mercados, criterio por espacio, criterio registrado y validaciones) | Elías |
+| `22_Test_SP_Importacion_Nucleo_Publicidad.sql` | Importación de fixture, PBI, cotizaciones y pauta (lotes con errores parciales, re-ejecución, conversión de moneda y pauta sobre partidos finalizados) | Elías |
 | `23_Test_SP_Importacion_Jugadores.sql` | Importación XML de jugadores | Mateo |
 | `24_Test_SP_Importacion_Eventos.sql` | Importación CSV de eventos | Mateo |
 | `25_Test_Funciones_Partidos.sql` | Definición de partidos, tabla de posiciones, cupos, fase inicial, fase de grupos completa y vista de resultados | Yamil |
@@ -129,7 +131,7 @@ Scripts de testing (en `scripts/testing/`):
 | `28_Test_SP_DefinirCruceEliminatorio.sql` | `SP_DEFINIR_CRUCE_ELIMINATORIO` | Yamil |
 | `importacion/03_Test_Seed_Jugadores_Eventos.sql` | Seed de jugadores y eventos: volúmenes mínimos y casos obligatorios (en espejo de `scripts/importacion/03_Seed_Jugadores_Eventos.sql`) | Mateo |
 
-Pendientes: importación de datos (`scripts/importacion/`), datos de prueba (seed), reportes, seguridad y respaldo.
+Pendientes: reportes, seguridad y respaldo.
 
 **Casos obligatorios de nucleo y publicidad:** partido 1 (ARG vs BRA, 23:00 UTC) en prime time en 6 mercados (ARG, BRA, URU, CHI, USA, CAN); árbitro argentino rechazado en ARG vs BRA (queda en `eventos.LogImportacion`, archivo `seed_designaciones`); importación de pauta con 6 filas válidas y 3 inválidas.
 
@@ -176,6 +178,8 @@ Además:
 ---
 
 ## Asignación de publicidad
+
+**Modelo.** Cada anunciante tiene una o más campañas (`publicidad.Campania`) y cada campaña sus piezas (`Pieza`, una por idioma o mercado), orientadas a uno o más países (`OrientacionPais`). La tarifa de referencia de cada franja depende de la fase del torneo (`Tarifa`, con moneda y fecha de vigencia). `EspacioPublicitario` es el histórico de lo exhibido en cada partido: guarda la tarifa y la moneda aplicadas, la fecha y el criterio de asignación (`NULL` si se cargó a mano). Una vez finalizado el partido, sus espacios no se modifican ni se eliminan.
 
 Ninguna requiere API key. Los archivos se generan con `scripts/importacion/fuentes_externas.py` (Python 3; `pip install requests beautifulsoup4` solo para el scraping).
 
