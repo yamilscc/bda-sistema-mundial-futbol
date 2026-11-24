@@ -12,6 +12,11 @@ Objetivo:
 		  - nucleo.fn_MercadosEnPrimeTime: mercados (países) donde el horario de un partido
 		  cae en prime time local.
 		  - nucleo.fn_SeleccionesDelPartido: selecciones que disputan un partido.
+		  - nucleo.fn_SeleccionConPartidoCercano: selecciones que tienen otro partido a menos de
+		    48 horas de un horario dado (regla de descanso, única fuente para los SP de partidos).
+		  - nucleo.fn_PartidoTieneRegistros: qué registros asociados tiene un partido
+		    (formaciones, sustituciones, goles, amonestaciones, designaciones, sanciones y
+		    espacios publicitarios), única fuente para los SP de partidos.
 */
 
 USE MundialFutbol;
@@ -101,5 +106,95 @@ RETURN
 	FROM nucleo.Partido AS p
 	WHERE p.IdPartido = @IdPartido
 	  AND p.IdSeleccionVisitante IS NOT NULL
+);
+GO
+
+/*
+nucleo.fn_SeleccionConPartidoCercano
+Propósito: aplicar en un solo lugar la regla de descanso entre partidos de una selección (la usan
+           nucleo.SP_ALTA_Partido, nucleo.SP_MODIFICACION_Partido y nucleo.SP_DEFINIR_CRUCE_ELIMINATORIO).
+Parámetros:
+	@IdSeleccionLocal, @IdSeleccionVisitante: selecciones a evaluar (alguna puede ser NULL).
+	@FechaHoraUTC:                            instante UTC del partido que se quiere programar.
+	@IdPartidoExcluido:                       partido que no se compara (el propio, al modificar o asignar
+	                                          un cruce); NULL si no hay que excluir ninguno.
+Columnas devueltas (una fila por cada partido conflictivo de cada selección):
+	IdSeleccion        -> selección con un partido cercano.
+	IdPartidoCercano   -> partido que está a menos de HorasDescanso del horario evaluado.
+	HorasDescanso      -> horas mínimas entre los inicios de dos partidos de una selección (48).
+Criterios:
+	- Hay conflicto si el otro partido empieza estrictamente a menos de 48 horas (antes o después):
+	  a exactamente 48 horas no hay conflicto.
+	- Se comparan todos los partidos de la selección, de cualquier fase y estado, como local o visitante.
+	- 0 filas si no hay conflictos (o si ambas selecciones son NULL).
+	- La regla vive solo acá: para cambiar las 48 horas se modifica este valor, que aparece tres veces
+	  en la función (los dos DATEADD y la columna HorasDescanso).
+*/
+CREATE OR ALTER FUNCTION nucleo.fn_SeleccionConPartidoCercano
+(
+	@IdSeleccionLocal     INT,
+	@IdSeleccionVisitante INT,
+	@FechaHoraUTC         DATETIME2(0),
+	@IdPartidoExcluido    INT
+)
+RETURNS TABLE
+AS
+RETURN
+(
+	SELECT s.IdSeleccion,
+	       p.IdPartido AS IdPartidoCercano,
+	       CAST(48 AS INT) AS HorasDescanso
+	FROM (VALUES (@IdSeleccionLocal), (@IdSeleccionVisitante)) AS s(IdSeleccion)
+	INNER JOIN nucleo.Partido AS p
+	        ON s.IdSeleccion IN (p.IdSeleccionLocal, p.IdSeleccionVisitante)
+	WHERE s.IdSeleccion IS NOT NULL
+	  AND (@IdPartidoExcluido IS NULL OR p.IdPartido <> @IdPartidoExcluido)
+	  AND p.FechaHoraUTC > DATEADD(HOUR, -48, @FechaHoraUTC)
+	  AND p.FechaHoraUTC < DATEADD(HOUR,  48, @FechaHoraUTC)
+);
+GO
+
+/*
+nucleo.fn_PartidoTieneRegistros
+Propósito: saber qué registros asociados tiene un partido, para impedir que se lo elimine o que se
+           le cambien las selecciones, la fase, la sede o el horario (los usan nucleo.SP_BAJA_Partido,
+           nucleo.SP_MODIFICACION_Partido y nucleo.SP_DEFINIR_CRUCE_ELIMINATORIO).
+Parámetros:
+	@IdPartido: partido a evaluar.
+Columnas devueltas (SIEMPRE una fila; con un partido inexistente todo es 0):
+	TieneFormaciones, TieneSustituciones, TieneGoles, TieneAmonestaciones, TieneDesignaciones,
+	TieneSanciones (sanciones de las designaciones del partido), TieneEspacios (espacios publicitarios),
+	TieneAlguno -> 1 si tiene cualquiera de los anteriores.
+*/
+CREATE OR ALTER FUNCTION nucleo.fn_PartidoTieneRegistros (@IdPartido INT)
+RETURNS TABLE
+AS
+RETURN
+(
+	SELECT r.TieneFormaciones, r.TieneSustituciones, r.TieneGoles, r.TieneAmonestaciones,
+	       r.TieneDesignaciones, r.TieneSanciones, r.TieneEspacios,
+	       CAST(CASE WHEN r.TieneFormaciones = 1 OR r.TieneSustituciones = 1 OR r.TieneGoles = 1
+	                   OR r.TieneAmonestaciones = 1 OR r.TieneDesignaciones = 1 OR r.TieneSanciones = 1
+	                   OR r.TieneEspacios = 1
+	                 THEN 1 ELSE 0 END AS BIT) AS TieneAlguno
+	FROM (
+		SELECT CAST(CASE WHEN EXISTS (SELECT 1 FROM jugadores.Formacion WHERE IdPartido = @IdPartido)
+		                 THEN 1 ELSE 0 END AS BIT) AS TieneFormaciones,
+		       CAST(CASE WHEN EXISTS (SELECT 1 FROM jugadores.Sustitucion WHERE IdPartido = @IdPartido)
+		                 THEN 1 ELSE 0 END AS BIT) AS TieneSustituciones,
+		       CAST(CASE WHEN EXISTS (SELECT 1 FROM eventos.Gol WHERE IdPartido = @IdPartido)
+		                 THEN 1 ELSE 0 END AS BIT) AS TieneGoles,
+		       CAST(CASE WHEN EXISTS (SELECT 1 FROM eventos.Amonestacion WHERE IdPartido = @IdPartido)
+		                 THEN 1 ELSE 0 END AS BIT) AS TieneAmonestaciones,
+		       CAST(CASE WHEN EXISTS (SELECT 1 FROM nucleo.DesignacionArbitral WHERE IdPartido = @IdPartido)
+		                 THEN 1 ELSE 0 END AS BIT) AS TieneDesignaciones,
+		       CAST(CASE WHEN EXISTS (SELECT 1
+		                              FROM nucleo.Sancion AS sa
+		                              INNER JOIN nucleo.DesignacionArbitral AS d ON d.IdDesignacionArbitral = sa.IdDesignacionArbitral
+		                              WHERE d.IdPartido = @IdPartido)
+		                 THEN 1 ELSE 0 END AS BIT) AS TieneSanciones,
+		       CAST(CASE WHEN EXISTS (SELECT 1 FROM publicidad.EspacioPublicitario WHERE IdPartido = @IdPartido)
+		                 THEN 1 ELSE 0 END AS BIT) AS TieneEspacios
+	) AS r
 );
 GO
