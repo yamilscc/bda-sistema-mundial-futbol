@@ -82,8 +82,8 @@ BEGIN
     SELECT @nombre = p.Nombre, @iso2 = p.Iso2, @iso3 = p.Iso3, @huso = p.Huso, @idConf = c.IdConfederacion
     FROM @pais AS p INNER JOIN nucleo.Confederacion AS c ON c.Sigla = p.Conf WHERE p.Id = @i;
     IF NOT EXISTS (SELECT 1 FROM nucleo.Pais WHERE CodigoISO3 = @iso3)
-        EXEC nucleo.SP_ABM_Pais @operacion = 'ALTA', @nombre = @nombre, @codigoISO2 = @iso2, @codigoISO3 = @iso3,
-                                @idConfederacion = @idConf, @husoHorarioComercial = @huso;
+        EXEC nucleo.SP_ALTA_Pais @nombre = @nombre, @codigoISO2 = @iso2, @codigoISO3 = @iso3,
+                                 @idConfederacion = @idConf, @husoHorarioComercial = @huso;
     SET @i += 1;
 END;
 GO
@@ -102,8 +102,8 @@ BEGIN
     FROM @sel AS s INNER JOIN nucleo.Pais AS p ON p.CodigoISO3 = s.Iso3 INNER JOIN nucleo.Grupo AS g ON g.Nombre = s.Grupo
     WHERE s.Id = @i;
     IF NOT EXISTS (SELECT 1 FROM nucleo.Seleccion WHERE CodigoFIFA = @iso3)
-        EXEC nucleo.SP_ABM_Seleccion @operacion = 'ALTA', @codigoFIFA = @iso3, @rankingFIFA = @ranking,
-                                     @esAnfitrion = @anf, @idPais = @idPais, @idGrupo = @idGrupo;
+        EXEC nucleo.SP_ALTA_Seleccion @codigoFIFA = @iso3, @rankingFIFA = @ranking,
+                                      @esAnfitrion = @anf, @idPais = @idPais, @idGrupo = @idGrupo;
     SET @i += 1;
 END;
 
@@ -120,7 +120,7 @@ WHILE @i <= @n
 BEGIN
     SELECT @idSel = IdSeleccion, @rol = Rol, @nom = Nombre FROM @staff WHERE Id = @i;
     IF NOT EXISTS (SELECT 1 FROM nucleo.StaffTecnico WHERE IdSeleccion = @idSel AND Rol = @rol)
-        EXEC nucleo.SP_ABM_StaffTecnico @operacion = 'ALTA', @idSeleccion = @idSel, @nombreApellido = @nom, @rol = @rol;
+        EXEC nucleo.SP_ALTA_StaffTecnico @idSeleccion = @idSel, @nombreApellido = @nom, @rol = @rol;
     SET @i += 1;
 END;
 GO
@@ -162,14 +162,14 @@ BEGIN
     SET @idArb = (SELECT IdArbitro FROM nucleo.Arbitro WHERE NombreApellido = @nombre AND FechaNacimiento = @nac);
     IF @idArb IS NULL
     BEGIN
-        EXEC nucleo.SP_ABM_Arbitro @operacion = 'ALTA', @nombreApellido = @nombre, @sexo = @sexo, @estaHabilitado = 'Y',
-                                   @fechaNacimiento = @nac, @idPais = @idPais, @idCategoria = @idCat;
+        EXEC nucleo.SP_ALTA_Arbitro @nombreApellido = @nombre, @sexo = @sexo, @estaHabilitado = 'Y',
+                                    @fechaNacimiento = @nac, @idPais = @idPais, @idCategoria = @idCat;
         SET @idArb = (SELECT IdArbitro FROM nucleo.Arbitro WHERE NombreApellido = @nombre AND FechaNacimiento = @nac);
     END;
     IF NOT EXISTS (SELECT 1 FROM nucleo.ArbitroIdioma WHERE IdArbitro = @idArb AND IdIdioma = @idI1)
-        EXEC nucleo.SP_ABM_ArbitroIdioma @operacion = 'ALTA', @idArbitro = @idArb, @idIdioma = @idI1;
+        EXEC nucleo.SP_ALTA_ArbitroIdioma @idArbitro = @idArb, @idIdioma = @idI1;
     IF NOT EXISTS (SELECT 1 FROM nucleo.ArbitroIdioma WHERE IdArbitro = @idArb AND IdIdioma = @idI2)
-        EXEC nucleo.SP_ABM_ArbitroIdioma @operacion = 'ALTA', @idArbitro = @idArb, @idIdioma = @idI2;
+        EXEC nucleo.SP_ALTA_ArbitroIdioma @idArbitro = @idArb, @idIdioma = @idI2;
     SET @i += 1;
 END;
 GO
@@ -185,7 +185,7 @@ WHILE @i <= @n
 BEGIN
     SELECT @nombre = a.Nombre, @idPais = p.IdPais FROM @anu AS a INNER JOIN nucleo.Pais AS p ON p.CodigoISO3 = a.Iso3 WHERE a.Id = @i;
     IF NOT EXISTS (SELECT 1 FROM publicidad.Anunciante WHERE Nombre = @nombre)
-        EXEC publicidad.SP_ABM_Anunciante @operacion = 'ALTA', @nombre = @nombre, @idPais = @idPais;
+        EXEC publicidad.SP_ALTA_Anunciante @nombre = @nombre, @idPais = @idPais;
     SET @i += 1;
 END;
 
@@ -213,7 +213,7 @@ BEGIN
     INNER JOIN nucleo.Idioma AS id ON id.Nombre = z.Idioma
     WHERE z.Id = @i;
     IF NOT EXISTS (SELECT 1 FROM publicidad.Pieza WHERE IdAnunciante = @idAnu AND Titulo = @titulo AND IdIdioma = @idIdioma)
-        EXEC publicidad.SP_ABM_Pieza @operacion = 'ALTA', @idAnunciante = @idAnu, @idIdioma = @idIdioma,
+        EXEC publicidad.SP_ALTA_Pieza @idAnunciante = @idAnu, @idIdioma = @idIdioma,
                                      @titulo = @titulo, @descripcion = 'Campaña Mundial 2026';
     SET @i += 1;
 END;
@@ -234,7 +234,7 @@ WHILE @i <= @n
 BEGIN
     SELECT @idPz = IdPieza, @idPa = IdPais FROM @orient WHERE Id = @i;
     IF NOT EXISTS (SELECT 1 FROM publicidad.OrientacionPais WHERE IdPieza = @idPz AND IdPais = @idPa)
-        EXEC publicidad.SP_ABM_OrientacionPais @operacion = 'ALTA', @idPieza = @idPz, @idPais = @idPa;
+        EXEC publicidad.SP_ALTA_OrientacionPais @idPieza = @idPz, @idPais = @idPa;
     SET @i += 1;
 END;
 GO
