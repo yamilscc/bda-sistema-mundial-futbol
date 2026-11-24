@@ -1,0 +1,83 @@
+[
+ {
+  "numeroPartido": 1,
+  "numeroEspacio": 1,
+  "anunciante": "Pampa Telecom",
+  "titulo": "Conect\u00e1 el Mundial",
+  "idioma": "Espa\u00f1ol",
+  "monto": 150000,
+  "moneda": "EUR"
+ },
+ {
+  "numeroPartido": 1,
+  "numeroEspacio": 2,
+  "anunciante": "Liberty Sportswear",
+  "titulo": "Pura Pasi\u00f3n",
+  "idioma": "Espa\u00f1ol",
+  "monto": 14000000,
+  "moneda": "JPY"
+ },
+ {
+  "numeroPartido": 2,
+  "numeroEspacio": 1,
+  "anunciante": "Sakura Motors",
+  "titulo": "Drive the Future",
+  "idioma": "Ingl\u00e9s",
+  "monto": 12000000,
+  "moneda": "JPY"
+ },
+ {
+  "numeroPartido": 3,
+  "numeroEspacio": 1,
+  "anunciante": "Helvetia Watches",
+  "titulo": "Tiempo de Campeones",
+  "idioma": "Alem\u00e1n",
+  "monto": 80000,
+  "moneda": "GBP"
+ },
+ {
+  "numeroPartido": 4,
+  "numeroEspacio": 1,
+  "anunciante": "Verde Bebidas",
+  "titulo": "Sabor de Torcida",
+  "idioma": "Portugu\u00e9s",
+  "monto": 500000,
+  "moneda": "BRL"
+ },
+ {
+  "numeroPartido": 5,
+  "numeroEspacio": 1,
+  "anunciante": "Maple Bank",
+  "titulo": "Banking Goals",
+  "idioma": "Ingl\u00e9s",
+  "monto": 100000,
+  "moneda": "USD"
+ },
+ {
+  "numeroPartido": 6,
+  "numeroEspacio": 1,
+  "anunciante": "Pampa Telecom",
+  "titulo": "Roaming Mundialista",
+  "idioma": "Ingl\u00e9s",
+  "monto": 90000000,
+  "moneda": "ARS"
+ },
+ {
+  "numeroPartido": 99,
+  "numeroEspacio": 1,
+  "anunciante": "Maple Bank",
+  "titulo": "Banking Goals",
+  "idioma": "Ingl\u00e9s",
+  "monto": 100000,
+  "moneda": "USD"
+ },
+ {
+  "numeroPartido": 7,
+  "numeroEspacio": 1,
+  "anunciante": "Anunciante Fantasma",
+  "titulo": "Sin Pieza",
+  "idioma": "Espa\u00f1ol",
+  "monto": 50000,
+  "moneda": "USD"
+ }
+]

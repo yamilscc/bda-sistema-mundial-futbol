@@ -75,7 +75,7 @@ Cada archivo empieza con dos dígitos que marcan su orden. Los números 01 a 28 
 | 06 | `06_FK_Cruzadas.sql` | Claves foráneas que cruzan módulos (jugadores, eventos y publicidad hacia el núcleo) | Elías |
 | 07 | `07_Funciones_Nucleo.sql` | `fn_SeleccionesDelPartido`, `fn_MercadosEnPrimeTime`, `fn_SeleccionConPartidoCercano` (descanso de 48 horas) y `fn_PartidoTieneRegistros` | Yamil |
 | 08 | `08_SP_ControlArbitral.sql` | `SP_CONTROL_ARBITRAL`: designación de árbitros con validación de nacionalidad y advertencia de cruce | Elías |
-| 09 | `09_SP_Sedes_Partidos.sql` | ABM de sedes y partidos, registro de resultados y cálculo de selecciones clasificadas | Yamil |
+| 09 | `09_SP_Sedes_Partidos.sql` | ABM de sedes y partidos, registro de resultados y cálculo de selecciones clasificadas | Elías |
 | 10 | `10_Funciones_Eventos.sql` | `fn_ResultadoPartido` y `fn_EstaSuspendido` | Mateo |
 | 11 | `11_SP_RegistrarGol.sql` | `SP_REGISTRAR_GOL` | Mateo |
 | 12 | `12_SP_RegistrarAmonestacion.sql` | `SP_REGISTRAR_AMONESTACION` con cálculo de suspensión | Mateo |
@@ -131,9 +131,9 @@ Scripts de testing (en `scripts/testing/`):
 
 Pendientes: importación de datos (`scripts/importacion/`), datos de prueba (seed), reportes, seguridad y respaldo.
 
-> Las claves foráneas que cruzan módulos (por ejemplo, de `Convocatoria` hacia `Seleccion` o de `EspacioPublicitario` hacia `Partido`) se agregan con `ALTER TABLE` en `06_FK_Cruzadas.sql`, una vez creadas todas las tablas.
+**Casos obligatorios de nucleo y publicidad:** partido 1 (ARG vs BRA, 23:00 UTC) en prime time en 6 mercados (ARG, BRA, URU, CHI, USA, CAN); árbitro argentino rechazado en ARG vs BRA (queda en `eventos.LogImportacion`, archivo `seed_designaciones`); importación de pauta con 6 filas válidas y 3 inválidas.
 
----
+**Decisiones del fixture:** los 24 partidos son de *Fase de grupos* (4 grupos de 4 = 24 cruces). `SP_ALTA_Partido` no admite selecciones en fases eliminatorias (se asignarían con `SP_DEFINIR_CRUCE_ELIMINATORIO`, que no está en el repositorio) y las formaciones de Mateo exigen las dos selecciones definidas. BRA está en el Grupo A, junto a ARG, porque los partidos de grupos deben ser entre selecciones del mismo grupo. Las selecciones juegan con 5 días de separación (la regla real de descanso del SP es de 48 h).
 
 ## Clasificación
 
@@ -177,21 +177,17 @@ Además:
 
 ## Asignación de publicidad
 
-Cada partido tiene exactamente 4 espacios publicitarios. Cada espacio recibe una pieza de `publicidad.Pieza`, elegida al azar entre las que están orientadas a los países que correspondan según `publicidad.OrientacionPais`:
+Ninguna requiere API key. Los archivos se generan con `scripts/importacion/fuentes_externas.py` (Python 3; `pip install requests beautifulsoup4` solo para el scraping).
 
-| Espacio | Países considerados |
-|---|---|
-| 1 | País de la selección local |
-| 2 | País de la selección visitante |
-| 3 | Los 3 países con mayor `PBIPerCapitaUSD` |
-| 4 | Países para los que el partido cae en prime time local (19:00 a 23:00) |
+| Fuente | URL y parámetros | Límites de uso | Destino |
+|---|---|---|---|
+| API Banco Mundial | `https://api.worldbank.org/v2/country/AR;BR;...;AU/indicator/NY.GDP.PCAP.CD?format=json&date=2018:2024&per_page=1000` (países por ISO2) | Pública y gratuita, sin API key; sin cuota publicada (se hace 1 sola consulta) | `nucleo.SP_IMPORTAR_PBI_JSON` -> `Pais.PBIPerCapitaUSD` (último año con dato) |
+| API Frankfurter | `https://api.frankfurter.app/latest?from=USD&to=EUR,BRL,JPY,GBP` | Gratuita, sin API key ni límite fijo (se hace 1 consulta). Usa cotizaciones del BCE: **no publica ARS** | `publicidad.SP_IMPORTAR_COTIZACIONES_JSON` -> `CotizacionMoneda`; `SP_IMPORTAR_PAUTA_JSON` convierte a USD |
+| Scraping Wikipedia | `https://en.wikipedia.org/wiki/2026_FIFA_World_Cup` (tabla de sedes: capacidad) | Sin API key; se envía un `User-Agent` identificatorio y se hace 1 sola descarga. `--offline` usa los datos incluidos en el script | `fixture_sedes.csv` -> `eventos.vw_CargaStagingFixture` -> `nucleo.SP_IMPORTAR_FIXTURE_CSV` |
 
-Reglas adicionales:
+El Banco Mundial se cruza por `CodigoISO2` y no por `CodigoISO3` porque varios códigos del torneo son códigos FIFA (NED, GER, ENG, SUI, CHI). Las coordenadas, el huso y el cruce de partidos del fixture salen del propio script; del scraping se toma la capacidad.
 
-- Las 4 piezas de un partido deben ser distintas.
-- Si no hay piezas orientadas a los países de un espacio, se asigna cualquier pieza que no esté usada en ese partido.
-- El horario local de cada país se calcula a partir de `Partido.FechaHoraUTC` y el huso horario del país (`nucleo.fn_MercadosEnPrimeTime`).
-- La elección al azar se hace una sola vez: la pieza elegida queda guardada en `publicidad.EspacioPublicitario` y no se vuelve a sortear.
+> Las claves foráneas que cruzan módulos (por ejemplo, de `Convocatoria` hacia `Seleccion` o de `EspacioPublicitario` hacia `Partido`) se agregan con `ALTER TABLE` en `06_FK_Cruzadas.sql`, una vez creadas todas las tablas.
 
 ---
 

@@ -193,6 +193,11 @@ GO
 :r $(RUTA)\21_SP_AsignarPublicidad.sql
 GO
 
+PRINT '--- 22 SP importación de nucleo y publicidad (PBI, cotizaciones, pauta y fixture)';
+GO
+:r $(RUTA)\22_SP_Importacion_Nucleo_Publicidad.sql
+GO
+
 PRINT '--- 23 SP importación XML de jugadores';
 GO
 :r $(RUTA)\23_SP_Importacion_Jugadores.sql
