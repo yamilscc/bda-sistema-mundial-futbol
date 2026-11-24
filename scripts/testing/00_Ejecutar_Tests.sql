@@ -9,7 +9,7 @@ Torczuk, Elías Alexei
 Canseco Carrizo, Yamil Simón
 Objetivo:
 	- Orquestar la ejecución de TODOS los scripts de testing en el orden de su número
-	  (01 a 24 y el test del seed en importacion/), igual que 00_Reset_Total.sql orquesta los scripts de creación.
+	  (01 a 28 y el test del seed en importacion/), igual que 00_Reset_Total.sql orquesta los scripts de creación.
 	- Entre test y test, deshacer cualquier transacción que haya quedado abierta, para que
 	  un test cortado a mitad de camino no arrastre sus datos al siguiente.
 	- Verificar al inicio que la base exista y esté recién creada (el test 01 lo requiere).
@@ -245,6 +245,42 @@ GO
 PRINT '===== TEST 24 SP importación CSV de eventos';
 GO
 :r $(RUTA)\24_Test_SP_Importacion_Eventos.sql
+GO
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
+GO
+USE MundialFutbol;
+GO
+
+PRINT '===== TEST 25 Funciones de partidos';
+GO
+:r $(RUTA)\25_Test_Funciones_Partidos.sql
+GO
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
+GO
+USE MundialFutbol;
+GO
+
+PRINT '===== TEST 26 SP finalizar partido';
+GO
+:r $(RUTA)\26_Test_SP_FinalizarPartido.sql
+GO
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
+GO
+USE MundialFutbol;
+GO
+
+PRINT '===== TEST 27 SP cálculo de selecciones clasificadas';
+GO
+:r $(RUTA)\27_Test_SP_CalculoSeleccionesClasificadas.sql
+GO
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
+GO
+USE MundialFutbol;
+GO
+
+PRINT '===== TEST 28 SP definir cruce eliminatorio';
+GO
+:r $(RUTA)\28_Test_SP_DefinirCruceEliminatorio.sql
 GO
 WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
 GO
