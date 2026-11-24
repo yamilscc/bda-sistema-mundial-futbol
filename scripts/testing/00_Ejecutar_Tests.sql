@@ -38,17 +38,17 @@ SET NOCOUNT ON;
 GO
 
 -- =========================================================================
--- VERIFICACI�N PREVIA
+-- VERIFICACIÓN PREVIA
 -- =========================================================================
 IF DB_ID('MundialFutbol') IS NULL
-	PRINT 'ATENCI�N: la base MundialFutbol no existe. Ejecutar primero creacion\00_Reset_Total.sql.';
+	PRINT 'ATENCIÓN: la base MundialFutbol no existe. Ejecutar primero creacion\00_Reset_Total.sql.';
 GO
 
 USE MundialFutbol;
 GO
 
 IF EXISTS (SELECT 1 FROM nucleo.Grupo) OR EXISTS (SELECT 1 FROM nucleo.Partido)
-	PRINT 'ATENCI�N: la base ya tiene grupos o partidos cargados. El test 01 espera una base reci�n '
+	PRINT 'ATENCIÓN: la base ya tiene grupos o partidos cargados. El test 01 espera una base recién '
 	    + 'creada: conviene ejecutar antes creacion\00_Reset_Total.sql.';
 GO
 
@@ -57,16 +57,16 @@ PRINT 'Inicio de la corrida de tests: ' + CONVERT(VARCHAR(19), @inicio, 120);
 GO
 
 -- =========================================================================
--- EJECUCI�N ORDENADA DE LOS TESTS
--- Despu�s de cada :r va el bloque de control: deshace transacciones abiertas y vuelve a la
--- base MundialFutbol (por si un test cambi� de contexto).
+-- EJECUCIÓN ORDENADA DE LOS TESTS
+-- Después de cada :r va el bloque de control: deshace transacciones abiertas y vuelve a la
+-- base MundialFutbol (por si un test cambió de contexto).
 -- =========================================================================
 
-PRINT '===== TEST 01 Tablas del n�cleo';
+PRINT '===== TEST 01 Tablas del núcleo';
 GO
 :r $(RUTA)\01_Test_Tablas_Nucleo.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued� una transacci�n abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
@@ -75,7 +75,7 @@ PRINT '===== TEST 02 Tablas de jugadores';
 GO
 :r $(RUTA)\02_Test_Tablas_Jugadores.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued� una transacci�n abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
@@ -84,7 +84,7 @@ PRINT '===== TEST 03 Tablas de eventos';
 GO
 :r $(RUTA)\03_Test_Tablas_Eventos.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued� una transacci�n abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
@@ -93,16 +93,16 @@ PRINT '===== TEST 04 Tablas de publicidad';
 GO
 :r $(RUTA)\04_Test_Tablas_Publicidad.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued� una transacci�n abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
 
-PRINT '===== TEST 07 Funciones del n�cleo';
+PRINT '===== TEST 07 Funciones del núcleo';
 GO
 :r $(RUTA)\07_Test_Funciones_Nucleo.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued� una transacci�n abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
@@ -111,7 +111,7 @@ PRINT '===== TEST 08 SP de control arbitral';
 GO
 :r $(RUTA)\08_Test_SP_ControlArbitral.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued� una transacci�n abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
@@ -120,7 +120,7 @@ PRINT '===== TEST 09 SP de sedes y partidos';
 GO
 :r $(RUTA)\09_Test_SP_Sedes_Partidos.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued� una transacci�n abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
@@ -129,7 +129,7 @@ PRINT '===== TEST 10 Funciones de eventos';
 GO
 :r $(RUTA)\10_Test_Funciones_Eventos.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued� una transacci�n abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
@@ -138,16 +138,16 @@ PRINT '===== TEST 11 SP registrar gol';
 GO
 :r $(RUTA)\11_Test_SP_RegistrarGol.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued� una transacci�n abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
 
-PRINT '===== TEST 12 SP registrar amonestaci�n';
+PRINT '===== TEST 12 SP registrar amonestación';
 GO
 :r $(RUTA)\12_Test_SP_RegistrarAmonestacion.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued� una transacci�n abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
@@ -156,7 +156,7 @@ PRINT '===== TEST 13 SP ABM de eventos';
 GO
 :r $(RUTA)\13_Test_SP_ABM_Eventos.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued� una transacci�n abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
@@ -165,7 +165,7 @@ PRINT '===== TEST 14 Funciones de jugadores';
 GO
 :r $(RUTA)\14_Test_Funciones_Jugadores.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued� una transacci�n abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
@@ -174,25 +174,25 @@ PRINT '===== TEST 15 SP de convocatoria y bajas';
 GO
 :r $(RUTA)\15_Test_SP_Convocatoria_Baja.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued� una transacci�n abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
 
-PRINT '===== TEST 16 SP registrar formaci�n';
+PRINT '===== TEST 16 SP registrar formación';
 GO
 :r $(RUTA)\16_Test_SP_RegistrarFormacion.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued� una transacci�n abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
 
-PRINT '===== TEST 17 SP registrar sustituci�n';
+PRINT '===== TEST 17 SP registrar sustitución';
 GO
 :r $(RUTA)\17_Test_SP_RegistrarSustitucion.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued� una transacci�n abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
@@ -201,16 +201,16 @@ PRINT '===== TEST 18 SP ABM de jugadores';
 GO
 :r $(RUTA)\18_Test_SP_ABM_Jugadores.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued� una transacci�n abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
 
-PRINT '===== TEST 19 SP ABM restantes del n�cleo';
+PRINT '===== TEST 19 SP ABM restantes del núcleo';
 GO
 :r $(RUTA)\19_Test_SP_ABM_Nucleo.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued� una transacci�n abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
@@ -219,7 +219,7 @@ PRINT '===== TEST 20 SP ABM de publicidad';
 GO
 :r $(RUTA)\20_Test_SP_ABM_Publicidad.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued� una transacci�n abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
@@ -228,34 +228,34 @@ PRINT '===== TEST 21 SP asignar publicidad';
 GO
 :r $(RUTA)\21_Test_SP_AsignarPublicidad.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued� una transacci�n abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
 
-PRINT '===== TEST 22 Importaci�n de nucleo y publicidad (fixture, PBI, cotizaciones y pauta)';
+PRINT '===== TEST 22 Importación de nucleo y publicidad (fixture, PBI, cotizaciones y pauta)';
 GO
 :r $(RUTA)\22_Test_SP_Importacion_Nucleo_Publicidad.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued� una transacci�n abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
 
-PRINT '===== TEST 23 SP importaci�n XML de jugadores';
+PRINT '===== TEST 23 SP importación XML de jugadores';
 GO
 :r $(RUTA)\23_Test_SP_Importacion_Jugadores.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued� una transacci�n abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
 
-PRINT '===== TEST 24 SP importaci�n CSV de eventos';
+PRINT '===== TEST 24 SP importación CSV de eventos';
 GO
 :r $(RUTA)\24_Test_SP_Importacion_Eventos.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued� una transacci�n abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
@@ -264,7 +264,7 @@ PRINT '===== TEST 25 Funciones de partidos';
 GO
 :r $(RUTA)\25_Test_Funciones_Partidos.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued� una transacci�n abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
@@ -273,16 +273,16 @@ PRINT '===== TEST 26 SP finalizar partido';
 GO
 :r $(RUTA)\26_Test_SP_FinalizarPartido.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued� una transacci�n abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
 
-PRINT '===== TEST 27 SP c�lculo de selecciones clasificadas';
+PRINT '===== TEST 27 SP cálculo de selecciones clasificadas';
 GO
 :r $(RUTA)\27_Test_SP_CalculoSeleccionesClasificadas.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued� una transacci�n abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
@@ -291,7 +291,7 @@ PRINT '===== TEST 28 SP definir cruce eliminatorio';
 GO
 :r $(RUTA)\28_Test_SP_DefinirCruceEliminatorio.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued� una transacci�n abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
@@ -300,7 +300,7 @@ PRINT '===== TEST importacion/03 Seed de jugadores y eventos (escenario aislado)
 GO
 :r $(RUTA)\importacion\03_Test_Seed_Jugadores_Eventos.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued� una transacci�n abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
@@ -323,36 +323,9 @@ GO
 USE MundialFutbol;
 GO
 
-PRINT '===== TEST 31A Roles: Rol_Administrador (Entrega 8)';
+PRINT '===== TEST 31 Seguridad: Roles y Permisos (Entrega 8)';
 GO
-:r $(RUTA)\31_Test_Rol_Administrador.sql
-GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
-GO
-USE MundialFutbol;
-GO
-
-PRINT '===== TEST 31B Roles: Rol_OperadorResultados (Entrega 8)';
-GO
-:r $(RUTA)\31_Test_Rol_OperadorResultados.sql
-GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
-GO
-USE MundialFutbol;
-GO
-
-PRINT '===== TEST 31C Roles: Rol_GestorPublicidad (Entrega 8)';
-GO
-:r $(RUTA)\31_Test_Rol_GestorPublicidad.sql
-GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
-GO
-USE MundialFutbol;
-GO
-
-PRINT '===== TEST 31D Roles: Rol_Consulta (Entrega 8)';
-GO
-:r $(RUTA)\31_Test_Rol_Consulta.sql
+:r $(RUTA)\31_Test_Seguridad_Roles_Permisos.sql
 GO
 WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
 GO
@@ -388,7 +361,7 @@ FROM (
 ) AS t;
 
 PRINT 'Fin de la corrida de tests: ' + CONVERT(VARCHAR(19), SYSDATETIME(), 120);
-PRINT 'Buscar "FALL�" en la pesta�a Mensajes: no deber�a aparecer ninguna vez.';
+PRINT 'Buscar "FALLÓ" en la pestaña Mensajes: no debería aparecer ninguna vez.';
 GO
 
 SET NOCOUNT OFF;
