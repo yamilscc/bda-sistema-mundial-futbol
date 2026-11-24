@@ -228,6 +228,11 @@ GO
 :r $(RUTA)\28_SP_DefinirCruceEliminatorio.sql
 GO
 
+PRINT '--- 26 SP Reportes';
+GO
+:r $(RUTA)\26_SP_Reportes.sql
+GO
+
 -- Los próximos SP, vistas y funciones se suman acá, siempre en orden numérico.
 
 -- =========================================================================
