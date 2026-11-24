@@ -58,7 +58,7 @@ GO
 
 -- ===== 2. Caso obligatorio: designación rechazada por nacionalidad =====
 DECLARE @idPartido INT = (SELECT IdPartido FROM nucleo.Partido WHERE NumeroPartido = 1),
-        @idArbitro INT = (SELECT IdArbitro FROM nucleo.Arbitro WHERE NombreApellido = 'Néstor Ferrante'), -- argentino
+        @idArbitro INT = nucleo.fn_IdArbitroPorNombre('Néstor Ferrante'), -- argentino (busca también con el nombre cifrado)
         @adv VARCHAR(200), @mensaje NVARCHAR(500);
 IF @idPartido IS NOT NULL AND @idArbitro IS NOT NULL
    AND NOT EXISTS (SELECT 1 FROM eventos.LogImportacion WHERE NombreArchivo = 'seed_designaciones' AND MensajeError LIKE '%país del árbitro%')

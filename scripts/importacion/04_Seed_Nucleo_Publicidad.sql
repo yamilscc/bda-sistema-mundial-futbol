@@ -161,12 +161,12 @@ BEGIN
     INNER JOIN nucleo.Idioma AS i1 ON i1.Nombre = a.Idioma1
     INNER JOIN nucleo.Idioma AS i2 ON i2.Nombre = a.Idioma2
     WHERE a.Id = @i;
-    SET @idArb = (SELECT IdArbitro FROM nucleo.Arbitro WHERE NombreApellido = @nombre AND FechaNacimiento = @nac);
+    SET @idArb = nucleo.fn_IdArbitroPorNombre(@nombre);   -- busca también con el nombre cifrado (script 31)
     IF @idArb IS NULL
     BEGIN
         EXEC nucleo.SP_ALTA_Arbitro @nombreApellido = @nombre, @sexo = @sexo, @estaHabilitado = 'Y',
                                     @fechaNacimiento = @nac, @idPais = @idPais, @idCategoria = @idCat;
-        SET @idArb = (SELECT IdArbitro FROM nucleo.Arbitro WHERE NombreApellido = @nombre AND FechaNacimiento = @nac);
+        SET @idArb = nucleo.fn_IdArbitroPorNombre(@nombre);
     END;
     IF NOT EXISTS (SELECT 1 FROM nucleo.ArbitroIdioma WHERE IdArbitro = @idArb AND IdIdioma = @idI1)
         EXEC nucleo.SP_ALTA_ArbitroIdioma @idArbitro = @idArb, @idIdioma = @idI1;

@@ -17,6 +17,11 @@ Objetivo:
 		  - nucleo.fn_PartidoTieneRegistros: qué registros asociados tiene un partido
 		    (formaciones, sustituciones, goles, amonestaciones, designaciones, sanciones y
 		    espacios publicitarios), única fuente para los SP de partidos.
+	- Funciones escalares de búsqueda y de nombre visible de árbitros y staff técnico
+	  (nucleo.fn_IdArbitroPorNombre, nucleo.fn_IdStaffPorNombre, nucleo.fn_NombreArbitro y
+	  nucleo.fn_NombreStaff). Son el único punto por el que importaciones, seeds y reportes
+	  buscan o muestran estos nombres: 31_Seguridad_Cifrado.sql las modifica para que operen
+	  sobre los datos cifrados sin tocar a quienes las usan.
 */
 
 USE MundialFutbol;
@@ -197,4 +202,47 @@ RETURN
 		                 THEN 1 ELSE 0 END AS BIT) AS TieneEspacios
 	) AS r
 );
+GO
+
+/*
+nucleo.fn_IdArbitroPorNombre / nucleo.fn_IdStaffPorNombre
+Propósito: devolver el Id del árbitro (o integrante del staff técnico) con ese nombre y apellido,
+	o NULL si no existe. Si hay homónimos devuelve el de menor Id.
+nucleo.fn_NombreArbitro / nucleo.fn_NombreStaff
+Propósito: devolver el nombre y apellido visible de un árbitro (o integrante del staff técnico).
+Versión inicial: comparan y devuelven la columna NombreApellido en texto plano. El script
+31_Seguridad_Cifrado.sql las redefine (CREATE OR ALTER) para buscar por hash y descifrar.
+*/
+CREATE OR ALTER FUNCTION nucleo.fn_IdArbitroPorNombre (@nombreApellido VARCHAR(200))
+RETURNS INT
+AS
+BEGIN
+	RETURN (SELECT TOP (1) IdArbitro FROM nucleo.Arbitro
+	        WHERE NombreApellido = LTRIM(RTRIM(@nombreApellido)) ORDER BY IdArbitro);
+END;
+GO
+
+CREATE OR ALTER FUNCTION nucleo.fn_IdStaffPorNombre (@nombreApellido VARCHAR(200))
+RETURNS INT
+AS
+BEGIN
+	RETURN (SELECT TOP (1) IdStaffTecnico FROM nucleo.StaffTecnico
+	        WHERE NombreApellido = LTRIM(RTRIM(@nombreApellido)) ORDER BY IdStaffTecnico);
+END;
+GO
+
+CREATE OR ALTER FUNCTION nucleo.fn_NombreArbitro (@idArbitro INT)
+RETURNS VARCHAR(200)
+AS
+BEGIN
+	RETURN (SELECT NombreApellido FROM nucleo.Arbitro WHERE IdArbitro = @idArbitro);
+END;
+GO
+
+CREATE OR ALTER FUNCTION nucleo.fn_NombreStaff (@idStaffTecnico INT)
+RETURNS VARCHAR(200)
+AS
+BEGIN
+	RETURN (SELECT NombreApellido FROM nucleo.StaffTecnico WHERE IdStaffTecnico = @idStaffTecnico);
+END;
 GO

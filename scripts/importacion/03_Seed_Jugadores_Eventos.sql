@@ -210,8 +210,7 @@ BEGIN
             FROM jugadores.Club
             ORDER BY (IdClub + @dorsal + @idxSel) % 12, IdClub;
 
-            SET @idJugNuevo = NULL;   -- un SELECT sin filas no pisa la variable: sin esto queda el jugador de la vuelta anterior
-            SELECT @idJugNuevo = IdJugador FROM jugadores.Jugador WHERE Documento = @docJug;
+            SET @idJugNuevo = jugadores.fn_IdJugadorPorDocumento(@docJug);   -- NULL si no existe (también con el documento cifrado)
 
             IF @idJugNuevo IS NULL
                 EXEC jugadores.SP_ALTA_Jugador

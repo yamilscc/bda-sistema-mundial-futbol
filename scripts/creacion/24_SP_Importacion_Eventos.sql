@@ -197,18 +197,14 @@ BEGIN
                 IF @docSancionado IS NULL OR @docSancionado = ''
                     THROW 52000, N'El documento del jugador autor del gol es obligatorio.', 1;
 
-                SELECT @idJugadorAutor = IdJugador
-                FROM jugadores.Jugador
-                WHERE Documento = @docSancionado;
+                SET @idJugadorAutor = jugadores.fn_IdJugadorPorDocumento(@docSancionado);
 
                 IF @idJugadorAutor IS NULL
                     THROW 52000, N'No existe un jugador con el DocumentoSancionado informado.', 1;
 
                 IF @docAsistente IS NOT NULL AND @docAsistente <> ''
                 BEGIN
-                    SELECT @idJugadorAsist = IdJugador
-                    FROM jugadores.Jugador
-                    WHERE Documento = @docAsistente;
+                    SET @idJugadorAsist = jugadores.fn_IdJugadorPorDocumento(@docAsistente);
 
                     IF @idJugadorAsist IS NULL
                         THROW 52000, N'No existe un jugador con el DocumentoAsistente informado.', 1;
@@ -251,14 +247,10 @@ BEGIN
                 IF @docSancionado IS NULL OR @docSancionado = ''
                     THROW 52000, N'El documento del jugador o miembro del staff sancionado es obligatorio.', 1;
 
-                SELECT @idJugadorAutor = IdJugador
-                FROM jugadores.Jugador
-                WHERE Documento = @docSancionado;
+                SET @idJugadorAutor = jugadores.fn_IdJugadorPorDocumento(@docSancionado);
 
                 IF @idJugadorAutor IS NULL
-                    SELECT @idStaffTecnico = IdStaffTecnico
-                    FROM nucleo.StaffTecnico
-                    WHERE NombreApellido = @docSancionado;
+                    SET @idStaffTecnico = nucleo.fn_IdStaffPorNombre(@docSancionado);
 
                 IF @idJugadorAutor IS NULL AND @idStaffTecnico IS NULL
                     THROW 52000, N'No existe jugador ni integrante del staff técnico con el DocumentoSancionado informado.', 1;
