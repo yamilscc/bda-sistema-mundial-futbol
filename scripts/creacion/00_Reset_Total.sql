@@ -228,6 +228,11 @@ GO
 :r $(RUTA)\28_SP_DefinirCruceEliminatorio.sql
 GO
 
+PRINT '--- 29 SP importación de campañas del dossier';
+GO
+:r $(RUTA)\29_SP_Importacion_Campanias.sql
+GO
+
 -- Los próximos SP, vistas y funciones se suman acá, siempre en orden numérico.
 
 -- =========================================================================
