@@ -50,7 +50,7 @@ BEGIN
             @idTipoGol INT,
             @idPeriodo INT;
 
-    -- Todas las validaciones están en eventos.fn_ValidarGol (la comparte SP_ABM_Gol).
+    -- Todas las validaciones están en eventos.fn_ValidarGol (la comparte SP_MODIFICACION_Gol).
     SET @errores = eventos.fn_ValidarGol(@idPartido, @idJugadorAutor, @tipoGol, @periodo, @minuto,
                                          @idJugadorAsistencia, @permitirFechaFutura);
 

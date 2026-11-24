@@ -1133,7 +1133,7 @@ GO
 
 -- =========================================================================
 -- 12. SP_ABM_DesignacionArbitral
--- En ALTA delega en nucleo.SP_CONTROL_ARBITRAL (mismo patrón que SP_ABM_Gol).
+-- En ALTA delega en nucleo.SP_CONTROL_ARBITRAL (mismo patrón que eventos.SP_ALTA_Gol).
 -- =========================================================================
 CREATE OR ALTER PROCEDURE nucleo.SP_ABM_DesignacionArbitral
     @operacion             VARCHAR(12),

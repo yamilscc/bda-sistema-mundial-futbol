@@ -56,24 +56,21 @@ IF NOT EXISTS (SELECT 1 FROM jugadores.ReglaCambios)
         @maxVentanasSuplementario = 1;
 
 IF NOT EXISTS (SELECT 1 FROM eventos.ReglaSuspension WHERE Criterio = 'Acumulacion Amarillas')
-    EXEC eventos.SP_ABM_ReglaSuspension
-        @operacion          = 'ALTA',
+    EXEC eventos.SP_ALTA_ReglaSuspension
         @idReglaSuspension  = @idReglaSusp OUTPUT,
         @criterio           = 'Acumulacion Amarillas',
         @cantidadAmarillas  = 2,
         @partidosSuspension = 1;
 
 IF NOT EXISTS (SELECT 1 FROM eventos.ReglaSuspension WHERE Criterio = 'Doble Amarilla')
-    EXEC eventos.SP_ABM_ReglaSuspension
-        @operacion          = 'ALTA',
+    EXEC eventos.SP_ALTA_ReglaSuspension
         @idReglaSuspension  = @idReglaSusp OUTPUT,
         @criterio           = 'Doble Amarilla',
         @cantidadAmarillas  = NULL,
         @partidosSuspension = 1;
 
 IF NOT EXISTS (SELECT 1 FROM eventos.ReglaSuspension WHERE Criterio = 'Roja Directa')
-    EXEC eventos.SP_ABM_ReglaSuspension
-        @operacion          = 'ALTA',
+    EXEC eventos.SP_ALTA_ReglaSuspension
         @idReglaSuspension  = @idReglaSusp OUTPUT,
         @criterio           = 'Roja Directa',
         @cantidadAmarillas  = NULL,
@@ -89,7 +86,7 @@ WHILE @i <= @n
 BEGIN
     SELECT @desc = Descripcion FROM @tiposGol WHERE IdOrden = @i;
     IF NOT EXISTS (SELECT 1 FROM eventos.TipoGol WHERE Descripcion = @desc)
-        EXEC eventos.SP_ABM_TipoGol @operacion = 'ALTA', @idTipoGol = @idTipoGol OUTPUT, @descripcion = @desc;
+        EXEC eventos.SP_ALTA_TipoGol @idTipoGol = @idTipoGol OUTPUT, @descripcion = @desc;
     SET @i += 1;
 END;
 
@@ -105,7 +102,7 @@ WHILE @i <= @n
 BEGIN
     SELECT @desc = Descripcion FROM @periodos WHERE IdOrden = @i;
     IF NOT EXISTS (SELECT 1 FROM eventos.Periodo WHERE Descripcion = @desc)
-        EXEC eventos.SP_ABM_Periodo @operacion = 'ALTA', @idPeriodo = @idPeriodo OUTPUT, @descripcion = @desc;
+        EXEC eventos.SP_ALTA_Periodo @idPeriodo = @idPeriodo OUTPUT, @descripcion = @desc;
     SET @i += 1;
 END;
 
@@ -120,7 +117,7 @@ WHILE @i <= @n
 BEGIN
     SELECT @desc = Tipo FROM @tarjetas WHERE IdOrden = @i;
     IF NOT EXISTS (SELECT 1 FROM eventos.Tarjeta WHERE Tipo = @desc)
-        EXEC eventos.SP_ABM_Tarjeta @operacion = 'ALTA', @idTarjeta = @idTarjeta OUTPUT, @tipo = @desc;
+        EXEC eventos.SP_ALTA_Tarjeta @idTarjeta = @idTarjeta OUTPUT, @tipo = @desc;
     SET @i += 1;
 END;
 

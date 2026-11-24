@@ -125,7 +125,7 @@ GO
 -- fn_ValidarGol
 -- Devuelve el texto con todas las condiciones que no cumple un gol (una línea por condición,
 -- cada una empieza con '- ') o una cadena vacía si es válido. Lo usan SP_REGISTRAR_GOL (alta)
--- y SP_ABM_Gol (modificación), así las reglas viven en un solo lugar.
+-- y SP_MODIFICACION_Gol (modificación), así las reglas viven en un solo lugar.
 -- =========================================================================
 CREATE OR ALTER FUNCTION eventos.fn_ValidarGol
 (
@@ -284,7 +284,7 @@ GO
 -- condición, cada una empieza con '- ') o una cadena vacía si es válida.
 -- @idAmonestacionExcluir: en una modificación, la amonestación que se está cambiando (no se
 -- la considera expulsión previa de sí misma); en un alta va NULL.
--- Lo usan SP_REGISTRAR_AMONESTACION (alta) y SP_ABM_Amonestacion (modificación).
+-- Lo usan SP_REGISTRAR_AMONESTACION (alta) y SP_MODIFICACION_Amonestacion (modificación).
 -- =========================================================================
 CREATE OR ALTER FUNCTION eventos.fn_ValidarAmonestacion
 (
