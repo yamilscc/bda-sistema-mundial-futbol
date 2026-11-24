@@ -86,8 +86,8 @@ Cada archivo empieza con dos dígitos que marcan su orden. Los números 01 a 28 
 | 17 | `17_SP_RegistrarSustitucion.sql` | `SP_REGISTRAR_SUSTITUCION` con control de ventanas y cantidad de cambios | Mateo |
 | 18 | `18_SP_ABM_Jugadores.sql` | ABM (`SP_ALTA_`, `SP_MODIFICACION_` y `SP_BAJA_`) del módulo de jugadores: reglas, clubes, jugadores, convocatoria, bajas, formaciones, jugadores de formación y sustituciones | Mateo |
 | 19 | `19_SP_ABM_Nucleo.sql` | ABM restantes del núcleo (`SP_ALTA_`, `SP_MODIFICACION_` y `SP_BAJA_`): confederaciones, países, ciudades, fases, grupos, selecciones, staff técnico, idiomas, categorías, árbitros, idiomas de árbitros (solo alta y baja), designaciones, sanciones y regla de clasificación | Denis |
-| 20 | `20_SP_ABM_Publicidad.sql` | ABM (`SP_ALTA_`, `SP_MODIFICACION_` y `SP_BAJA_`) de monedas, anunciantes, campañas, piezas, orientación por país (solo alta y baja), tarifas y espacios publicitarios (los de un partido finalizado no se modifican ni se eliminan) | Denis |
-| 21 | `21_SP_AsignarPublicidad.sql` | `SP_ASIGNAR_PUBLICIDAD`: asigna las piezas a los espacios libres de un partido según país de las selecciones, PBI y prime time, y registra el criterio aplicado | Elías |
+| 20 | `20_SP_ABM_Publicidad.sql` | ABM (`SP_ALTA_`, `SP_MODIFICACION_` y `SP_BAJA_`) de monedas, anunciantes, campañas, piezas, orientación por país (solo alta y baja), tarifas y espacios publicitarios (en un partido finalizado no se dan de alta, no se modifican ni se eliminan) | Denis |
+| 21 | `21_SP_AsignarPublicidad.sql` | `SP_ASIGNAR_PUBLICIDAD`: propone y asigna las piezas de los espacios libres de un partido con un ranking determinista (países de las selecciones, PBI per cápita, prime time), una pieza por anunciante, tarifa de la fase y modo simulación (`@soloSimular`); registra el criterio aplicado | Elías |
 | 22 | `22_SP_Importacion_Nucleo_Publicidad.sql` | `SP_IMPORTAR_FIXTURE_CSV`, `SP_IMPORTAR_PBI_JSON`, `SP_IMPORTAR_COTIZACIONES_JSON` y `SP_IMPORTAR_PAUTA_JSON` (con conversión de moneda), y la vista de aterrizaje del fixture | Elías |
 | 23 | `23_SP_Importacion_Jugadores.sql` | Importación XML de jugadores | Mateo |
 | 24 | `24_SP_Importacion_Eventos.sql` | Importación CSV de eventos | Mateo |
@@ -121,7 +121,7 @@ Scripts de testing (en `scripts/testing/`):
 | `18_Test_SP_ABM_Jugadores.sql` | SP ABM de jugadores | Mateo |
 | `19_Test_SP_ABM_Nucleo.sql` | SP ABM restantes del núcleo | Denis |
 | `20_Test_SP_ABM_Publicidad.sql` | SP ABM de publicidad (incluye campañas, tarifas, monedas con cotizaciones y espacios de partidos finalizados) | Denis |
-| `21_Test_SP_AsignarPublicidad.sql` | `SP_ASIGNAR_PUBLICIDAD` (prime time en más de cuatro mercados, criterio por espacio, criterio registrado y validaciones) | Elías |
+| `21_Test_SP_AsignarPublicidad.sql` | `SP_ASIGNAR_PUBLICIDAD` (ranking exacto del partido ARG vs BRA con prime time en 6 mercados, determinismo, simulación, espacios cargados a mano, una pieza por anunciante, menos candidatas que espacios, tarifa por fase y errores agrupados; alta manual rechazada en partido finalizado) | Elías |
 | `22_Test_SP_Importacion_Nucleo_Publicidad.sql` | Importación de fixture, PBI, cotizaciones y pauta (lotes con errores parciales, re-ejecución, conversión de moneda y pauta sobre partidos finalizados) | Elías |
 | `23_Test_SP_Importacion_Jugadores.sql` | Importación XML de jugadores | Mateo |
 | `24_Test_SP_Importacion_Eventos.sql` | Importación CSV de eventos | Mateo |
@@ -179,7 +179,23 @@ Además:
 
 ## Asignación de publicidad
 
-**Modelo.** Cada anunciante tiene una o más campañas (`publicidad.Campania`) y cada campaña sus piezas (`Pieza`, una por idioma o mercado), orientadas a uno o más países (`OrientacionPais`). La tarifa de referencia de cada franja depende de la fase del torneo (`Tarifa`, con moneda y fecha de vigencia). `EspacioPublicitario` es el histórico de lo exhibido en cada partido: guarda la tarifa y la moneda aplicadas, la fecha y el criterio de asignación (`NULL` si se cargó a mano). Una vez finalizado el partido, sus espacios no se modifican ni se eliminan.
+**Modelo.** Cada anunciante tiene una o más campañas (`publicidad.Campania`) y cada campaña sus piezas (`Pieza`, una por idioma o mercado), orientadas a uno o más países (`OrientacionPais`). La tarifa de referencia de cada franja depende de la fase del torneo (`Tarifa`, con moneda y fecha de vigencia). `EspacioPublicitario` es el histórico de lo exhibido en cada partido: guarda la tarifa y la moneda aplicadas, la fecha y el criterio de asignación (`NULL` si se cargó a mano). Una vez finalizado el partido, sus espacios no se dan de alta, no se modifican ni se eliminan.
+
+**Criterio de asignación (`publicidad.SP_ASIGNAR_PUBLICIDAD`).** Firma: `@idPartido INT, @soloSimular BIT = 0, @advertencia VARCHAR(200) = NULL OUTPUT`. El SP propone qué piezas ocupan los espacios libres (1 a 4) del partido:
+
+1. **Candidatas:** toda pieza con al menos un país en `OrientacionPais` que no esté ya en el partido y cuyo anunciante no tenga ya un espacio en ese partido (cargado a mano, por la pauta importada o por una corrida anterior).
+2. **Ranking**, calculado sobre los países de orientación de cada pieza, en este orden:
+   1. `EsParticipante` (desc): alguno de sus países es el de la selección local o visitante (`nucleo.fn_SeleccionesDelPartido`).
+   2. `PBIMax` (desc): el mayor `PBIPerCapitaUSD` entre sus países; si ninguno tiene PBI, la pieza queda última en este criterio.
+   3. `EnPrimeTime` (desc): alguno de sus países está en prime time local (19:00 a 22:59) a la hora del partido (`nucleo.fn_MercadosEnPrimeTime`).
+   4. `IdPieza` (asc): desempate final. Con los mismos datos, el resultado es siempre el mismo (no se usa `NEWID()`).
+3. **Una pieza por anunciante:** de cada anunciante se queda solo su mejor pieza según el mismo orden.
+4. Se toman las N mejores (N = espacios libres) y se asignan a los números libres de menor a mayor. Los espacios ocupados no se tocan. Si hay menos candidatas que espacios libres, se asignan las que hay y `@advertencia` informa cuáles quedaron sin asignar (no es un error).
+5. **Tarifa:** sale de `publicidad.Tarifa` para la fase del partido: la de mayor `VigenciaDesde` que no supere la fecha del partido (`FechaHoraUTC`). Si en esa fecha hay tarifas en varias monedas, se elige USD y después el menor `IdTarifa`. El monto y la moneda se copian a cada espacio asignado.
+6. `CriterioAsignacion` guarda el motivo en forma compacta, por ejemplo `Participante | PBI 27280 (POR) | Prime time`.
+7. `@soloSimular = 1` devuelve la propuesta (espacio, pieza, anunciante, tarifa, moneda, criterio) **sin insertar nada**. En los dos modos el result set muestra los espacios ocupados del partido con su estado: `Ya ocupado`, `Asignado` o `Propuesto`.
+
+Las validaciones se juntan en un único error (`THROW 52000`) antes de abrir la transacción: partido inexistente, partido finalizado, sin espacios libres, sin tarifa para la fase a la fecha del partido y sin ninguna pieza candidata.
 
 Ninguna requiere API key. Los archivos se generan con `scripts/importacion/fuentes_externas.py` (Python 3; `pip install requests beautifulsoup4` solo para el scraping).
 
