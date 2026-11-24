@@ -126,35 +126,35 @@ INSERT INTO nucleo.Idioma (Nombre) VALUES ('TEST PU21 Idioma');
 DECLARE @idIdioma TINYINT = (SELECT IdIdioma FROM nucleo.Idioma WHERE Nombre = 'TEST PU21 Idioma');
 
 DECLARE @idUSD INT;
-EXEC publicidad.SP_ABM_Moneda 'ALTA', @idUSD OUTPUT, 'USD', 'Dolar Estadounidense';
+EXEC publicidad.SP_ALTA_Moneda @idUSD OUTPUT, 'USD', 'Dolar Estadounidense';
 
 -- Tres anunciantes y diez piezas. El orden de alta define el IdPieza (Z10 antes que Z4 a propósito).
 DECLARE @idAnA INT, @idAnB INT, @idAnC INT;
-EXEC publicidad.SP_ABM_Anunciante 'ALTA', @idAnA OUTPUT, 'TEST PU21 Anunciante A', @pAR1;
-EXEC publicidad.SP_ABM_Anunciante 'ALTA', @idAnB OUTPUT, 'TEST PU21 Anunciante B', @pMK3;
-EXEC publicidad.SP_ABM_Anunciante 'ALTA', @idAnC OUTPUT, 'TEST PU21 Anunciante C', @pMK5;
+EXEC publicidad.SP_ALTA_Anunciante @idAnA OUTPUT, 'TEST PU21 Anunciante A', @pAR1;
+EXEC publicidad.SP_ALTA_Anunciante @idAnB OUTPUT, 'TEST PU21 Anunciante B', @pMK3;
+EXEC publicidad.SP_ALTA_Anunciante @idAnC OUTPUT, 'TEST PU21 Anunciante C', @pMK5;
 
 DECLARE @z1 INT, @z2 INT, @z3 INT, @z4 INT, @z5 INT, @z6 INT, @z7 INT, @z8 INT, @z9 INT, @z10 INT;
-EXEC publicidad.SP_ABM_Pieza 'ALTA', @z1  OUTPUT, @idAnA, @idIdioma, 'Z1',  NULL;
-EXEC publicidad.SP_ABM_Pieza 'ALTA', @z2  OUTPUT, @idAnA, @idIdioma, 'Z2',  NULL;
-EXEC publicidad.SP_ABM_Pieza 'ALTA', @z10 OUTPUT, @idAnA, @idIdioma, 'Z10', NULL;
-EXEC publicidad.SP_ABM_Pieza 'ALTA', @z3  OUTPUT, @idAnB, @idIdioma, 'Z3',  NULL;
-EXEC publicidad.SP_ABM_Pieza 'ALTA', @z4  OUTPUT, @idAnB, @idIdioma, 'Z4',  NULL;
-EXEC publicidad.SP_ABM_Pieza 'ALTA', @z5  OUTPUT, @idAnC, @idIdioma, 'Z5',  NULL;
-EXEC publicidad.SP_ABM_Pieza 'ALTA', @z6  OUTPUT, @idAnC, @idIdioma, 'Z6',  NULL;
-EXEC publicidad.SP_ABM_Pieza 'ALTA', @z7  OUTPUT, @idAnC, @idIdioma, 'Z7',  NULL;
-EXEC publicidad.SP_ABM_Pieza 'ALTA', @z8  OUTPUT, @idAnA, @idIdioma, 'Z8',  NULL;
-EXEC publicidad.SP_ABM_Pieza 'ALTA', @z9  OUTPUT, @idAnA, @idIdioma, 'Z9',  NULL;
+EXEC publicidad.SP_ALTA_Pieza @z1  OUTPUT, @idAnA, @idIdioma, 'Z1',  NULL;
+EXEC publicidad.SP_ALTA_Pieza @z2  OUTPUT, @idAnA, @idIdioma, 'Z2',  NULL;
+EXEC publicidad.SP_ALTA_Pieza @z10 OUTPUT, @idAnA, @idIdioma, 'Z10', NULL;
+EXEC publicidad.SP_ALTA_Pieza @z3  OUTPUT, @idAnB, @idIdioma, 'Z3',  NULL;
+EXEC publicidad.SP_ALTA_Pieza @z4  OUTPUT, @idAnB, @idIdioma, 'Z4',  NULL;
+EXEC publicidad.SP_ALTA_Pieza @z5  OUTPUT, @idAnC, @idIdioma, 'Z5',  NULL;
+EXEC publicidad.SP_ALTA_Pieza @z6  OUTPUT, @idAnC, @idIdioma, 'Z6',  NULL;
+EXEC publicidad.SP_ALTA_Pieza @z7  OUTPUT, @idAnC, @idIdioma, 'Z7',  NULL;
+EXEC publicidad.SP_ALTA_Pieza @z8  OUTPUT, @idAnA, @idIdioma, 'Z8',  NULL;
+EXEC publicidad.SP_ALTA_Pieza @z9  OUTPUT, @idAnA, @idIdioma, 'Z9',  NULL;
 
-EXEC publicidad.SP_ABM_OrientacionPais 'ALTA', @z1,  @pAR1;
-EXEC publicidad.SP_ABM_OrientacionPais 'ALTA', @z2,  @pAR2;
-EXEC publicidad.SP_ABM_OrientacionPais 'ALTA', @z10, @pUT9;
-EXEC publicidad.SP_ABM_OrientacionPais 'ALTA', @z3,  @pMK3;
-EXEC publicidad.SP_ABM_OrientacionPais 'ALTA', @z4,  @pMK4;
-EXEC publicidad.SP_ABM_OrientacionPais 'ALTA', @z5,  @pMK5;
-EXEC publicidad.SP_ABM_OrientacionPais 'ALTA', @z6,  @pMK6;
-EXEC publicidad.SP_ABM_OrientacionPais 'ALTA', @z7,  @pMK7;
-EXEC publicidad.SP_ABM_OrientacionPais 'ALTA', @z8,  @pMK8;
+EXEC publicidad.SP_ALTA_OrientacionPais @z1,  @pAR1;
+EXEC publicidad.SP_ALTA_OrientacionPais @z2,  @pAR2;
+EXEC publicidad.SP_ALTA_OrientacionPais @z10, @pUT9;
+EXEC publicidad.SP_ALTA_OrientacionPais @z3,  @pMK3;
+EXEC publicidad.SP_ALTA_OrientacionPais @z4,  @pMK4;
+EXEC publicidad.SP_ALTA_OrientacionPais @z5,  @pMK5;
+EXEC publicidad.SP_ALTA_OrientacionPais @z6,  @pMK6;
+EXEC publicidad.SP_ALTA_OrientacionPais @z7,  @pMK7;
+EXEC publicidad.SP_ALTA_OrientacionPais @z8,  @pMK8;
 -- Z9 queda sin país de orientación: nunca es candidata.
 
 DECLARE @resultado VARCHAR(200), @advertencia VARCHAR(200), @cantidad INT;
@@ -301,8 +301,8 @@ PRINT '--- TEST 3: se completan solo los espacios libres ---';
 -- 3.A Se cargan a mano los espacios 2 (Z5) y 4 (Z6) con tarifa 1000.00.
 -- Resultado esperado: alta exitosa de 2 espacios.
 BEGIN TRY
-    EXEC publicidad.SP_ABM_EspacioPublicitario 'ALTA', @p253, 2, @z5, 1000.00, @idUSD;
-    EXEC publicidad.SP_ABM_EspacioPublicitario 'ALTA', @p253, 4, @z6, 1000.00, @idUSD;
+    EXEC publicidad.SP_ALTA_EspacioPublicitario @p253, 2, @z5, 1000.00, @idUSD;
+    EXEC publicidad.SP_ALTA_EspacioPublicitario @p253, 4, @z6, 1000.00, @idUSD;
     PRINT '3.A: OK - espacios 2 y 4 cargados a mano.';
 END TRY
 BEGIN CATCH
@@ -355,9 +355,15 @@ PRINT '--- TEST 4: ninguna pieza candidata para el espacio libre ---';
 -- Queda libre el espacio 3 y no queda ninguna pieza de su criterio sin usar en el partido.
 -- Resultado esperado: error "No hay piezas publicitarias candidatas" y el espacio 3 sigue libre.
 BEGIN TRY
-    EXEC publicidad.SP_ABM_EspacioPublicitario 'ALTA', @p254, 1, @z8,  500.00, @idUSD;
-    EXEC publicidad.SP_ABM_EspacioPublicitario 'ALTA', @p254, 2, @z3,  500.00, @idUSD;
-    EXEC publicidad.SP_ABM_EspacioPublicitario 'ALTA', @p254, 4, @z10, 500.00, @idUSD;
+    EXEC publicidad.SP_ALTA_EspacioPublicitario @p254, 1, @z1, 500.00, @idUSD;
+    EXEC publicidad.SP_ALTA_EspacioPublicitario @p254, 2, @z2, 500.00, @idUSD;
+    EXEC publicidad.SP_ALTA_EspacioPublicitario @p254, 3, @z3, 500.00, @idUSD;
+
+    EXEC publicidad.SP_BAJA_OrientacionPais @z5,  @pMK5;
+    EXEC publicidad.SP_BAJA_OrientacionPais @z6,  @pMK6;
+    EXEC publicidad.SP_BAJA_OrientacionPais @z7,  @pMK7;
+    EXEC publicidad.SP_BAJA_OrientacionPais @z8,  @pMK8;
+    EXEC publicidad.SP_BAJA_OrientacionPais @z10, @pUT9;
 
     EXEC publicidad.SP_ASIGNAR_PUBLICIDAD @p254, 500.00, @idUSD;
     PRINT '4.A: FALLÓ - permitió asignar sin piezas candidatas.';

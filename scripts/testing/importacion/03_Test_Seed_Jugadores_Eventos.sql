@@ -157,7 +157,7 @@ BEGIN
             ELSE 'Delantero'
         END;
 
-        EXEC jugadores.SP_ABM_Jugador 'ALTA', @jId OUTPUT, 'Nom', 'Ape', @doc, '1998-01-01', 'M', @pos, NULL;
+        EXEC jugadores.SP_ALTA_Jugador @jId OUTPUT, 'Nom', 'Ape', @doc, '1998-01-01', 'M', @pos, NULL;
         EXEC jugadores.SP_CONVOCAR_JUGADOR @selCur, @jId, @d, '2026-05-20', @cId OUTPUT;
         SET @d += 1;
     END;
