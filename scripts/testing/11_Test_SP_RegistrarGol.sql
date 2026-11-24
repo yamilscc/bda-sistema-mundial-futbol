@@ -289,11 +289,9 @@ PRINT '--- Partido finalizado y futuro ---';
 
 -- Se finaliza el partido 243 con 1 a 0. SP_ALTA_Partido solo crea partidos 'Programado' y ya no
 -- existe un SP de resultado, por lo que el estado se deja como preparación del escenario
--- (cumple CK_Partido_Resultado: Finalizado exige goles y ambas selecciones informados).
+-- (cumple CK_Partido_Resultado: Finalizado exige ambas selecciones informadas).
 UPDATE nucleo.Partido
-SET Estado         = 'Finalizado',
-    GolesLocal     = 1,
-    GolesVisitante = 0
+SET Estado = 'Finalizado'
 WHERE IdPartido = @p243;
 
 -- G14 Gol en un partido finalizado.

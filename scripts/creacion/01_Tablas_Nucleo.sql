@@ -196,11 +196,6 @@ BEGIN
 		Concurrencia INT NULL,
 		FechaHoraUTC DATETIME2(0) NOT NULL,
 		Estado VARCHAR(10) NOT NULL,
-		GolesLocal TINYINT NULL,
-		GolesVisitante TINYINT NULL,
-		PenalesLocal TINYINT NULL,
-		PenalesVisitante TINYINT NULL,
-		Asistencia TINYINT NULL,
 		IdFase TINYINT NOT NULL,
 		IdSede TINYINT NOT NULL,
 		IdSeleccionLocal TINYINT NULL,
@@ -212,27 +207,14 @@ BEGIN
 		CONSTRAINT UQ_Partido_IdSede_FechaHoraUTC UNIQUE (IdSede, FechaHoraUTC),
 		CONSTRAINT CK_Partido_Concurrencia_Positiva CHECK (Concurrencia >= 0),
 		CONSTRAINT CK_Partido_Estado_Valido CHECK (Estado IN ('Programado', 'Finalizado')),
-		CONSTRAINT CK_Partido_GolesLocal_Valido CHECK (GolesLocal >= 0),
-		CONSTRAINT CK_Partido_GolesVisitante_Valido CHECK (GolesVisitante >= 0),
-		CONSTRAINT CK_Partido_PenalesLocal_Valido CHECK (PenalesLocal >= 0),
-		CONSTRAINT CK_Partido_PenalesVisitante_Valido CHECK (PenalesVisitante >= 0),
-		-- Programado: sin resultado. Finalizado: ambas selecciones y goles informados.
+		-- El resultado NO se guarda en Partido (3FN): se deriva de eventos.Gol con
+		-- eventos.fn_ResultadoPartido. Finalizado exige ambas selecciones definidas.
 		CONSTRAINT CK_Partido_Resultado CHECK (
-			( Estado = 'Programado' AND GolesLocal IS NULL AND GolesVisitante IS NULL 
-			AND PenalesLocal IS NULL AND PenalesVisitante IS NULL AND Asistencia IS NULL)
-			OR (Estado = 'Finalizado' AND GolesLocal IS NOT NULL AND GolesVisitante IS NOT NULL
-			AND IdSeleccionLocal IS NOT NULL AND IdSeleccionVisitante IS NOT NULL)
-		),
-		-- Penales: ambos o ninguno, solo si el partido terminó empatado, y sin empate 
-		-- en la tanda.
-		CONSTRAINT CK_Partido_Diferencia_Penales CHECK(	
-			(PenalesLocal IS NULL AND PenalesVisitante IS NULL) 
-			OR (PenalesLocal IS NOT NULL AND PenalesVisitante IS NOT NULL 
-			AND GolesLocal = GolesVisitante AND PenalesLocal <> PenalesVisitante)	
+			Estado = 'Programado'
+			OR (Estado = 'Finalizado' AND IdSeleccionLocal IS NOT NULL AND IdSeleccionVisitante IS NOT NULL)
 		),
 		-- Check para validar que un equipo no se puede enfrentar a si mismo
 		CONSTRAINT CK_Partido_Equipos CHECK (IdSeleccionLocal <> IdSeleccionVisitante),
-		CONSTRAINT CK_Partido_Asistencia_Valido CHECK (Asistencia >= 0),
 
 		CONSTRAINT FK_Partido_Fase FOREIGN KEY (IdFase)
 			REFERENCES nucleo.Fase (IdFase),

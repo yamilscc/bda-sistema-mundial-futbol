@@ -805,9 +805,9 @@ BEGIN CATCH
 END CATCH;
 
 -- Preparación: el partido 240 pasa a Finalizado (lo hará SP_FINALIZAR_PARTIDO en el flujo real), con
--- su resultado y la concurrencia. Se actualiza directo porque CK_Partido_Resultado exige el resultado.
+-- la concurrencia. Se actualiza directo; el resultado no se guarda en Partido (se deriva de eventos.Gol).
 UPDATE nucleo.Partido
-SET Estado = 'Finalizado', GolesLocal = 1, GolesVisitante = 0, Concurrencia = 45000
+SET Estado = 'Finalizado', Concurrencia = 45000
 WHERE IdPartido = @p240;
 
 -- 3.J Modificación de un partido Finalizado.

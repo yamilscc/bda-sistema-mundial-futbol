@@ -26,8 +26,9 @@ Convenciones de estos SP:
 	  válido (cruce sin definir, sede sin capacidad o sin coordenadas).
 	- Sede no guarda huso horario: lo hereda de Ciudad.HusoHorario.
 	- Partido recibe la hora LOCAL de la sede y guarda solo FechaHoraUTC. El Alta siempre
-	  crea el partido en estado 'Programado'. Estos SP no cargan resultado, Asistencia
-	  ni Concurrencia (eso ocurre al finalizar el partido).
+	  crea el partido en estado 'Programado'. Estos SP no cargan Concurrencia
+	  (eso ocurre al finalizar el partido). Partido no guarda el resultado: se deriva de
+	  eventos.Gol con eventos.fn_ResultadoPartido.
 	- Reglas de agenda (constantes declaradas al inicio de SP_ALTA_Partido y SP_MODIFICACION_Partido):
 	  180 minutos mínimos entre dos partidos de la misma sede y 48 horas mínimas entre los
 	  inicios de dos partidos de una selección.
