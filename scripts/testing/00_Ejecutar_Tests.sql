@@ -1,34 +1,34 @@
 ﻿/*
 Universidad: Universidad Nacional de La Matanza
 Materia: Bases de Datos Aplicadas - Grupo 05
-Autor: Canseco Carrizo, Yamil Sim�n
+Autor: Canseco Carrizo, Yamil Simón
 Integrantes:
 Casella, Mateo Ezequiel
 Chungara Tenorio, Denis Abner
-Torczuk, El�as Alexei
-Canseco Carrizo, Yamil Sim�n
+Torczuk, Elías Alexei
+Canseco Carrizo, Yamil Simón
 Objetivo:
-	- Orquestar la ejecuci�n de TODOS los scripts de testing en el orden de su n�mero
-	  (01 a 32 y el test del seed en importacion/), igual que 00_Reset_Total.sql orquesta los scripts de creaci�n.
-	- Entre test y test, deshacer cualquier transacci�n que haya quedado abierta, para que
+	- Orquestar la ejecución de TODOS los scripts de testing en el orden de su número
+	  (01 a 32 y el test del seed en importacion/), igual que 00_Reset_Total.sql orquesta los scripts de creación.
+	- Entre test y test, deshacer cualquier transacción que haya quedado abierta, para que
 	  un test cortado a mitad de camino no arrastre sus datos al siguiente.
-	- Verificar al inicio que la base exista y est� reci�n creada (el test 01 lo requiere).
+	- Verificar al inicio que la base exista y esté recién creada (el test 01 lo requiere).
 
 REQUISITOS PARA EJECUTARLO:
-	- Ejecutar ANTES creacion\00_Reset_Total.sql (base reci�n creada, sin datos de prueba).
-	- Activar el modo SQLCMD en SSMS: men� Consulta > Modo SQLCMD (sin esto fallan :setvar y :r).
+	- Ejecutar ANTES creacion\00_Reset_Total.sql (base recién creada, sin datos de prueba).
+	- Activar el modo SQLCMD en SSMS: menú Consulta > Modo SQLCMD (sin esto fallan :setvar y :r).
 	- Editar abajo la variable RUTA con la carpeta scripts\testing de TU copia del repositorio,
 	  sin barra final. Ejemplo: C:\Users\elias\bda-sistema-mundial-futbol\scripts\testing
-	- Recomendado: Resultados a texto (Ctrl+T) en vez de cuadr�cula. Varios tests devuelven
-	  muchos SELECT de evidencia y la cuadr�cula consume mucha memoria en SSMS.
+	- Recomendado: Resultados a texto (Ctrl+T) en vez de cuadrícula. Varios tests devuelven
+	  muchos SELECT de evidencia y la cuadrícula consume mucha memoria en SSMS.
 
-C�MO LEER EL RESULTADO:
-	- Cada test imprime su encabezado "===== TEST xx" en la pesta�a Mensajes.
-	- Buscar (Ctrl+F) "FALL�" en Mensajes: no deber�a aparecer ninguna vez.
+CÓMO LEER EL RESULTADO:
+	- Cada test imprime su encabezado "===== TEST xx" en la pestaña Mensajes.
+	- Buscar (Ctrl+F) "FALLÓ" en Mensajes: no debería aparecer ninguna vez.
 	- Los casos que se verifican con SELECT traen el valor esperado en el nombre de la
 	  columna (ej: Filas_Esperadas_0) o en el comentario "-- Esperado:" del test.
-	- Se usa ":on error ignore" a prop�sito: un error no controlado en un test se informa
-	  en Mensajes pero NO corta la corrida, as� se ejecutan todos los tests igual.
+	- Se usa ":on error ignore" a propósito: un error no controlado en un test se informa
+	  en Mensajes pero NO corta la corrida, así se ejecutan todos los tests igual.
 */
 
 :on error ignore

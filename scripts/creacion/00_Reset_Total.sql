@@ -25,7 +25,7 @@ Los scripts de testing y de seed NO se ejecutan desde acá (se corren aparte).
 */
 
 :on error exit
-:setvar RUTA C:\Users\Denis\Desktop\mundial2\bda-sistema-mundial-futbol\scripts\creacion
+:setvar RUTA C:\CAMBIAR\bda-sistema-mundial-futbol\scripts\creacion
 
 SET NOCOUNT ON;
 GO

@@ -152,8 +152,8 @@ BEGIN
             END;
 
             IF @pbiActual IS NULL OR @pbiActual <> @pbi
-                EXEC nucleo.SP_MODIFICACION_Pais
-                    @idPais = @idPais, @nombre = @nombre,
+                EXEC nucleo.SP_ABM_Pais
+                    @operacion = 'MODIFICACION', @idPais = @idPais, @nombre = @nombre,
                     @codigoISO2 = @iso2Pais, @codigoISO3 = @iso3, @idConfederacion = @idConf,
                     @husoHorarioComercial = @huso, @pbiPerCapitaUSD = @pbi;
             SET @filasProcesadas += 1;
@@ -387,15 +387,15 @@ BEGIN
             SET @existe = IIF(EXISTS (SELECT 1 FROM publicidad.EspacioPublicitario
                                       WHERE IdPartido = @idPartido AND NumeroEspacio = @numEspacio), 1, 0);
             IF @existe = 0
-                EXEC publicidad.SP_ALTA_EspacioPublicitario
-                    @idPartido = @idPartido, @numeroEspacio = @numEspacio,
+                EXEC publicidad.SP_ABM_EspacioPublicitario
+                    @operacion = 'ALTA', @idPartido = @idPartido, @numeroEspacio = @numEspacio,
                     @idPieza = @idPieza, @tarifaPublicitaria = @tarifa, @idMoneda = @idMonedaDestino;
             ELSE IF NOT EXISTS (SELECT 1 FROM publicidad.EspacioPublicitario
                                 WHERE IdPartido = @idPartido AND NumeroEspacio = @numEspacio
                                   AND IdPieza = @idPieza AND TarifaPublicitaria = @tarifa
                                   AND IdMoneda = @idMonedaDestino)
-                EXEC publicidad.SP_MODIFICACION_EspacioPublicitario
-                    @idPartido = @idPartido, @numeroEspacio = @numEspacio,
+                EXEC publicidad.SP_ABM_EspacioPublicitario
+                    @operacion = 'MODIFICACION', @idPartido = @idPartido, @numeroEspacio = @numEspacio,
                     @idPieza = @idPieza, @tarifaPublicitaria = @tarifa, @idMoneda = @idMonedaDestino;
             SET @filasProcesadas += 1;
         END TRY
@@ -509,12 +509,12 @@ BEGIN
             SELECT @idCiudad = IdCiudad FROM nucleo.Ciudad WHERE Nombre = @ciudad AND IdPais = @idPais;
             IF @idCiudad IS NULL
             BEGIN
-                EXEC nucleo.SP_ALTA_Ciudad @nombre = @ciudad, @idPais = @idPais, @husoHorario = @huso;
+                EXEC nucleo.SP_ABM_Ciudad @operacion = 'ALTA', @nombre = @ciudad, @idPais = @idPais, @husoHorario = @huso;
                 SELECT @idCiudad = IdCiudad FROM nucleo.Ciudad WHERE Nombre = @ciudad AND IdPais = @idPais;
             END
             ELSE IF EXISTS (SELECT 1 FROM nucleo.Ciudad WHERE IdCiudad = @idCiudad AND HusoHorario <> @huso)
-                EXEC nucleo.SP_MODIFICACION_Ciudad @idCiudad = @idCiudad, @nombre = @ciudad,
-                                                   @idPais = @idPais, @husoHorario = @huso;
+                EXEC nucleo.SP_ABM_Ciudad @operacion = 'MODIFICACION', @idCiudad = @idCiudad, @nombre = @ciudad,
+                                          @idPais = @idPais, @husoHorario = @huso;
 
             -- Sede (Upsert)
             SELECT @idSede = IdSede FROM nucleo.Sede WHERE NombreEstadio = @estadio AND IdCiudad = @idCiudad;
