@@ -11,7 +11,7 @@ Integrantes:
 Objetivo: Seed de catálogos y entidades base de nucleo y publicidad (idempotente: se puede re-ejecutar):
           confederaciones, 22 países (16 participantes + 6 neutrales), 4 grupos, 16 selecciones, cuerpo técnico,
           idiomas, categorías, 18 árbitros con idiomas, monedas, 9 anunciantes de 9 países y 12 piezas con
-          sus países de orientación. Usa los SP ABM de las entregas anteriores (sin SQL dinámico ni cursores).
+          sus países de orientación. Usa los SP_ALTA_<Tabla> de las entregas anteriores (sin SQL dinámico ni cursores).
           Los grupos respetan el contrato con Mateo, salvo que BRA se ubica en el Grupo A (junto a ARG) porque
           SP_ALTA_Partido exige que los partidos de fase de grupos sean entre selecciones del mismo grupo y el
           partido 1 debe ser ARG vs BRA. Los partidos y sedes los carga 05_Importar_Nucleo_Publicidad.sql.
@@ -51,7 +51,7 @@ FROM (VALUES ('USD', 'Dólar estadounidense'), ('EUR', 'Euro'), ('ARS', 'Peso ar
 WHERE NOT EXISTS (SELECT 1 FROM publicidad.Moneda AS m WHERE m.Codigo = v.Codigo);
 GO
 
--- ===== Países (SP_ABM_Pais). El PBI lo completa SP_IMPORTAR_PBI_JSON (API Banco Mundial) =====
+-- ===== Países (SP_ALTA_Pais). El PBI lo completa SP_IMPORTAR_PBI_JSON (API Banco Mundial) =====
 DECLARE @pais TABLE (Id INT IDENTITY(1,1) PRIMARY KEY, Nombre VARCHAR(50), Iso2 CHAR(2), Iso3 CHAR(3), Conf VARCHAR(8), Huso VARCHAR(50));
 INSERT INTO @pais (Nombre, Iso2, Iso3, Conf, Huso) VALUES
  ('Argentina', 'AR', 'ARG', 'CONMEBOL', 'Argentina Standard Time'),
@@ -82,13 +82,13 @@ BEGIN
     SELECT @nombre = p.Nombre, @iso2 = p.Iso2, @iso3 = p.Iso3, @huso = p.Huso, @idConf = c.IdConfederacion
     FROM @pais AS p INNER JOIN nucleo.Confederacion AS c ON c.Sigla = p.Conf WHERE p.Id = @i;
     IF NOT EXISTS (SELECT 1 FROM nucleo.Pais WHERE CodigoISO3 = @iso3)
-        EXEC nucleo.SP_ABM_Pais @operacion = 'ALTA', @nombre = @nombre, @codigoISO2 = @iso2, @codigoISO3 = @iso3,
-                                @idConfederacion = @idConf, @husoHorarioComercial = @huso;
+        EXEC nucleo.SP_ALTA_Pais @nombre = @nombre, @codigoISO2 = @iso2, @codigoISO3 = @iso3,
+                                 @idConfederacion = @idConf, @husoHorarioComercial = @huso;
     SET @i += 1;
 END;
 GO
 
--- ===== Selecciones (SP_ABM_Seleccion) y cuerpo técnico (SP_ABM_StaffTecnico) =====
+-- ===== Selecciones (SP_ALTA_Seleccion) y cuerpo técnico (SP_ALTA_StaffTecnico) =====
 DECLARE @sel TABLE (Id INT IDENTITY(1,1) PRIMARY KEY, Iso3 CHAR(3), Ranking SMALLINT, Anfitrion BIT, Grupo CHAR(1));
 INSERT INTO @sel (Iso3, Ranking, Anfitrion, Grupo) VALUES
  ('ARG', 1, 0, 'A'), ('BRA', 5, 0, 'A'), ('USA', 12, 1, 'A'), ('JPN', 15, 0, 'A'),
@@ -102,8 +102,8 @@ BEGIN
     FROM @sel AS s INNER JOIN nucleo.Pais AS p ON p.CodigoISO3 = s.Iso3 INNER JOIN nucleo.Grupo AS g ON g.Nombre = s.Grupo
     WHERE s.Id = @i;
     IF NOT EXISTS (SELECT 1 FROM nucleo.Seleccion WHERE CodigoFIFA = @iso3)
-        EXEC nucleo.SP_ABM_Seleccion @operacion = 'ALTA', @codigoFIFA = @iso3, @rankingFIFA = @ranking,
-                                     @esAnfitrion = @anf, @idPais = @idPais, @idGrupo = @idGrupo;
+        EXEC nucleo.SP_ALTA_Seleccion @codigoFIFA = @iso3, @rankingFIFA = @ranking,
+                                      @esAnfitrion = @anf, @idPais = @idPais, @idGrupo = @idGrupo;
     SET @i += 1;
 END;
 
@@ -120,12 +120,12 @@ WHILE @i <= @n
 BEGIN
     SELECT @idSel = IdSeleccion, @rol = Rol, @nom = Nombre FROM @staff WHERE Id = @i;
     IF NOT EXISTS (SELECT 1 FROM nucleo.StaffTecnico WHERE IdSeleccion = @idSel AND Rol = @rol)
-        EXEC nucleo.SP_ABM_StaffTecnico @operacion = 'ALTA', @idSeleccion = @idSel, @nombreApellido = @nom, @rol = @rol;
+        EXEC nucleo.SP_ALTA_StaffTecnico @idSeleccion = @idSel, @nombreApellido = @nom, @rol = @rol;
     SET @i += 1;
 END;
 GO
 
--- ===== Árbitros (SP_ABM_Arbitro) e idiomas (SP_ABM_ArbitroIdioma): 12 neutrales + 6 de países participantes =====
+-- ===== Árbitros (SP_ALTA_Arbitro) e idiomas (SP_ALTA_ArbitroIdioma): 12 neutrales + 6 de países participantes =====
 DECLARE @arb TABLE (Id INT IDENTITY(1,1) PRIMARY KEY, Nombre VARCHAR(200), Sexo CHAR(1), Nacimiento DATE,
                     Iso3 CHAR(3), Categoria VARCHAR(100), Idioma1 VARCHAR(100), Idioma2 VARCHAR(100));
 INSERT INTO @arb (Nombre, Sexo, Nacimiento, Iso3, Categoria, Idioma1, Idioma2) VALUES
@@ -162,14 +162,14 @@ BEGIN
     SET @idArb = (SELECT IdArbitro FROM nucleo.Arbitro WHERE NombreApellido = @nombre AND FechaNacimiento = @nac);
     IF @idArb IS NULL
     BEGIN
-        EXEC nucleo.SP_ABM_Arbitro @operacion = 'ALTA', @nombreApellido = @nombre, @sexo = @sexo, @estaHabilitado = 'Y',
-                                   @fechaNacimiento = @nac, @idPais = @idPais, @idCategoria = @idCat;
+        EXEC nucleo.SP_ALTA_Arbitro @nombreApellido = @nombre, @sexo = @sexo, @estaHabilitado = 'Y',
+                                    @fechaNacimiento = @nac, @idPais = @idPais, @idCategoria = @idCat;
         SET @idArb = (SELECT IdArbitro FROM nucleo.Arbitro WHERE NombreApellido = @nombre AND FechaNacimiento = @nac);
     END;
     IF NOT EXISTS (SELECT 1 FROM nucleo.ArbitroIdioma WHERE IdArbitro = @idArb AND IdIdioma = @idI1)
-        EXEC nucleo.SP_ABM_ArbitroIdioma @operacion = 'ALTA', @idArbitro = @idArb, @idIdioma = @idI1;
+        EXEC nucleo.SP_ALTA_ArbitroIdioma @idArbitro = @idArb, @idIdioma = @idI1;
     IF NOT EXISTS (SELECT 1 FROM nucleo.ArbitroIdioma WHERE IdArbitro = @idArb AND IdIdioma = @idI2)
-        EXEC nucleo.SP_ABM_ArbitroIdioma @operacion = 'ALTA', @idArbitro = @idArb, @idIdioma = @idI2;
+        EXEC nucleo.SP_ALTA_ArbitroIdioma @idArbitro = @idArb, @idIdioma = @idI2;
     SET @i += 1;
 END;
 GO
@@ -185,7 +185,7 @@ WHILE @i <= @n
 BEGIN
     SELECT @nombre = a.Nombre, @idPais = p.IdPais FROM @anu AS a INNER JOIN nucleo.Pais AS p ON p.CodigoISO3 = a.Iso3 WHERE a.Id = @i;
     IF NOT EXISTS (SELECT 1 FROM publicidad.Anunciante WHERE Nombre = @nombre)
-        EXEC publicidad.SP_ABM_Anunciante @operacion = 'ALTA', @nombre = @nombre, @idPais = @idPais;
+        EXEC publicidad.SP_ALTA_Anunciante @nombre = @nombre, @idPais = @idPais;
     SET @i += 1;
 END;
 
@@ -213,8 +213,8 @@ BEGIN
     INNER JOIN nucleo.Idioma AS id ON id.Nombre = z.Idioma
     WHERE z.Id = @i;
     IF NOT EXISTS (SELECT 1 FROM publicidad.Pieza WHERE IdAnunciante = @idAnu AND Titulo = @titulo AND IdIdioma = @idIdioma)
-        EXEC publicidad.SP_ABM_Pieza @operacion = 'ALTA', @idAnunciante = @idAnu, @idIdioma = @idIdioma,
-                                     @titulo = @titulo, @descripcion = 'Campaña Mundial 2026';
+        EXEC publicidad.SP_ALTA_Pieza @idAnunciante = @idAnu, @idIdioma = @idIdioma,
+                                      @titulo = @titulo, @descripcion = 'Campaña Mundial 2026';
     SET @i += 1;
 END;
 
@@ -234,7 +234,7 @@ WHILE @i <= @n
 BEGIN
     SELECT @idPz = IdPieza, @idPa = IdPais FROM @orient WHERE Id = @i;
     IF NOT EXISTS (SELECT 1 FROM publicidad.OrientacionPais WHERE IdPieza = @idPz AND IdPais = @idPa)
-        EXEC publicidad.SP_ABM_OrientacionPais @operacion = 'ALTA', @idPieza = @idPz, @idPais = @idPa;
+        EXEC publicidad.SP_ALTA_OrientacionPais @idPieza = @idPz, @idPais = @idPa;
     SET @i += 1;
 END;
 GO
