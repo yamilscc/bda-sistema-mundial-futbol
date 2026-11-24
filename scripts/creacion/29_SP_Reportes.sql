@@ -904,7 +904,7 @@ BEGIN
         sede.Capacidad                                                      AS CapacidadEstadio,
         CAST(p.Concurrencia * 100.0 / NULLIF(sede.Capacidad, 0) AS DECIMAL(5,2)) AS PorcentajeOcupacionEstadio,
         ISNULL(arb.NombreApellido, 'Sin designar')                          AS ArbitroPrincipal
-    FROM nucleo.Partido AS p
+    FROM nucleo.vw_PartidoResultado AS p
     INNER JOIN nucleo.Fase AS f
         ON f.IdFase = p.IdFase
     INNER JOIN nucleo.Sede AS sede
