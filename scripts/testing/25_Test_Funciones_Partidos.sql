@@ -280,13 +280,14 @@ IF EXISTS (SELECT 1 FROM nucleo.fn_DefinicionPartido(@id) WHERE IdGanador IS NUL
 ELSE
 	PRINT 'TEST 1.H FALLÓ: la tanda de un partido de grupos definió ganador.';
 
--- 1.I Partido Programado (con goles cargados).
--- Esperado: 0 filas.
+-- 1.I Partido Programado con 3 goles de c3 (visitante) cargados.
+-- Esperado: la función no mira el Estado (la usa SP_FINALIZAR_PARTIDO antes de cerrar el partido):
+--           ganador c3, perdedor c1, DefinidoPorPenales = 0. La vista lo oculta (ver TEST 5.C).
 SET @id = (SELECT IdPartido FROM nucleo.Partido WHERE NumeroPartido = 123);
-IF NOT EXISTS (SELECT 1 FROM nucleo.fn_DefinicionPartido(@id))
-	PRINT 'TEST 1.I OK: un partido Programado no tiene definición.';
+IF EXISTS (SELECT 1 FROM nucleo.fn_DefinicionPartido(@id) WHERE IdGanador = @c3 AND IdPerdedor = @c1 AND DefinidoPorPenales = 0)
+	PRINT 'TEST 1.I OK: la definición se calcula también para un partido Programado.';
 ELSE
-	PRINT 'TEST 1.I FALLÓ: devolvió fila para un partido Programado.';
+	PRINT 'TEST 1.I FALLÓ: no calculó el ganador de un partido Programado.';
 
 -- 1.J Partido inexistente.
 -- Esperado: 0 filas.

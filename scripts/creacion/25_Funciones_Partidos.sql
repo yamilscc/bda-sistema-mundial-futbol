@@ -54,8 +54,11 @@ GO
 
 /*
 fn_DefinicionPartido
-Devuelve UNA fila con el ganador y el perdedor del partido; 0 filas si el partido no existe, está
-'Programado' o no tiene ambas selecciones definidas.
+Devuelve UNA fila con el ganador y el perdedor del partido según los goles cargados; 0 filas si el
+partido no existe o no tiene ambas selecciones definidas.
+Es un cálculo puro: no mira el Estado, para que nucleo.SP_FINALIZAR_PARTIDO (script 26) pueda saber
+si el partido tiene ganador ANTES de finalizarlo. Los reportes deben leer el resultado de partidos
+jugados: nucleo.vw_PartidoResultado oculta el ganador mientras el partido está 'Programado'.
 Criterios:
 	- Gana la selección con más goles (DefinidoPorPenales = 0).
 	- Con goles iguales en una fase eliminatoria, si hubo tanda con diferente cantidad de penales gana
@@ -88,7 +91,6 @@ RETURN
 	INNER JOIN nucleo.Fase AS f ON f.IdFase = p.IdFase
 	CROSS APPLY eventos.fn_ResultadoPartido(p.IdPartido) AS r
 	WHERE p.IdPartido = @IdPartido
-	  AND p.Estado = 'Finalizado'
 	  AND p.IdSeleccionLocal IS NOT NULL
 	  AND p.IdSeleccionVisitante IS NOT NULL
 );
@@ -209,8 +211,8 @@ GO
 /*
 vw_PartidoResultado
 Camino de lectura del resultado para reportes y BI: el partido con su resultado (derivado de los goles)
-y su definición. Los goles y penales son NULL mientras el partido está 'Programado' (sin ese filtro
-eventos.fn_ResultadoPartido devolvería un 0 a 0 que parece un resultado).
+y su definición. Los goles, los penales y el ganador son NULL mientras el partido está 'Programado'
+(sin ese filtro eventos.fn_ResultadoPartido devolvería un 0 a 0 que parece un resultado).
 */
 CREATE OR ALTER VIEW nucleo.vw_PartidoResultado
 AS
@@ -227,9 +229,9 @@ SELECT p.IdPartido,
        CASE WHEN p.Estado = 'Finalizado' THEN r.GolesVisitante END   AS GolesVisitante,
        CASE WHEN p.Estado = 'Finalizado' THEN r.PenalesLocal END     AS PenalesLocal,
        CASE WHEN p.Estado = 'Finalizado' THEN r.PenalesVisitante END AS PenalesVisitante,
-       d.IdGanador,
-       d.IdPerdedor,
-       d.DefinidoPorPenales
+       CASE WHEN p.Estado = 'Finalizado' THEN d.IdGanador END         AS IdGanador,
+       CASE WHEN p.Estado = 'Finalizado' THEN d.IdPerdedor END        AS IdPerdedor,
+       CASE WHEN p.Estado = 'Finalizado' THEN d.DefinidoPorPenales END AS DefinidoPorPenales
 FROM nucleo.Partido AS p
 OUTER APPLY eventos.fn_ResultadoPartido(p.IdPartido) AS r
 OUTER APPLY nucleo.fn_DefinicionPartido(p.IdPartido) AS d;
