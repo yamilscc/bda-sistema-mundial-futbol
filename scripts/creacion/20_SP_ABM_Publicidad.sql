@@ -285,7 +285,7 @@ BEGIN
 END;
 GO
 
--- EspacioPublicitario (modificación y baja): el histórico para facturar no se toca una vez finalizado el partido.
+-- EspacioPublicitario (alta, modificación y baja): el histórico para facturar no se toca una vez finalizado el partido.
 CREATE OR ALTER FUNCTION publicidad.fn_ValidarEspacioEditable (@idPartido INT)
 RETURNS NVARCHAR(MAX)
 AS
@@ -294,7 +294,7 @@ BEGIN
             @salto   NVARCHAR(2)   = CHAR(13) + CHAR(10);
 
     IF EXISTS (SELECT 1 FROM nucleo.Partido WHERE IdPartido = @idPartido AND Estado = 'Finalizado')
-        SET @errores += N'- El partido ya está finalizado: sus espacios publicitarios son histórico de facturación y no pueden modificarse ni eliminarse.' + @salto;
+        SET @errores += N'- El partido ya está finalizado: sus espacios publicitarios son histórico de facturación y no admiten altas, modificaciones ni bajas.' + @salto;
 
     RETURN @errores;
 END;
@@ -1036,6 +1036,7 @@ BEGIN
     SET @criterioAsignacion = NULLIF(LTRIM(RTRIM(@criterioAsignacion)), '');
 
     SET @errores = publicidad.fn_ValidarEspacioClave(@idPartido, @numeroEspacio, 0)
+                 + publicidad.fn_ValidarEspacioEditable(@idPartido)
                  + publicidad.fn_ValidarEspacioDatos(@idPartido, NULL, @idPieza, @tarifaPublicitaria, @idMoneda);
 
     IF LEN(@errores) > 0
