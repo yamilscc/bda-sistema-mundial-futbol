@@ -16,7 +16,7 @@ Objetivo: Cargar las campañas del dossier de publicidad (campanas_dossier.csv, 
 
 REQUISITOS PARA EJECUTARLO:
   - Activar el modo SQLCMD en SSMS: menú Consulta > Modo SQLCMD.
-  - Editar RUTA_IMP con la ruta local de la carpeta scripts\importacion (sin barra final).
+  - Editar RUTA_IMP con la ruta local de la carpeta scripts\importacion (sin barra final) (solo si se ejecuta suelto: ver abajo).
   - Haber ejecutado 04_Seed_Nucleo_Publicidad.sql (países e idiomas) y el script de creación 29.
   - ORDEN: después de 06 y 07, para no cambiar la pauta ya asignada en los partidos del seed: las campañas
     nuevas no tienen espacios y solo entran en las asignaciones de SP_ASIGNAR_PUBLICIDAD que se hagan después.
@@ -24,7 +24,8 @@ REQUISITOS PARA EJECUTARLO:
 */
 
 :on error exit
-:setvar RUTA_IMP "C:\CAMBIAR\bda-sistema-mundial-futbol\scripts\importacion"
+-- Con 00_Cargar_Seeds.sql la ruta se define una sola vez ahí. Si este script se ejecuta suelto, descomentar y editar:
+-- :setvar RUTA_IMP "C:\CAMBIAR\bda-sistema-mundial-futbol\scripts\importacion"
 :setvar ARCHIVO_CSV "campanas_dossier.csv"
 
 USE MundialFutbol;

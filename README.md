@@ -41,7 +41,7 @@ Base de datos en **SQL Server (T-SQL)** para gestionar la operación de los part
     │   └── 01_… a 29_…           # un archivo por módulo, con prefijo numérico de orden de ejecución
     ├── testing/                  # scripts de testing (uno por cada script de creación probado)
     │   └── importacion/          # tests en espejo de scripts/importacion/ (ej. 03_Test_Seed_Jugadores_Eventos.sql)
-    └── importacion/              # procesos de importación de datos externos (CSV/XML/API/scraping)
+    └── importacion/              # seeds e importaciones de datos externos (CSV/XML/API/scraping); 00_Cargar_Seeds.sql los lanza en orden
 ```
 
 - Cada script empieza con dos dígitos que indican el orden de ejecución y con el encabezado definido en `doc/nomenclaturas.md`.

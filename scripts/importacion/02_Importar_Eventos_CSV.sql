@@ -13,12 +13,13 @@ Objetivo: Cargar un archivo CSV de eventos hacia eventos.StagingEvento mediante 
 
 REQUISITOS PARA EJECUTARLO:
   - Activar el modo SQLCMD en SSMS: menú Consulta > Modo SQLCMD.
-  - Editar RUTA_IMP con la ruta local de la carpeta scripts\importacion (sin barra final).
+  - Editar RUTA_IMP con la ruta local de la carpeta scripts\importacion (sin barra final) (solo si se ejecuta suelto: ver abajo).
   - Tener cargados previamente los partidos y jugadores convocados.
 */
 
 :on error exit
-:setvar RUTA_IMP "C:\CAMBIAR\bda-sistema-mundial-futbol\scripts\importacion"
+-- Con 00_Cargar_Seeds.sql la ruta se define una sola vez ahí. Si este script se ejecuta suelto, descomentar y editar:
+-- :setvar RUTA_IMP "C:\CAMBIAR\bda-sistema-mundial-futbol\scripts\importacion"
 :setvar ARCHIVO_CSV "eventos_partidos.csv"
 
 USE MundialFutbol;
