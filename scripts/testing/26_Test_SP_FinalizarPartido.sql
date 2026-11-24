@@ -1,32 +1,32 @@
 /*
 Universidad: Universidad Nacional de La Matanza
 Materia: Bases de Datos Aplicadas - Grupo 05
-Autor: Canseco Carrizo, Yamil Simón
+Autor: Canseco Carrizo, Yamil SimÃ³n
 Integrantes:
 Casella, Mateo Ezequiel
 Chungara Tenorio, Denis Abner
-Torczuk, Elías Alexei
-Canseco Carrizo, Yamil Simón
+Torczuk, ElÃ­as Alexei
+Canseco Carrizo, Yamil SimÃ³n
 Objetivo:
-	- Probar nucleo.SP_FINALIZAR_PARTIDO (script 26) y el cálculo del ganador sin estar finalizado
+	- Probar nucleo.SP_FINALIZAR_PARTIDO (script 26) y el cÃ¡lculo del ganador sin estar finalizado
 	  de nucleo.fn_DefinicionPartido (script 25).
 	- Requiere ejecutados los scripts 01 a 26. Sede, partidos y goles se cargan con INSERT directo.
 	- Datos de prueba con prefijo 'TEST FIN' / 'TEST_FIN', borrados al inicio y al final. Los partidos
 	  usan los NumeroPartido 151 a 170.
-	- Convención de salida: "OK" -> el caso se comportó como se esperaba; "OK (Bloqueado)" -> el SP
-	  rechazó la operación inválida con el mensaje esperado; "FALLÓ" -> el caso no se comportó como
+	- ConvenciÃ³n de salida: "OK" -> el caso se comportÃ³ como se esperaba; "OK (Bloqueado)" -> el SP
+	  rechazÃ³ la operaciÃ³n invÃ¡lida con el mensaje esperado; "FALLÃ“" -> el caso no se comportÃ³ como
 	  se esperaba.
 
 Escenario: 5 selecciones TEST en el grupo Z (s1..s5), 6 jugadores (j1..j6) y 2 sedes.
-  j1..j5 están convocados en s1..s5; j6 no está convocado. s5 es una selección ajena a los partidos.
+  j1..j5 estÃ¡n convocados en s1..s5; j6 no estÃ¡ convocado. s5 es una selecciÃ³n ajena a los partidos.
   Sede 1: capacidad 50000. Sede 2: sin capacidad cargada.
-  Todos los partidos se crean 'Programado'; cada caso usa su propio partido (entre paréntesis, el
+  Todos los partidos se crean 'Programado'; cada caso usa su propio partido (entre parÃ©ntesis, el
   resultado que arman los goles cargados):
     151 grupos s1-s2 (2-1)            152 grupos s1-s3 (0-0)           153 grupos s1-s4 (1-0)
     154 octavos s1-s2 (2-1)           155 octavos s3-s4 (1-1, tanda 4-3)
     156 grupos s2-s3 en sede 2 (1-0)  170 octavos s2-s4 (0-0, tanda 4-3)
     157 grupos sin selecciones        158 grupos s1-s2, fecha futura   159 grupos s2-s4 (1-0)
-    161 grupos s1-s2, gol de j5 (selección ajena)
+    161 grupos s1-s2, gol de j5 (selecciÃ³n ajena)
     162 grupos s1-s3, gol de j6 (sin convocar)
     163 grupos s1-s4 (1-1, tanda 3-2)
     164 octavos s1-s2 (0-0, sin tanda)
@@ -39,7 +39,7 @@ Escenario: 5 selecciones TEST en el grupo Z (s1..s5), 6 jugadores (j1..j6) y 2 s
 USE MundialFutbol;
 GO
 
--- Si una corrida anterior quedó con la transacción abierta, se deshace antes de empezar.
+-- Si una corrida anterior quedÃ³ con la transacciÃ³n abierta, se deshace antes de empezar.
 WHILE @@TRANCOUNT > 0
 	ROLLBACK TRANSACTION;
 
@@ -61,7 +61,7 @@ GO
 -- =========================================================================
 -- DATOS DE PRUEBA
 -- =========================================================================
--- Catálogos de eventos (se insertan solo si faltan; no se borran al final).
+-- CatÃ¡logos de eventos (se insertan solo si faltan; no se borran al final).
 INSERT INTO eventos.TipoGol (Descripcion)
 SELECT v.d FROM (VALUES ('Jugada'), ('Penal')) AS v(d)
 WHERE NOT EXISTS (SELECT 1 FROM eventos.TipoGol AS t WHERE t.Descripcion = v.d);
@@ -75,7 +75,7 @@ DECLARE @tgPenal  INT = (SELECT IdTipoGol FROM eventos.TipoGol WHERE Descripcion
 DECLARE @pePT     INT = (SELECT IdPeriodo FROM eventos.Periodo WHERE Descripcion = 'Primer Tiempo');
 DECLARE @peTanda  INT = (SELECT IdPeriodo FROM eventos.Periodo WHERE Descripcion = 'Definicion por Penales');
 
--- Países, selecciones y sedes.
+-- PaÃ­ses, selecciones y sedes.
 INSERT INTO nucleo.Confederacion (Nombre, Sigla) VALUES ('TEST FIN Confederacion', 'TFN');
 DECLARE @idConf TINYINT = (SELECT IdConfederacion FROM nucleo.Confederacion WHERE Sigla = 'TFN');
 
@@ -125,7 +125,7 @@ INNER JOIN nucleo.Seleccion AS s ON s.CodigoFIFA = CASE j.Documento
                                                       WHEN 'TEST_FIN_5' THEN 'QQA'
                                                    END;
 
--- Partidos (todos 'Programado'; una fecha distinta por número: pasada o, si Futuro = 1, en 2030).
+-- Partidos (todos 'Programado'; una fecha distinta por nÃºmero: pasada o, si Futuro = 1, en 2030).
 DECLARE @fGrupos  TINYINT = (SELECT IdFase FROM nucleo.Fase WHERE Nombre = 'Fase de grupos');
 DECLARE @fOctavos TINYINT = (SELECT IdFase FROM nucleo.Fase WHERE Nombre = 'Octavos de final');
 
@@ -168,7 +168,7 @@ INNER JOIN nucleo.Partido AS p ON p.NumeroPartido = g.Num
 INNER JOIN jugadores.Jugador AS j ON j.Documento = 'TEST_FIN_' + CAST(g.Jug AS VARCHAR(2))
 INNER JOIN (VALUES (1), (2), (3), (4)) AS k(n) ON k.n <= g.Cant;
 
--- Tandas de penales (tipo 'Penal', período 'Definicion por Penales'): (partido, jugador, cantidad).
+-- Tandas de penales (tipo 'Penal', perÃ­odo 'Definicion por Penales'): (partido, jugador, cantidad).
 INSERT INTO eventos.Gol (IdPartido, IdJugadorAutor, IdJugadorAsistencia, IdTipoGol, IdPeriodo, Minuto)
 SELECT p.IdPartido, j.IdJugador, NULL, @tgPenal, @peTanda, 120
 FROM (VALUES
@@ -186,7 +186,7 @@ INNER JOIN (VALUES (1), (2), (3), (4)) AS k(n) ON k.n <= g.Cant;
 DECLARE @id INT;
 
 -- =========================================================================
--- TEST 1: finalizaciones válidas
+-- TEST 1: finalizaciones vÃ¡lidas
 -- =========================================================================
 -- 1.A Fase de grupos, 2-1, concurrencia 45000.
 -- Esperado: OK. El partido queda Finalizado con Concurrencia = 45000 y la vista devuelve 2-1, ganador s1.
@@ -197,10 +197,10 @@ BEGIN TRY
 	   AND EXISTS (SELECT 1 FROM nucleo.vw_PartidoResultado WHERE IdPartido = @id AND GolesLocal = 2 AND GolesVisitante = 1 AND IdGanador = @s1)
 		PRINT 'TEST 1.A OK: partido de grupos finalizado con 2-1 y concurrencia 45000.';
 	ELSE
-		PRINT 'TEST 1.A FALLÓ: el partido no quedó Finalizado con el resultado esperado.';
+		PRINT 'TEST 1.A FALLÃ“: el partido no quedÃ³ Finalizado con el resultado esperado.';
 END TRY
 BEGIN CATCH
-	PRINT 'TEST 1.A FALLÓ: error inesperado -> ' + ERROR_MESSAGE();
+	PRINT 'TEST 1.A FALLÃ“: error inesperado -> ' + ERROR_MESSAGE();
 END CATCH;
 
 -- 1.B Fase de grupos, 0-0 (sin goles cargados).
@@ -212,10 +212,10 @@ BEGIN TRY
 	   AND EXISTS (SELECT 1 FROM nucleo.vw_PartidoResultado WHERE IdPartido = @id AND GolesLocal = 0 AND GolesVisitante = 0 AND IdGanador IS NULL)
 		PRINT 'TEST 1.B OK: empate 0-0 en grupos finalizado sin ganador.';
 	ELSE
-		PRINT 'TEST 1.B FALLÓ: el partido 0-0 no quedó Finalizado como se esperaba.';
+		PRINT 'TEST 1.B FALLÃ“: el partido 0-0 no quedÃ³ Finalizado como se esperaba.';
 END TRY
 BEGIN CATCH
-	PRINT 'TEST 1.B FALLÓ: error inesperado -> ' + ERROR_MESSAGE();
+	PRINT 'TEST 1.B FALLÃ“: error inesperado -> ' + ERROR_MESSAGE();
 END CATCH;
 
 -- 1.C Concurrencia no informada (los datasets pueden no traerla).
@@ -226,10 +226,10 @@ BEGIN TRY
 	IF EXISTS (SELECT 1 FROM nucleo.Partido WHERE IdPartido = @id AND Estado = 'Finalizado' AND Concurrencia IS NULL)
 		PRINT 'TEST 1.C OK: finalizado sin concurrencia (queda NULL).';
 	ELSE
-		PRINT 'TEST 1.C FALLÓ: el partido no quedó Finalizado con Concurrencia NULL.';
+		PRINT 'TEST 1.C FALLÃ“: el partido no quedÃ³ Finalizado con Concurrencia NULL.';
 END TRY
 BEGIN CATCH
-	PRINT 'TEST 1.C FALLÓ: error inesperado -> ' + ERROR_MESSAGE();
+	PRINT 'TEST 1.C FALLÃ“: error inesperado -> ' + ERROR_MESSAGE();
 END CATCH;
 
 -- 1.D Octavos de final, 2-1 en juego.
@@ -240,10 +240,10 @@ BEGIN TRY
 	IF EXISTS (SELECT 1 FROM nucleo.vw_PartidoResultado WHERE IdPartido = @id AND Estado = 'Finalizado' AND IdGanador = @s1 AND DefinidoPorPenales = 0)
 		PRINT 'TEST 1.D OK: eliminatoria ganada en juego finalizada.';
 	ELSE
-		PRINT 'TEST 1.D FALLÓ: la eliminatoria no quedó Finalizada con ganador s1.';
+		PRINT 'TEST 1.D FALLÃ“: la eliminatoria no quedÃ³ Finalizada con ganador s1.';
 END TRY
 BEGIN CATCH
-	PRINT 'TEST 1.D FALLÓ: error inesperado -> ' + ERROR_MESSAGE();
+	PRINT 'TEST 1.D FALLÃ“: error inesperado -> ' + ERROR_MESSAGE();
 END CATCH;
 
 -- 1.E Octavos de final, 1-1 con tanda 4-3 para s3.
@@ -256,10 +256,10 @@ BEGIN TRY
 	             AND PenalesLocal = 4 AND PenalesVisitante = 3 AND IdGanador = @s3 AND DefinidoPorPenales = 1)
 		PRINT 'TEST 1.E OK: eliminatoria definida por penales finalizada.';
 	ELSE
-		PRINT 'TEST 1.E FALLÓ: la eliminatoria por penales no quedó Finalizada con ganador s3.';
+		PRINT 'TEST 1.E FALLÃ“: la eliminatoria por penales no quedÃ³ Finalizada con ganador s3.';
 END TRY
 BEGIN CATCH
-	PRINT 'TEST 1.E FALLÓ: error inesperado -> ' + ERROR_MESSAGE();
+	PRINT 'TEST 1.E FALLÃ“: error inesperado -> ' + ERROR_MESSAGE();
 END CATCH;
 
 -- 1.F Sede sin capacidad cargada y concurrencia 90000.
@@ -270,10 +270,10 @@ BEGIN TRY
 	IF EXISTS (SELECT 1 FROM nucleo.Partido WHERE IdPartido = @id AND Estado = 'Finalizado' AND Concurrencia = 90000)
 		PRINT 'TEST 1.F OK: sede sin capacidad, no se controla el tope.';
 	ELSE
-		PRINT 'TEST 1.F FALLÓ: el partido no quedó Finalizado con Concurrencia 90000.';
+		PRINT 'TEST 1.F FALLÃ“: el partido no quedÃ³ Finalizado con Concurrencia 90000.';
 END TRY
 BEGIN CATCH
-	PRINT 'TEST 1.F FALLÓ: error inesperado -> ' + ERROR_MESSAGE();
+	PRINT 'TEST 1.F FALLÃ“: error inesperado -> ' + ERROR_MESSAGE();
 END CATCH;
 
 -- 1.G Octavos de final 0-0 en juego (sin goles en juego) y tanda 4-3 para s2.
@@ -286,10 +286,10 @@ BEGIN TRY
 	             AND IdGanador = @s2 AND DefinidoPorPenales = 1)
 		PRINT 'TEST 1.G OK: 0-0 en juego definido por penales finalizado.';
 	ELSE
-		PRINT 'TEST 1.G FALLÓ: el partido 0-0 con tanda no quedó Finalizado con ganador s2.';
+		PRINT 'TEST 1.G FALLÃ“: el partido 0-0 con tanda no quedÃ³ Finalizado con ganador s2.';
 END TRY
 BEGIN CATCH
-	PRINT 'TEST 1.G FALLÓ: error inesperado -> ' + ERROR_MESSAGE();
+	PRINT 'TEST 1.G FALLÃ“: error inesperado -> ' + ERROR_MESSAGE();
 END CATCH;
 
 -- =========================================================================
@@ -299,28 +299,28 @@ END CATCH;
 -- Esperado: Bloqueado: "El partido indicado no existe".
 BEGIN TRY
 	EXEC nucleo.SP_FINALIZAR_PARTIDO @idPartido = 32000, @concurrencia = 1000;
-	PRINT 'TEST 2.A FALLÓ: permitió finalizar un partido inexistente.';
+	PRINT 'TEST 2.A FALLÃ“: permitiÃ³ finalizar un partido inexistente.';
 END TRY
 BEGIN CATCH
 	IF ERROR_MESSAGE() LIKE '%El partido indicado no existe%'
 		PRINT 'TEST 2.A OK (Bloqueado): ' + ERROR_MESSAGE();
 	ELSE
-		PRINT 'TEST 2.A FALLÓ: mensaje inesperado -> ' + ERROR_MESSAGE();
+		PRINT 'TEST 2.A FALLÃ“: mensaje inesperado -> ' + ERROR_MESSAGE();
 END CATCH;
 
 -- 2.B Partido ya finalizado (el 151 del caso 1.A).
--- Esperado: Bloqueado: "no está en estado Programado"; la concurrencia 45000 no se modifica.
+-- Esperado: Bloqueado: "no estÃ¡ en estado Programado"; la concurrencia 45000 no se modifica.
 SET @id = (SELECT IdPartido FROM nucleo.Partido WHERE NumeroPartido = 151);
 BEGIN TRY
 	EXEC nucleo.SP_FINALIZAR_PARTIDO @idPartido = @id, @concurrencia = 100;
-	PRINT 'TEST 2.B FALLÓ: permitió finalizar un partido ya finalizado.';
+	PRINT 'TEST 2.B FALLÃ“: permitiÃ³ finalizar un partido ya finalizado.';
 END TRY
 BEGIN CATCH
-	IF ERROR_MESSAGE() LIKE '%no está en estado Programado%'
+	IF ERROR_MESSAGE() LIKE '%no estÃ¡ en estado Programado%'
 	   AND EXISTS (SELECT 1 FROM nucleo.Partido WHERE IdPartido = @id AND Concurrencia = 45000)
 		PRINT 'TEST 2.B OK (Bloqueado): ' + ERROR_MESSAGE();
 	ELSE
-		PRINT 'TEST 2.B FALLÓ: mensaje inesperado o se modificó la concurrencia -> ' + ERROR_MESSAGE();
+		PRINT 'TEST 2.B FALLÃ“: mensaje inesperado o se modificÃ³ la concurrencia -> ' + ERROR_MESSAGE();
 END CATCH;
 
 -- 2.C Partido sin selecciones definidas.
@@ -328,27 +328,27 @@ END CATCH;
 SET @id = (SELECT IdPartido FROM nucleo.Partido WHERE NumeroPartido = 157);
 BEGIN TRY
 	EXEC nucleo.SP_FINALIZAR_PARTIDO @idPartido = @id, @concurrencia = 1000;
-	PRINT 'TEST 2.C FALLÓ: permitió finalizar un partido sin selecciones.';
+	PRINT 'TEST 2.C FALLÃ“: permitiÃ³ finalizar un partido sin selecciones.';
 END TRY
 BEGIN CATCH
 	IF ERROR_MESSAGE() LIKE '%no tiene definidas ambas selecciones%'
 		PRINT 'TEST 2.C OK (Bloqueado): ' + ERROR_MESSAGE();
 	ELSE
-		PRINT 'TEST 2.C FALLÓ: mensaje inesperado -> ' + ERROR_MESSAGE();
+		PRINT 'TEST 2.C FALLÃ“: mensaje inesperado -> ' + ERROR_MESSAGE();
 END CATCH;
 
 -- 2.D Partido con fecha futura.
--- Esperado: Bloqueado: "todavía no se jugó".
+-- Esperado: Bloqueado: "todavÃ­a no se jugÃ³".
 SET @id = (SELECT IdPartido FROM nucleo.Partido WHERE NumeroPartido = 158);
 BEGIN TRY
 	EXEC nucleo.SP_FINALIZAR_PARTIDO @idPartido = @id, @concurrencia = 1000;
-	PRINT 'TEST 2.D FALLÓ: permitió finalizar un partido futuro.';
+	PRINT 'TEST 2.D FALLÃ“: permitiÃ³ finalizar un partido futuro.';
 END TRY
 BEGIN CATCH
-	IF ERROR_MESSAGE() LIKE '%todavía no se jugó%'
+	IF ERROR_MESSAGE() LIKE '%todavÃ­a no se jugÃ³%'
 		PRINT 'TEST 2.D OK (Bloqueado): ' + ERROR_MESSAGE();
 	ELSE
-		PRINT 'TEST 2.D FALLÓ: mensaje inesperado -> ' + ERROR_MESSAGE();
+		PRINT 'TEST 2.D FALLÃ“: mensaje inesperado -> ' + ERROR_MESSAGE();
 END CATCH;
 
 -- 2.E Concurrencia negativa.
@@ -356,40 +356,40 @@ END CATCH;
 SET @id = (SELECT IdPartido FROM nucleo.Partido WHERE NumeroPartido = 159);
 BEGIN TRY
 	EXEC nucleo.SP_FINALIZAR_PARTIDO @idPartido = @id, @concurrencia = -1;
-	PRINT 'TEST 2.E FALLÓ: permitió una concurrencia negativa.';
+	PRINT 'TEST 2.E FALLÃ“: permitiÃ³ una concurrencia negativa.';
 END TRY
 BEGIN CATCH
 	IF ERROR_MESSAGE() LIKE '%La concurrencia no puede ser negativa%'
 		PRINT 'TEST 2.E OK (Bloqueado): ' + ERROR_MESSAGE();
 	ELSE
-		PRINT 'TEST 2.E FALLÓ: mensaje inesperado -> ' + ERROR_MESSAGE();
+		PRINT 'TEST 2.E FALLÃ“: mensaje inesperado -> ' + ERROR_MESSAGE();
 END CATCH;
 
 -- 2.F Concurrencia mayor que la capacidad de la sede (50000).
 -- Esperado: Bloqueado: "supera la capacidad de la sede (50000)".
 BEGIN TRY
 	EXEC nucleo.SP_FINALIZAR_PARTIDO @idPartido = @id, @concurrencia = 50001;
-	PRINT 'TEST 2.F FALLÓ: permitió una concurrencia mayor que la capacidad.';
+	PRINT 'TEST 2.F FALLÃ“: permitiÃ³ una concurrencia mayor que la capacidad.';
 END TRY
 BEGIN CATCH
 	IF ERROR_MESSAGE() LIKE '%supera la capacidad de la sede (50000)%'
 		PRINT 'TEST 2.F OK (Bloqueado): ' + ERROR_MESSAGE();
 	ELSE
-		PRINT 'TEST 2.F FALLÓ: mensaje inesperado -> ' + ERROR_MESSAGE();
+		PRINT 'TEST 2.F FALLÃ“: mensaje inesperado -> ' + ERROR_MESSAGE();
 END CATCH;
 
--- 2.G Gol de un jugador convocado en una selección ajena al partido (j5, selección s5).
--- Esperado: Bloqueado: "1 gol(es) cuyo autor no está convocado en ninguna de las dos selecciones".
+-- 2.G Gol de un jugador convocado en una selecciÃ³n ajena al partido (j5, selecciÃ³n s5).
+-- Esperado: Bloqueado: "1 gol(es) cuyo autor no estÃ¡ convocado en ninguna de las dos selecciones".
 SET @id = (SELECT IdPartido FROM nucleo.Partido WHERE NumeroPartido = 161);
 BEGIN TRY
 	EXEC nucleo.SP_FINALIZAR_PARTIDO @idPartido = @id, @concurrencia = 1000;
-	PRINT 'TEST 2.G FALLÓ: permitió finalizar con un gol de un jugador de otra selección.';
+	PRINT 'TEST 2.G FALLÃ“: permitiÃ³ finalizar con un gol de un jugador de otra selecciÃ³n.';
 END TRY
 BEGIN CATCH
-	IF ERROR_MESSAGE() LIKE '%Hay 1 gol(es) cuyo autor no está convocado en ninguna de las dos selecciones%'
+	IF ERROR_MESSAGE() LIKE '%Hay 1 gol(es) cuyo autor no estÃ¡ convocado en ninguna de las dos selecciones%'
 		PRINT 'TEST 2.G OK (Bloqueado): ' + ERROR_MESSAGE();
 	ELSE
-		PRINT 'TEST 2.G FALLÓ: mensaje inesperado -> ' + ERROR_MESSAGE();
+		PRINT 'TEST 2.G FALLÃ“: mensaje inesperado -> ' + ERROR_MESSAGE();
 END CATCH;
 
 -- 2.H Gol de un jugador sin convocar (j6).
@@ -397,69 +397,69 @@ END CATCH;
 SET @id = (SELECT IdPartido FROM nucleo.Partido WHERE NumeroPartido = 162);
 BEGIN TRY
 	EXEC nucleo.SP_FINALIZAR_PARTIDO @idPartido = @id, @concurrencia = 1000;
-	PRINT 'TEST 2.H FALLÓ: permitió finalizar con un gol de un jugador sin convocar.';
+	PRINT 'TEST 2.H FALLÃ“: permitiÃ³ finalizar con un gol de un jugador sin convocar.';
 END TRY
 BEGIN CATCH
-	IF ERROR_MESSAGE() LIKE '%Hay 1 gol(es) cuyo autor no está convocado en ninguna de las dos selecciones%'
+	IF ERROR_MESSAGE() LIKE '%Hay 1 gol(es) cuyo autor no estÃ¡ convocado en ninguna de las dos selecciones%'
 		PRINT 'TEST 2.H OK (Bloqueado): ' + ERROR_MESSAGE();
 	ELSE
-		PRINT 'TEST 2.H FALLÓ: mensaje inesperado -> ' + ERROR_MESSAGE();
+		PRINT 'TEST 2.H FALLÃ“: mensaje inesperado -> ' + ERROR_MESSAGE();
 END CATCH;
 
 -- 2.I Tanda de penales en un partido de fase de grupos.
--- Esperado: Bloqueado: "En fase de grupos no hay definición por penales".
+-- Esperado: Bloqueado: "En fase de grupos no hay definiciÃ³n por penales".
 SET @id = (SELECT IdPartido FROM nucleo.Partido WHERE NumeroPartido = 163);
 BEGIN TRY
 	EXEC nucleo.SP_FINALIZAR_PARTIDO @idPartido = @id, @concurrencia = 1000;
-	PRINT 'TEST 2.I FALLÓ: permitió una tanda de penales en fase de grupos.';
+	PRINT 'TEST 2.I FALLÃ“: permitiÃ³ una tanda de penales en fase de grupos.';
 END TRY
 BEGIN CATCH
-	IF ERROR_MESSAGE() LIKE '%En fase de grupos no hay definición por penales%'
+	IF ERROR_MESSAGE() LIKE '%En fase de grupos no hay definiciÃ³n por penales%'
 		PRINT 'TEST 2.I OK (Bloqueado): ' + ERROR_MESSAGE();
 	ELSE
-		PRINT 'TEST 2.I FALLÓ: mensaje inesperado -> ' + ERROR_MESSAGE();
+		PRINT 'TEST 2.I FALLÃ“: mensaje inesperado -> ' + ERROR_MESSAGE();
 END CATCH;
 
 -- 2.J Eliminatoria 0-0 sin goles cargados y sin tanda.
--- Esperado: Bloqueado: "terminó empatado y no tiene definición por penales".
+-- Esperado: Bloqueado: "terminÃ³ empatado y no tiene definiciÃ³n por penales".
 SET @id = (SELECT IdPartido FROM nucleo.Partido WHERE NumeroPartido = 164);
 BEGIN TRY
 	EXEC nucleo.SP_FINALIZAR_PARTIDO @idPartido = @id, @concurrencia = 1000;
-	PRINT 'TEST 2.J FALLÓ: permitió una eliminatoria empatada sin tanda.';
+	PRINT 'TEST 2.J FALLÃ“: permitiÃ³ una eliminatoria empatada sin tanda.';
 END TRY
 BEGIN CATCH
-	IF ERROR_MESSAGE() LIKE '%terminó empatado y no tiene definición por penales%'
+	IF ERROR_MESSAGE() LIKE '%terminÃ³ empatado y no tiene definiciÃ³n por penales%'
 		PRINT 'TEST 2.J OK (Bloqueado): ' + ERROR_MESSAGE();
 	ELSE
-		PRINT 'TEST 2.J FALLÓ: mensaje inesperado -> ' + ERROR_MESSAGE();
+		PRINT 'TEST 2.J FALLÃ“: mensaje inesperado -> ' + ERROR_MESSAGE();
 END CATCH;
 
--- 2.K Eliminatoria 1-1 con tanda igualada 3-3 (falta cargar algún penal).
--- Esperado: Bloqueado: "La definición por penales está igualada".
+-- 2.K Eliminatoria 1-1 con tanda igualada 3-3 (falta cargar algÃºn penal).
+-- Esperado: Bloqueado: "La definiciÃ³n por penales estÃ¡ igualada".
 SET @id = (SELECT IdPartido FROM nucleo.Partido WHERE NumeroPartido = 165);
 BEGIN TRY
 	EXEC nucleo.SP_FINALIZAR_PARTIDO @idPartido = @id, @concurrencia = 1000;
-	PRINT 'TEST 2.K FALLÓ: permitió una tanda igualada.';
+	PRINT 'TEST 2.K FALLÃ“: permitiÃ³ una tanda igualada.';
 END TRY
 BEGIN CATCH
-	IF ERROR_MESSAGE() LIKE '%La definición por penales está igualada%'
+	IF ERROR_MESSAGE() LIKE '%La definiciÃ³n por penales estÃ¡ igualada%'
 		PRINT 'TEST 2.K OK (Bloqueado): ' + ERROR_MESSAGE();
 	ELSE
-		PRINT 'TEST 2.K FALLÓ: mensaje inesperado -> ' + ERROR_MESSAGE();
+		PRINT 'TEST 2.K FALLÃ“: mensaje inesperado -> ' + ERROR_MESSAGE();
 END CATCH;
 
 -- 2.L Eliminatoria 2-1 con penales cargados.
--- Esperado: Bloqueado: "goles de la definición por penales pero el partido no terminó empatado".
+-- Esperado: Bloqueado: "goles de la definiciÃ³n por penales pero el partido no terminÃ³ empatado".
 SET @id = (SELECT IdPartido FROM nucleo.Partido WHERE NumeroPartido = 166);
 BEGIN TRY
 	EXEC nucleo.SP_FINALIZAR_PARTIDO @idPartido = @id, @concurrencia = 1000;
-	PRINT 'TEST 2.L FALLÓ: permitió penales en un partido que no terminó empatado.';
+	PRINT 'TEST 2.L FALLÃ“: permitiÃ³ penales en un partido que no terminÃ³ empatado.';
 END TRY
 BEGIN CATCH
-	IF ERROR_MESSAGE() LIKE '%definición por penales pero el partido no terminó empatado%'
+	IF ERROR_MESSAGE() LIKE '%definiciÃ³n por penales pero el partido no terminÃ³ empatado%'
 		PRINT 'TEST 2.L OK (Bloqueado): ' + ERROR_MESSAGE();
 	ELSE
-		PRINT 'TEST 2.L FALLÓ: mensaje inesperado -> ' + ERROR_MESSAGE();
+		PRINT 'TEST 2.L FALLÃ“: mensaje inesperado -> ' + ERROR_MESSAGE();
 END CATCH;
 
 -- 2.M Los partidos rechazados siguen 'Programado'.
@@ -468,85 +468,85 @@ IF (SELECT COUNT(*) FROM nucleo.Partido
     WHERE NumeroPartido IN (157, 158, 159, 161, 162, 163, 164, 165, 166, 167) AND Estado = 'Programado') = 10
 	PRINT 'TEST 2.M OK: los partidos rechazados siguen Programado.';
 ELSE
-	PRINT 'TEST 2.M FALLÓ: algún partido rechazado cambió de estado.';
+	PRINT 'TEST 2.M FALLÃ“: algÃºn partido rechazado cambiÃ³ de estado.';
 
 -- =========================================================================
 -- TEST 3: varias fallas juntas
 -- =========================================================================
 -- 3.A Partido de grupos con fecha futura, 1-1 con tanda cargada y concurrencia negativa.
 -- Esperado: Bloqueado con UN solo mensaje que contiene las tres condiciones incumplidas:
---           "todavía no se jugó", "La concurrencia no puede ser negativa" y
---           "En fase de grupos no hay definición por penales".
+--           "todavÃ­a no se jugÃ³", "La concurrencia no puede ser negativa" y
+--           "En fase de grupos no hay definiciÃ³n por penales".
 SET @id = (SELECT IdPartido FROM nucleo.Partido WHERE NumeroPartido = 167);
 BEGIN TRY
 	EXEC nucleo.SP_FINALIZAR_PARTIDO @idPartido = @id, @concurrencia = -5;
-	PRINT 'TEST 3.A FALLÓ: permitió finalizar un partido con varias fallas.';
+	PRINT 'TEST 3.A FALLÃ“: permitiÃ³ finalizar un partido con varias fallas.';
 END TRY
 BEGIN CATCH
 	IF ERROR_MESSAGE() LIKE 'SP_FINALIZAR_PARTIDO - No se pudo finalizar el partido:%'
-	   AND ERROR_MESSAGE() LIKE '%todavía no se jugó%'
+	   AND ERROR_MESSAGE() LIKE '%todavÃ­a no se jugÃ³%'
 	   AND ERROR_MESSAGE() LIKE '%La concurrencia no puede ser negativa%'
-	   AND ERROR_MESSAGE() LIKE '%En fase de grupos no hay definición por penales%'
+	   AND ERROR_MESSAGE() LIKE '%En fase de grupos no hay definiciÃ³n por penales%'
 		PRINT 'TEST 3.A OK (Bloqueado): ' + REPLACE(ERROR_MESSAGE(), CHAR(13) + CHAR(10), ' | ');
 	ELSE
-		PRINT 'TEST 3.A FALLÓ: el mensaje no agrupa las tres fallas -> ' + ERROR_MESSAGE();
+		PRINT 'TEST 3.A FALLÃ“: el mensaje no agrupa las tres fallas -> ' + ERROR_MESSAGE();
 END CATCH;
 
 -- =========================================================================
--- TEST 4: interacción con otros objetos y con la transacción del llamador
+-- TEST 4: interacciÃ³n con otros objetos y con la transacciÃ³n del llamador
 -- =========================================================================
--- 4.A Registrar un gol después del cierre (partido 151, ya Finalizado).
--- Esperado: Bloqueado por SP_REGISTRAR_GOL: "El partido ya está finalizado".
+-- 4.A Registrar un gol despuÃ©s del cierre (partido 151, ya Finalizado).
+-- Esperado: Bloqueado por SP_REGISTRAR_GOL: "El partido ya estÃ¡ finalizado".
 SET @id = (SELECT IdPartido FROM nucleo.Partido WHERE NumeroPartido = 151);
 DECLARE @idJ1 INT = (SELECT IdJugador FROM jugadores.Jugador WHERE Documento = 'TEST_FIN_1');
 BEGIN TRY
 	EXEC eventos.SP_REGISTRAR_GOL @idPartido = @id, @idJugadorAutor = @idJ1, @tipoGol = 'Jugada',
 	     @periodo = 'Segundo Tiempo', @minuto = 80, @permitirFechaFutura = 1;
-	PRINT 'TEST 4.A FALLÓ: permitió registrar un gol en un partido finalizado.';
+	PRINT 'TEST 4.A FALLÃ“: permitiÃ³ registrar un gol en un partido finalizado.';
 END TRY
 BEGIN CATCH
-	IF ERROR_MESSAGE() LIKE '%El partido ya está finalizado%'
+	IF ERROR_MESSAGE() LIKE '%El partido ya estÃ¡ finalizado%'
 		PRINT 'TEST 4.A OK (Bloqueado): ' + REPLACE(ERROR_MESSAGE(), CHAR(13) + CHAR(10), ' | ');
 	ELSE
-		PRINT 'TEST 4.A FALLÓ: mensaje inesperado -> ' + ERROR_MESSAGE();
+		PRINT 'TEST 4.A FALLÃ“: mensaje inesperado -> ' + ERROR_MESSAGE();
 END CATCH;
 
--- 4.B Llamada inválida dentro de una transacción abierta por el llamador (partido 164, sin tanda).
--- Esperado: Bloqueado, y la transacción del llamador sigue abierta (@@TRANCOUNT = 1) y utilizable.
+-- 4.B Llamada invÃ¡lida dentro de una transacciÃ³n abierta por el llamador (partido 164, sin tanda).
+-- Esperado: Bloqueado, y la transacciÃ³n del llamador sigue abierta (@@TRANCOUNT = 1) y utilizable.
 SET @id = (SELECT IdPartido FROM nucleo.Partido WHERE NumeroPartido = 164);
 BEGIN TRANSACTION;
 BEGIN TRY
 	EXEC nucleo.SP_FINALIZAR_PARTIDO @idPartido = @id, @concurrencia = 1000;
-	PRINT 'TEST 4.B FALLÓ: permitió finalizar una eliminatoria empatada sin tanda.';
+	PRINT 'TEST 4.B FALLÃ“: permitiÃ³ finalizar una eliminatoria empatada sin tanda.';
 END TRY
 BEGIN CATCH
-	IF @@TRANCOUNT = 1 AND XACT_STATE() = 1 AND ERROR_MESSAGE() LIKE '%terminó empatado y no tiene definición por penales%'
-		PRINT 'TEST 4.B OK (Bloqueado): la transacción del llamador sigue abierta.';
+	IF @@TRANCOUNT = 1 AND XACT_STATE() = 1 AND ERROR_MESSAGE() LIKE '%terminÃ³ empatado y no tiene definiciÃ³n por penales%'
+		PRINT 'TEST 4.B OK (Bloqueado): la transacciÃ³n del llamador sigue abierta.';
 	ELSE
-		PRINT 'TEST 4.B FALLÓ: @@TRANCOUNT = ' + CAST(@@TRANCOUNT AS VARCHAR(5)) + ' -> ' + ERROR_MESSAGE();
+		PRINT 'TEST 4.B FALLÃ“: @@TRANCOUNT = ' + CAST(@@TRANCOUNT AS VARCHAR(5)) + ' -> ' + ERROR_MESSAGE();
 END CATCH;
 WHILE @@TRANCOUNT > 0
 	ROLLBACK TRANSACTION;
 
--- 4.C Finalización válida dentro de una transacción del llamador que luego se deshace (partido 169).
--- Esperado: dentro de la transacción el partido figura Finalizado; tras el ROLLBACK del llamador
---           vuelve a Programado con Concurrencia NULL (el SP no confirmó la transacción ajena).
+-- 4.C FinalizaciÃ³n vÃ¡lida dentro de una transacciÃ³n del llamador que luego se deshace (partido 169).
+-- Esperado: dentro de la transacciÃ³n el partido figura Finalizado; tras el ROLLBACK del llamador
+--           vuelve a Programado con Concurrencia NULL (el SP no confirmÃ³ la transacciÃ³n ajena).
 SET @id = (SELECT IdPartido FROM nucleo.Partido WHERE NumeroPartido = 169);
 BEGIN TRANSACTION;
 BEGIN TRY
 	EXEC nucleo.SP_FINALIZAR_PARTIDO @idPartido = @id, @concurrencia = 1000;
 	IF NOT EXISTS (SELECT 1 FROM nucleo.Partido WHERE IdPartido = @id AND Estado = 'Finalizado' AND Concurrencia = 1000)
-		PRINT 'TEST 4.C FALLÓ: el partido no quedó Finalizado dentro de la transacción.';
+		PRINT 'TEST 4.C FALLÃ“: el partido no quedÃ³ Finalizado dentro de la transacciÃ³n.';
 END TRY
 BEGIN CATCH
-	PRINT 'TEST 4.C FALLÓ: error inesperado -> ' + ERROR_MESSAGE();
+	PRINT 'TEST 4.C FALLÃ“: error inesperado -> ' + ERROR_MESSAGE();
 END CATCH;
 WHILE @@TRANCOUNT > 0
 	ROLLBACK TRANSACTION;
 IF EXISTS (SELECT 1 FROM nucleo.Partido WHERE IdPartido = @id AND Estado = 'Programado' AND Concurrencia IS NULL)
 	PRINT 'TEST 4.C OK: tras el ROLLBACK del llamador el partido vuelve a Programado.';
 ELSE
-	PRINT 'TEST 4.C FALLÓ: el SP confirmó la transacción del llamador.';
+	PRINT 'TEST 4.C FALLÃ“: el SP confirmÃ³ la transacciÃ³n del llamador.';
 
 -- =========================================================================
 -- LIMPIEZA FINAL: borra todos los datos de prueba
@@ -563,7 +563,7 @@ DELETE FROM nucleo.Pais          WHERE Nombre LIKE 'TEST FIN%';
 DELETE FROM nucleo.Confederacion WHERE Nombre LIKE 'TEST FIN%';
 
 IF EXISTS (SELECT 1 FROM nucleo.Pais WHERE Nombre LIKE 'TEST FIN%')
-	PRINT 'ATENCIÓN: quedaron datos de prueba TEST FIN en la base.';
+	PRINT 'ATENCIÃ“N: quedaron datos de prueba TEST FIN en la base.';
 ELSE
 	PRINT 'Limpieza OK: no quedaron datos de prueba TEST FIN.';
 GO

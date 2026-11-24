@@ -228,6 +228,11 @@ GO
 :r $(RUTA)\28_SP_DefinirCruceEliminatorio.sql
 GO
 
+PRINT '--- 33 Consultas del alcance To BE (fixture, goleadores, tarjetas, árbitros, publicidad y BI)';
+GO
+:r $(RUTA)\33_Consultas_ToBe.sql
+GO
+
 -- Los próximos SP, vistas y funciones se suman acá, siempre en orden numérico.
 
 -- =========================================================================

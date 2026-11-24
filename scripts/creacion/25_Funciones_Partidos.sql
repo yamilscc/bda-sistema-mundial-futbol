@@ -1,54 +1,54 @@
 /*
 Universidad: Universidad Nacional de La Matanza
 Materia: Bases de Datos Aplicadas - Grupo 05
-Autor: Canseco Carrizo, Yamil SimÛn
+Autor: Canseco Carrizo, Yamil Sim√≥n
 Integrantes:
 Casella, Mateo Ezequiel
 Chungara Tenorio, Denis Abner
-Torczuk, ElÌas Alexei
-Canseco Carrizo, Yamil SimÛn
+Torczuk, El√≠as Alexei
+Canseco Carrizo, Yamil Sim√≥n
 Objetivo:
-	- Funciones y vista que derivan, a partir de los goles, la definiciÛn de cada partido y la
-	  clasificaciÛn de la fase de grupos:
-		  nucleo.fn_DefinicionPartido(@IdPartido)  -> ganador, perdedor y si se definiÛ por penales.
+	- Funciones y vista que derivan, a partir de los goles, la definici√≥n de cada partido y la
+	  clasificaci√≥n de la fase de grupos:
+		  nucleo.fn_DefinicionPartido(@IdPartido)  -> ganador, perdedor y si se defini√≥ por penales.
 		  nucleo.fn_SeleccionesClasificadas()      -> tabla de posiciones por grupo y clasificados.
-		  nucleo.fn_FaseEliminatoriaInicial()      -> fase con la que empieza la eliminaciÛn directa.
+		  nucleo.fn_FaseEliminatoriaInicial()      -> fase con la que empieza la eliminaci√≥n directa.
 		  nucleo.fn_ValidarFaseGruposCompleta()    -> texto de las condiciones que impiden dar por
-		                                              terminada la fase de grupos (vacÌo si est· completa).
-		  nucleo.vw_PartidoResultado               -> partido + resultado + definiciÛn (reportes y BI).
+		                                              terminada la fase de grupos (vac√≠o si est√° completa).
+		  nucleo.vw_PartidoResultado               -> partido + resultado + definici√≥n (reportes y BI).
 	- Requiere ejecutados los scripts 01 a 24 (usa nucleo.ReglaClasificacion, jugadores.Convocatoria
 	  y eventos.fn_ResultadoPartido).
 	- Test correspondiente: testing/25_Test_Funciones_Partidos.sql.
 
-DECISIONES DE DISE—O (documentadas ac· porque son reglas del grupo, no del reglamento oficial)
+DECISIONES DE DISE√ëO (documentadas ac√° porque son reglas del grupo, no del reglamento oficial)
 
   1. 3FN: nucleo.Partido no guarda el resultado. Todo se obtiene de eventos.fn_ResultadoPartido
      (a partir de eventos.Gol). Estas funciones no leen goles, penales ni asistencia de Partido.
-     PrecondiciÛn: todo gol debe tener un autor convocado en una de las dos selecciones del partido
+     Precondici√≥n: todo gol debe tener un autor convocado en una de las dos selecciones del partido
      (nucleo.SP_FINALIZAR_PARTIDO, script 26, lo valida antes de cerrar el partido).
 
   2. Cupo de clasificados (nucleo.ReglaClasificacion, una sola fila):
-       ClasificadosPorGrupo = cu·ntas selecciones clasifican directo por grupo (puestos 1..N).
-       MejoresTerceros      = cu·ntas selecciones m·s clasifican entre los grupos, tomadas del puesto
+       ClasificadosPorGrupo = cu√°ntas selecciones clasifican directo por grupo (puestos 1..N).
+       MejoresTerceros      = cu√°ntas selecciones m√°s clasifican entre los grupos, tomadas del puesto
                               inmediatamente inferior a los directos (puesto ClasificadosPorGrupo + 1).
-     Con 2 por grupo ese puesto es el tercero (de ahÌ el nombre); con otro valor de ClasificadosPorGrupo
+     Con 2 por grupo ese puesto es el tercero (de ah√≠ el nombre); con otro valor de ClasificadosPorGrupo
      es el puesto siguiente (con 1 por grupo, los "mejores segundos"). ClasificaComo = 'Mejor tercero'
      identifica a esas selecciones del cupo adicional, sea cual sea ese puesto.
      Presets: (2, 0) = modalidad de 8 grupos de 4 equipos (Catar 2022, por ejemplo): 16 clasificados.
               (2, 8) = modalidad de 12 grupos de 4 equipos (Mundial 2026, por ejemplo): 32 clasificados.
-     LimitaciÛn: el ranking de mejores terceros compara selecciones de grupos distintos con los mismos
-     criterios; no normaliza grupos de distinto tamaÒo (todos los presets usan grupos de 4).
+     Limitaci√≥n: el ranking de mejores terceros compara selecciones de grupos distintos con los mismos
+     criterios; no normaliza grupos de distinto tama√±o (todos los presets usan grupos de 4).
 
   3. Desempate dentro del grupo (y entre los mejores terceros): puntos, diferencia de gol,
-     goles a favor e IdSeleccion (menor primero). El ˙ltimo criterio hace el orden determinÌstico.
+     goles a favor e IdSeleccion (menor primero). El √∫ltimo criterio hace el orden determin√≠stico.
      No se usan fair play ni sorteo.
 
   4. Fase de grupos: 3 puntos por victoria, 1 por empate. La tanda de penales no cuenta en grupos:
      fn_DefinicionPartido la ignora en partidos de grupos (el resultado queda como empate).
 
-  5. Fase inicial de la eliminaciÛn directa: se deduce del total de clasificados reales:
+  5. Fase inicial de la eliminaci√≥n directa: se deduce del total de clasificados reales:
      32 -> 'Dieciseisavos de final', 16 -> 'Octavos de final', 8 -> 'Cuartos de final'.
-     Cualquier otro total (incluida una regla inexistente) es inv·lido: la funciÛn devuelve 0 filas.
+     Cualquier otro total (incluida una regla inexistente) es inv√°lido: la funci√≥n devuelve 0 filas.
 */
 
 USE MundialFutbol;
@@ -56,17 +56,17 @@ GO
 
 /*
 fn_DefinicionPartido
-Devuelve UNA fila con el ganador y el perdedor del partido seg˙n los goles cargados; 0 filas si el
+Devuelve UNA fila con el ganador y el perdedor del partido seg√∫n los goles cargados; 0 filas si el
 partido no existe o no tiene ambas selecciones definidas.
-Es un c·lculo puro: no mira el Estado, para que nucleo.SP_FINALIZAR_PARTIDO (script 26) pueda saber
+Es un c√°lculo puro: no mira el Estado, para que nucleo.SP_FINALIZAR_PARTIDO (script 26) pueda saber
 si el partido tiene ganador ANTES de finalizarlo. Los reportes deben leer el resultado de partidos
-jugados: nucleo.vw_PartidoResultado oculta el ganador mientras el partido est· 'Programado'.
+jugados: nucleo.vw_PartidoResultado oculta el ganador mientras el partido est√° 'Programado'.
 Criterios:
-	- Gana la selecciÛn con m·s goles (DefinidoPorPenales = 0).
+	- Gana la selecci√≥n con m√°s goles (DefinidoPorPenales = 0).
 	- Con goles iguales en una fase eliminatoria, si hubo tanda con diferente cantidad de penales gana
-	  quien convirtiÛ m·s (DefinidoPorPenales = 1).
+	  quien convirti√≥ m√°s (DefinidoPorPenales = 1).
 	- En cualquier otro caso (empate en fase de grupos, eliminatoria sin tanda o con tanda igualada)
-	  IdGanador e IdPerdedor son NULL y DefinidoPorPenales = 0. Los dos ˙ltimos son datos inv·lidos
+	  IdGanador e IdPerdedor son NULL y DefinidoPorPenales = 0. Los dos √∫ltimos son datos inv√°lidos
 	  que nucleo.SP_FINALIZAR_PARTIDO impide.
 */
 CREATE OR ALTER FUNCTION nucleo.fn_DefinicionPartido (@IdPartido SMALLINT)
@@ -100,15 +100,15 @@ GO
 
 /*
 fn_SeleccionesClasificadas
-Devuelve una fila por selecciÛn con su tabla de posiciones en el grupo y si clasifica.
+Devuelve una fila por selecci√≥n con su tabla de posiciones en el grupo y si clasifica.
 Columnas:
 	IdGrupo, Grupo, IdSeleccion, CodigoFIFA,
 	PJ, PG, PE, PP, GF, GC, DG, Pts, Posicion (1 = primero del grupo),
 	Clasifica (1 si clasifica),
-	ClasificaComo ('Directo', 'Mejor tercero' o NULL; ver decisiÛn de diseÒo 2 del encabezado).
+	ClasificaComo ('Directo', 'Mejor tercero' o NULL; ver decisi√≥n de dise√±o 2 del encabezado).
 Criterios:
 	- Solo cuentan los partidos 'Finalizado' de 'Fase de grupos' con ambas selecciones.
-	- Una selecciÛn sin partidos jugados aparece con todo en cero.
+	- Una selecci√≥n sin partidos jugados aparece con todo en cero.
 	- Si nucleo.ReglaClasificacion no tiene fila, devuelve igual las posiciones con Clasifica = 0.
 	- Es provisoria mientras queden partidos de grupos sin finalizar (SP_CALCULO_DE_SELECCIONES_CLASIFICADAS,
 	  script 27, exige la fase completa).
@@ -185,7 +185,7 @@ GO
 
 /*
 fn_FaseEliminatoriaInicial
-Devuelve UNA fila con la fase con la que empieza la eliminaciÛn directa, deducida del total de
+Devuelve UNA fila con la fase con la que empieza la eliminaci√≥n directa, deducida del total de
 selecciones clasificadas (32 -> Dieciseisavos, 16 -> Octavos, 8 -> Cuartos); 0 filas si el total no
 corresponde a ninguna fase. Cuenta los clasificados definidos por el cupo (no depende de los
 resultados), por lo que se puede consultar antes de que termine la fase de grupos.
@@ -212,16 +212,16 @@ GO
 
 /*
 fn_ValidarFaseGruposCompleta
-Devuelve el texto de las condiciones que impiden considerar terminada la fase de grupos (cada lÌnea
-empieza con "- " y termina con CHAR(13) + CHAR(10)); cadena vacÌa si la fase est· completa.
+Devuelve el texto de las condiciones que impiden considerar terminada la fase de grupos (cada l√≠nea
+empieza con "- " y termina con CHAR(13) + CHAR(10)); cadena vac√≠a si la fase est√° completa.
 Condiciones (la usan nucleo.SP_CALCULO_DE_SELECCIONES_CLASIFICADAS, script 27, y
 nucleo.SP_DEFINIR_CRUCE_ELIMINATORIO, script 28, para los cruces de la fase inicial):
 	- Hay partidos de 'Fase de grupos' cargados.
-	- Todos esos partidos est·n 'Finalizado' (se listan hasta 20 n˙meros de partido y "y N m·s").
-	- Cada selecciÛn tiene cargados todos sus partidos de grupo (n - 1, con n = tamaÒo de su grupo):
+	- Todos esos partidos est√°n 'Finalizado' (se listan hasta 20 n√∫meros de partido y "y N m√°s").
+	- Cada selecci√≥n tiene cargados todos sus partidos de grupo (n - 1, con n = tama√±o de su grupo):
 	  detecta partidos que nunca se cargaron (se listan hasta 20 selecciones).
-Los partidos de grupos se pueden cargar y finalizar en cualquier momento y de a uno: esta funciÛn
-solo se consulta cuando hace falta saber quiÈn clasificÛ.
+Los partidos de grupos se pueden cargar y finalizar en cualquier momento y de a uno: esta funci√≥n
+solo se consulta cuando hace falta saber qui√©n clasific√≥.
 */
 CREATE OR ALTER FUNCTION nucleo.fn_ValidarFaseGruposCompleta ()
 RETURNS NVARCHAR(MAX)
@@ -257,12 +257,12 @@ BEGIN
 			SET @errores += N'- Hay ' + CAST(@pendientes AS NVARCHAR(12))
 			              + N' partido(s) de fase de grupos sin finalizar: ' + @listaPendientes
 			              + CASE WHEN @pendientes > 20
-			                     THEN N' y ' + CAST(@pendientes - 20 AS NVARCHAR(12)) + N' m·s'
+			                     THEN N' y ' + CAST(@pendientes - 20 AS NVARCHAR(12)) + N' m√°s'
 			                     ELSE N'' END
 			              + N'.' + @salto;
 		END;
 
-		-- Selecciones con menos partidos de grupo cargados que n - 1 (n = tamaÒo de su grupo).
+		-- Selecciones con menos partidos de grupo cargados que n - 1 (n = tama√±o de su grupo).
 		SELECT @faltantes = COUNT(*)
 		FROM (SELECT s.IdSeleccion, COUNT(*) OVER (PARTITION BY s.IdGrupo) - 1 AS Esperados
 		      FROM nucleo.Seleccion AS s) AS s
@@ -288,10 +288,10 @@ BEGIN
 			      ORDER BY s.CodigoFIFA) AS y;
 
 			SET @errores += N'- Hay ' + CAST(@faltantes AS NVARCHAR(12))
-			              + N' selecciÛn(es) con partidos de fase de grupos sin cargar (cargados de esperados): '
+			              + N' selecci√≥n(es) con partidos de fase de grupos sin cargar (cargados de esperados): '
 			              + @listaFaltantes
 			              + CASE WHEN @faltantes > 20
-			                     THEN N' y ' + CAST(@faltantes - 20 AS NVARCHAR(12)) + N' m·s'
+			                     THEN N' y ' + CAST(@faltantes - 20 AS NVARCHAR(12)) + N' m√°s'
 			                     ELSE N'' END
 			              + N'.' + @salto;
 		END;
@@ -304,8 +304,8 @@ GO
 /*
 vw_PartidoResultado
 Camino de lectura del resultado para reportes y BI: el partido con su resultado (derivado de los goles)
-y su definiciÛn. Los goles, los penales y el ganador son NULL mientras el partido est· 'Programado'
-(sin ese filtro eventos.fn_ResultadoPartido devolverÌa un 0 a 0 que parece un resultado).
+y su definici√≥n. Los goles, los penales y el ganador son NULL mientras el partido est√° 'Programado'
+(sin ese filtro eventos.fn_ResultadoPartido devolver√≠a un 0 a 0 que parece un resultado).
 */
 CREATE OR ALTER VIEW nucleo.vw_PartidoResultado
 AS

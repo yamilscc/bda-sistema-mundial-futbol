@@ -1,12 +1,12 @@
 /*
 Universidad: Universidad Nacional de La Matanza
 Materia: Bases de Datos Aplicadas - Grupo 05
-Autor: Canseco Carrizo, Yamil SimÛn
+Autor: Canseco Carrizo, Yamil Sim√≥n
 Integrantes:
 Casella, Mateo Ezequiel
 Chungara Tenorio, Denis Abner
-Torczuk, ElÌas Alexei
-Canseco Carrizo, Yamil SimÛn
+Torczuk, El√≠as Alexei
+Canseco Carrizo, Yamil Sim√≥n
 Objetivo:
 	- Crear nucleo.SP_DEFINIR_CRUCE_ELIMINATORIO: asigna las dos selecciones de un partido de una fase
 	  eliminatoria validando el cruce contra los clasificados y los resultados de la fase anterior.
@@ -21,11 +21,11 @@ GO
 
 -- =========================================================================
 -- nucleo.SP_DEFINIR_CRUCE_ELIMINATORIO
--- Par·metros: @idPartido (partido eliminatorio 'Programado'), @idSeleccionLocal y
+-- Par√°metros: @idPartido (partido eliminatorio 'Programado'), @idSeleccionLocal y
 --             @idSeleccionVisitante (las dos son obligatorias).
--- Es el ˙nico camino para asignar selecciones en fases eliminatorias: SP_ALTA_Partido y
+-- Es el √∫nico camino para asignar selecciones en fases eliminatorias: SP_ALTA_Partido y
 -- SP_MODIFICACION_Partido (script 09) no las cargan ni las cambian.
--- Reglas de cruce (no se persiste un ·rbol pre-cargado; cada cruce se valida al cargarlo):
+-- Reglas de cruce (no se persiste un √°rbol pre-cargado; cada cruce se valida al cargarlo):
 --   - Fase inicial (la que deduce nucleo.fn_FaseEliminatoriaInicial del cupo de clasificados):
 --     la fase de grupos debe estar completa (nucleo.fn_ValidarFaseGruposCompleta) y ambas selecciones
 --     deben haber clasificado (nucleo.fn_SeleccionesClasificadas).
@@ -34,23 +34,23 @@ GO
 --     ganador puede haberse definido por penales). La Final mira a la Semifinal: el Tercer puesto no cuenta
 --     como fase anterior.
 --   - Tercer puesto: ambas selecciones PERDIERON una Semifinal 'Finalizado'.
---   - El partido de la fase anterior se jugÛ antes que este.
---   - Una fase anterior a la inicial no se juega con la regla de clasificaciÛn actual (por ejemplo,
---     Octavos cuando la eliminaciÛn empieza en Cuartos).
---   - NO se controla quÈ cruces son posibles entre selecciones de la misma fase (por ejemplo, que dos
---     selecciones del mismo grupo no se enfrenten en la fase inicial): el torneo no tiene un ·rbol fijo.
--- Reglas comunes (se informan todas juntas en un ˙nico mensaje):
+--   - El partido de la fase anterior se jug√≥ antes que este.
+--   - Una fase anterior a la inicial no se juega con la regla de clasificaci√≥n actual (por ejemplo,
+--     Octavos cuando la eliminaci√≥n empieza en Cuartos).
+--   - NO se controla qu√© cruces son posibles entre selecciones de la misma fase (por ejemplo, que dos
+--     selecciones del mismo grupo no se enfrenten en la fase inicial): el torneo no tiene un √°rbol fijo.
+-- Reglas comunes (se informan todas juntas en un √∫nico mensaje):
 --   - Partido existente, de una fase eliminatoria y 'Programado'; selecciones obligatorias, existentes y distintas.
---   - Ninguna de las dos est· asignada a otro partido de la misma fase.
+--   - Ninguna de las dos est√° asignada a otro partido de la misma fase.
 --   - Descanso: ninguna tiene otro partido a menos de 48 horas (nucleo.fn_SeleccionConPartidoCercano, la
 --     misma regla que SP_ALTA_Partido y SP_MODIFICACION_Partido).
 --   - Si el partido ya tiene formaciones, sustituciones, goles, amonestaciones, designaciones arbitrales,
 --     sanciones o espacios publicitarios (nucleo.fn_PartidoTieneRegistros), no se pueden cambiar sus selecciones.
--- Reasignar el mismo cruce, o cambiarlo si el partido no tiene registros, est· permitido; repetir
+-- Reasignar el mismo cruce, o cambiarlo si el partido no tiene registros, est√° permitido; repetir
 -- exactamente el cruce ya asignado no es un error ni cambia nada.
 -- Efecto: solo cambian IdSeleccionLocal e IdSeleccionVisitante. Salida: la fila de nucleo.vw_PartidoResultado.
--- TransacciÛn: abre la propia o, si el llamador ya tiene una abierta, usa un savepoint y no la deshace
---              ante un error de validaciÛn.
+-- Transacci√≥n: abre la propia o, si el llamador ya tiene una abierta, usa un savepoint y no la deshace
+--              ante un error de validaci√≥n.
 -- =========================================================================
 CREATE OR ALTER PROCEDURE nucleo.SP_DEFINIR_CRUCE_ELIMINATORIO
 	@idPartido            INT,
@@ -61,8 +61,8 @@ BEGIN
 	SET NOCOUNT ON;
 
 	DECLARE @errores NVARCHAR(MAX) = N'',
-	        @tranExterna BIT = IIF(@@TRANCOUNT > 0, 1, 0), -- 1 si el llamador ya abriÛ una transacciÛn
-	        @savepoint   BIT = 0,                          -- 1 cuando se tomÛ el savepoint PuntoSP
+	        @tranExterna BIT = IIF(@@TRANCOUNT > 0, 1, 0), -- 1 si el llamador ya abri√≥ una transacci√≥n
+	        @savepoint   BIT = 0,                          -- 1 cuando se tom√≥ el savepoint PuntoSP
 	        @mensaje NVARCHAR(2048),
 	        @salto   NVARCHAR(2) = CHAR(13) + CHAR(10),
 	        -- Datos del partido
@@ -121,17 +121,17 @@ BEGIN
 
 		-- Selecciones
 		IF @idSeleccionLocal IS NULL
-			SET @errores += N'- La selecciÛn local es obligatoria.' + @salto;
+			SET @errores += N'- La selecci√≥n local es obligatoria.' + @salto;
 		ELSE IF NOT EXISTS (SELECT 1 FROM nucleo.Seleccion WHERE IdSeleccion = @idSeleccionLocal)
-			SET @errores += N'- La selecciÛn local indicada no existe.' + @salto;
+			SET @errores += N'- La selecci√≥n local indicada no existe.' + @salto;
 
 		IF @idSeleccionVisitante IS NULL
-			SET @errores += N'- La selecciÛn visitante es obligatoria.' + @salto;
+			SET @errores += N'- La selecci√≥n visitante es obligatoria.' + @salto;
 		ELSE IF NOT EXISTS (SELECT 1 FROM nucleo.Seleccion WHERE IdSeleccion = @idSeleccionVisitante)
-			SET @errores += N'- La selecciÛn visitante indicada no existe.' + @salto;
+			SET @errores += N'- La selecci√≥n visitante indicada no existe.' + @salto;
 
 		IF @idSeleccionLocal IS NOT NULL AND @idSeleccionLocal = @idSeleccionVisitante
-			SET @errores += N'- Una selecciÛn no puede enfrentarse a sÌ misma.' + @salto;
+			SET @errores += N'- Una selecci√≥n no puede enfrentarse a s√≠ misma.' + @salto;
 
 		IF @idSeleccionLocal IS NOT NULL AND @idSeleccionVisitante IS NOT NULL
 		   AND @idSeleccionLocal <> @idSeleccionVisitante
@@ -146,7 +146,7 @@ BEGIN
 			WHERE s.IdSeleccion IN (@idSeleccionLocal, @idSeleccionVisitante);
 		END;
 
-		-- Reglas de cruce y de agenda: solo con un partido eliminatorio y dos selecciones v·lidas.
+		-- Reglas de cruce y de agenda: solo con un partido eliminatorio y dos selecciones v√°lidas.
 		IF @existe = 1 AND @esEliminatoria = 1 AND @seleccionesValidas = 1
 		BEGIN
 			SELECT @idFaseInicial = fi.IdFase, @nombreInicial = fi.Nombre
@@ -157,9 +157,9 @@ BEGIN
 			SET @esTercerPuesto = CASE WHEN @nombreFase = 'Tercer puesto' THEN 1 ELSE 0 END;
 
 			IF @esTercerPuesto = 0 AND @idFaseInicial IS NULL
-				SET @errores += N'- No se puede determinar con quÈ fase empieza la eliminaciÛn directa (el total de clasificados no es 8, 16 ni 32).' + @salto;
+				SET @errores += N'- No se puede determinar con qu√© fase empieza la eliminaci√≥n directa (el total de clasificados no es 8, 16 ni 32).' + @salto;
 			ELSE IF @esTercerPuesto = 0 AND @ordenFase < @ordenInicial
-				SET @errores += N'- ' + @nombreFase + N' no se juega con la regla de clasificaciÛn actual: la eliminaciÛn directa empieza en '
+				SET @errores += N'- ' + @nombreFase + N' no se juega con la regla de clasificaci√≥n actual: la eliminaci√≥n directa empieza en '
 				              + @nombreInicial + N'.' + @salto;
 			ELSE IF @esTercerPuesto = 0 AND @idFase = @idFaseInicial
 			BEGIN
@@ -167,7 +167,7 @@ BEGIN
 				SET @grupoIncompleto = nucleo.fn_ValidarFaseGruposCompleta();
 
 				IF LEN(@grupoIncompleto) > 0
-					SET @errores += N'- La fase de grupos no est· completa, por lo que todavÌa no se sabe quiÈn clasificÛ:' + @salto
+					SET @errores += N'- La fase de grupos no est√° completa, por lo que todav√≠a no se sabe qui√©n clasific√≥:' + @salto
 					              + @grupoIncompleto;
 				ELSE
 				BEGIN
@@ -179,7 +179,7 @@ BEGIN
 					                  WHERE c.IdSeleccion = s.IdSeleccion AND c.Clasifica = 1);
 
 					IF @lista IS NOT NULL
-						SET @errores += N'- No clasificaron a la eliminaciÛn directa: ' + @lista + N'.' + @salto;
+						SET @errores += N'- No clasificaron a la eliminaci√≥n directa: ' + @lista + N'.' + @salto;
 				END;
 			END
 			ELSE
@@ -211,7 +211,7 @@ BEGIN
 						SET @errores += N'- No ' + CASE WHEN @esTercerPuesto = 1 THEN N'perdieron' ELSE N'ganaron' END
 						              + N' un partido finalizado de ' + @nombreAnterior + N': ' + @lista + N'.' + @salto;
 
-					-- Ganaron (o perdieron) ese partido, pero se jugÛ despuÈs de este.
+					-- Ganaron (o perdieron) ese partido, pero se jug√≥ despu√©s de este.
 					SET @lista = NULL;
 					SELECT @lista = STRING_AGG(CAST(s.CodigoFIFA AS NVARCHAR(10)), N', ')
 					FROM @sel AS s
@@ -247,7 +247,7 @@ BEGIN
 			                AND s.IdSeleccion IN (p.IdSeleccionLocal, p.IdSeleccionVisitante));
 
 			IF @lista IS NOT NULL
-				SET @errores += N'- Ya est·n asignadas a otro partido de ' + @nombreFase + N': ' + @lista + N'.' + @salto;
+				SET @errores += N'- Ya est√°n asignadas a otro partido de ' + @nombreFase + N': ' + @lista + N'.' + @salto;
 
 			-- Descanso entre partidos (la regla vive en nucleo.fn_SeleccionConPartidoCercano).
 			SET @lista = NULL;
@@ -261,7 +261,7 @@ BEGIN
 				SET @errores += N'- Tienen otro partido a menos de ' + CAST(@horasDescanso AS NVARCHAR(10))
 				              + N' horas de este: ' + @lista + N'.' + @salto;
 
-			-- Con registros asociados no se pueden cambiar las selecciones (repetir el mismo cruce sÌ se puede).
+			-- Con registros asociados no se pueden cambiar las selecciones (repetir el mismo cruce s√≠ se puede).
 			SET @seleccionesCambian = CASE WHEN ISNULL(@idSeleccionLocal, 0) <> ISNULL(@localActual, 0)
 			                                 OR ISNULL(@idSeleccionVisitante, 0) <> ISNULL(@visitanteActual, 0)
 			                               THEN 1 ELSE 0 END;
@@ -278,7 +278,7 @@ BEGIN
 			THROW 52000, @mensaje, 1;
 		END;
 
-		-- ---- OperaciÛn ------------------------------------------------------
+		-- ---- Operaci√≥n ------------------------------------------------------
 		IF @tranExterna = 0
 			BEGIN TRANSACTION;
 		ELSE
@@ -287,7 +287,7 @@ BEGIN
 			SET @savepoint = 1;
 		END;
 
-		-- La condiciÛn Estado = 'Programado' evita pisar un cambio hecho por otra sesiÛn en el medio.
+		-- La condici√≥n Estado = 'Programado' evita pisar un cambio hecho por otra sesi√≥n en el medio.
 		UPDATE nucleo.Partido
 		SET IdSeleccionLocal = @idSeleccionLocal,
 		    IdSeleccionVisitante = @idSeleccionVisitante
@@ -295,14 +295,14 @@ BEGIN
 		  AND Estado = 'Programado';
 
 		IF @@ROWCOUNT = 0
-			THROW 52000, N'SP_DEFINIR_CRUCE_ELIMINATORIO - El partido fue finalizado por otra operaciÛn.', 1;
+			THROW 52000, N'SP_DEFINIR_CRUCE_ELIMINATORIO - El partido fue finalizado por otra operaci√≥n.', 1;
 
 		IF @tranExterna = 0
 			COMMIT TRANSACTION;
 	END TRY
 	BEGIN CATCH
-		-- Solo se deshace lo propio: la transacciÛn si la abriÛ este SP, o hasta el savepoint
-		-- si corre dentro de una transacciÛn del llamador (que queda abierta y a su cargo).
+		-- Solo se deshace lo propio: la transacci√≥n si la abri√≥ este SP, o hasta el savepoint
+		-- si corre dentro de una transacci√≥n del llamador (que queda abierta y a su cargo).
 		IF @tranExterna = 0 AND @@TRANCOUNT > 0
 			ROLLBACK TRANSACTION;
 		ELSE IF @savepoint = 1 AND XACT_STATE() = 1
