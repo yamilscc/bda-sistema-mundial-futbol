@@ -33,7 +33,9 @@ Se desarrollaron **siete (7) Stored Procedures** en `scripts/creacion/30_SP_Repo
 
 * **T-SQL Estático (sin SQL dinámico):** Todos los procedimientos están precompilados de forma estática, respetando la pauta de la cátedra, eliminando riesgos de inyección SQL y optimizando la reutilización de planes de ejecución.
 * **Tolerancia a datos parciales:** Mediante `LEFT JOIN`, `OUTER APPLY` e `ISNULL`, los reportes devuelven resultados consistentes aun cuando el torneo se encuentre en curso o existan partidos pendientes de disputa.
-* **Filtros opcionales:** Todos los procedimientos admiten parámetros de filtrado con valor por defecto (`NULL` o `0`), permitiendo consultar tanto el panorama completo del torneo como recortes específicos por selección, fase, sede, árbitro o partido.
+* **Filtros opcionales validados:** Todos los procedimientos admiten parámetros de filtrado con valor por defecto (`NULL` o `0`). Un filtro que no existe (selección, fase, sede, partido, árbitro, grupo o estado) se rechaza con un único mensaje que agrupa todos los problemas (`THROW 52000`), calculado por `nucleo.fn_ValidarFiltrosReporte`.
+* **Datos cifrados:** Los nombres de árbitros y del cuerpo técnico se obtienen con `nucleo.fn_NombreArbitro` y `nucleo.fn_NombreStaff`, que la Entrega 8 redefine para descifrarlos. Los reportes muestran el nombre real sin que los usuarios de consulta tengan permiso para descifrar por su cuenta (ver Entrega 8).
+* **Modelo de publicidad:** Anunciante 1-N Campania 1-N Pieza. Los ingresos son la tarifa guardada en cada `EspacioPublicitario` al asignarlo (lo facturado), no la tarifa vigente hoy.
 
 ---
 
@@ -67,14 +69,14 @@ flowchart LR
 * **Estructura:** Genera un documento XML mediante `FOR XML PATH('Arbitro'), ROOT('DesignacionesArbitrales'), TYPE`. Incluye atributos de identificación y habilitación, país, categoría, idiomas agrupados con `STRING_AGG`, resumen de designaciones totales y como principal, y el detalle anidado de partidos junto con las amonestaciones/expulsiones señaladas cuando actuó como árbitro `Principal`.
 
 ### 3.4 `publicidad.SP_REPORTE_OCUPACION_PUBLICITARIA` (Tabular – 2 Result Sets)
-* **Parámetros:** `@idSede TINYINT = NULL`, `@idPartido SMALLINT = NULL`.
+* **Parámetros:** `@idSede TINYINT = NULL`, `@idPartido SMALLINT = NULL`, `@resultado TINYINT = NULL` (`NULL`: los dos result sets; `1`: solo el detalle; `2`: solo el resumen).
 * **Lógica:**
-  * *Result set 1:* Detalle espacio por espacio (`1` a `4`) de cada partido y sede, indicando estado (`Ocupado`/`Libre`), anunciante, pieza publicitaria, idioma, tarifa, moneda y porcentaje de ocupación del encuentro.
-  * *Result set 2:* Resumen consolidado de espacios ocupados e ingresos totales agrupados por **sede y moneda**, evitando sumar importes expresados en divisas distintas.
+  * *Result set 1:* Detalle espacio por espacio (`1` a `4`) de cada partido y sede: estado (`Ocupado`/`Libre`), anunciante, campaña, pieza, idioma, tarifa y moneda guardadas en el espacio, la tarifa convertida a USD, el criterio de asignación y el porcentaje de ocupación del encuentro.
+  * *Result set 2:* Resumen de espacios ocupados e ingresos por **sede y moneda** (sin sumar importes de divisas distintas), más `IngresosUSD` y `TotalIngresosUSDSede`, convertidos con la cotización (base USD) más reciente a la fecha del partido.
 
 ### 3.5 `publicidad.SP_REPORTE_MATRIZ_PRIME_TIME` (Tabular – `PIVOT` Estático)
 * **Parámetros:** `@idPartido SMALLINT = NULL`, `@idFase TINYINT = NULL`.
-* **Lógica:** Construye una tabla cruzada de partidos contra códigos ISO3 de mercados/países mediante el operador `PIVOT` estático, informando `'SI (HH:MM)'`, `'NO'` o `'N/D'`. Complementa la matriz con `TotalMercadosPrimeTime` y `MercadosEnPrimeTimeDetalle` calculados desde `nucleo.fn_MercadosEnPrimeTime`.
+* **Lógica:** Tabla cruzada de partidos contra los **22 mercados del torneo** (los países del seed, con los códigos del modelo: ENG, NED, GER, SUI, CHI) mediante `PIVOT` estático, con `'SI (HH:MM)'` (hora local del mercado) o `'NO'`. `TotalMercadosPrimeTime` y `MercadosEnPrimeTimeDetalle` salen de `nucleo.fn_MercadosEnPrimeTime` y no dependen de la lista de columnas: un país nuevo se cuenta igual, y se agrega como columna editando el procedimiento (no se usa SQL dinámico). Con el seed, el partido 1 (ARG vs BRA, 23:00 UTC) está en prime time en 6 mercados.
 
 ### 3.6 `jugadores.SP_REPORTE_SELECCIONES_PLANTILLAS` (XML #2)
 * **Parámetros:** `@codigoFIFA CHAR(3) = NULL`, `@grupo CHAR(1) = NULL`, `@incluirBajas BIT = 0`.
@@ -88,7 +90,9 @@ flowchart LR
 
 ## 4. Validación y Testing (`30_Test_SP_Reportes.sql`)
 
-La verificación funcional se implementó en `scripts/testing/30_Test_SP_Reportes.sql`, integrado en el flujo maestro `00_Ejecutar_Tests.sql`. El script ejecuta y valida los 7 reportes tanto en consultas globales (sin filtros) como con combinaciones de parámetros opcionales (`@codigoFIFA`, `@idFase`, `@incluirEnContra`, `@soloConSuspensionActiva`, `@incluirBajas`, `@idSede`, `@idPartido`, `@estado`), documentando en comentarios el resultado esperado para cada caso.
+La verificación se implementó en `scripts/testing/30_Test_SP_Reportes.sql`, integrado en `00_Ejecutar_Tests.sql`. Cada caso imprime `OK` o `FALLÓ` comparando el reporte con lo que dicen las tablas (cantidad de filas o de nodos XML, totales de goles, tarjetas e ingresos), verifica que los dos XML tengan su raíz y no muestren nombres enmascarados, y que cada reporte rechace un filtro inexistente con un mensaje agrupado. Sin datos cargados, los casos que los necesitan se informan como `OMITIDO`.
+
+Resultado con los seeds cargados (`importacion/00_Cargar_Seeds.sql`): goleadores 13 filas (26 goles válidos), tarjetas de 4 jugadores (7 tarjetas), designaciones 18 árbitros y 120 designaciones, ocupación 96 espacios ocupados de 96, matriz de 24 partidos (partido 1 en 6 mercados), plantillas 16 selecciones y 368 convocados, resultados 24 partidos finalizados.
 
 ---
 
@@ -97,5 +101,5 @@ La verificación funcional se implementó en `scripts/testing/30_Test_SP_Reporte
 | Carpeta | Archivo | Descripción |
 |---|---|---|
 | `scripts/creacion/` | `30_SP_Reportes.sql` | Implementación en T-SQL estático de los 7 reportes oficiales (5 tabulares + 2 XML). |
-| `scripts/testing/` | `30_Test_SP_Reportes.sql` | Pruebas integrales de los 7 reportes oficiales y sus filtros opcionales. |
+| `scripts/testing/` | `30_Test_SP_Reportes.sql` | Verificación automática (OK/FALLÓ) de los 7 reportes, sus filtros y la validez de los XML. |
 | `doc/entrega7/` | `entrega7_reportes_oficiales.md` | Documento técnico formal de la Entrega 7 (Reportes Oficiales). |
