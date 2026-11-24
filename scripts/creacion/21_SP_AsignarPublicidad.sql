@@ -41,7 +41,7 @@ GO
 --     espacios del mismo partido, UQ_EspacioPublicitario_Partido_Pieza).
 --   - La elección es uniforme entre piezas distintas: una pieza orientada a varios países del
 --     conjunto no tiene más probabilidad que una orientada a uno solo.
---   - Si el partido ya tiene espacios cargados (por ejemplo, a mano con SP_ABM_EspacioPublicitario),
+--   - Si el partido ya tiene espacios cargados (por ejemplo, a mano con SP_ALTA_EspacioPublicitario),
 --     solo se completan los números libres con el criterio de cada número; los ocupados no se
 --     tocan y sus piezas no se repiten.
 --   - No hay criterio de reemplazo: si un espacio no tiene pieza candidata (por ejemplo, el cruce
