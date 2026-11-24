@@ -22,6 +22,8 @@ Objetivo: Carga inicial (Seed Data) idempotente para los módulos de jugadores y
             4) Cambio por lesión antes del minuto 20.
           Requiere ejecutados los scripts 01 a 24 y cargadas previamente las selecciones y
           partidos en estado 'Programado' (módulo nucleo).
+          ORDEN: después de 04, 05 y 06 y de 01_Importar_Convocatoria_XML.sql (que respeta: completa solo los
+          dorsales libres), y antes de 02 y 07. Si el XML se importa después, los dorsales ya están ocupados.
 */
 
 USE MundialFutbol;

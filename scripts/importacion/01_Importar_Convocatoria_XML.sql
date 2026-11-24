@@ -16,7 +16,8 @@ REQUISITOS PARA EJECUTARLO:
   - Activar el modo SQLCMD en SSMS: menú Consulta > Modo SQLCMD.
   - Editar RUTA_IMP con la ruta local de la carpeta scripts\importacion (sin barra final).
   - Tener cargadas previamente las selecciones en nucleo.Seleccion y la regla de cupos
-    en jugadores.ReglaConvocados.
+    en jugadores.ReglaConvocados (las deja 04_Seed_Nucleo_Publicidad.sql).
+  - ORDEN: después de 04, 05 y 06 y antes de 03_Seed_Jugadores_Eventos.sql, que completa los dorsales libres.
 */
 
 :on error exit

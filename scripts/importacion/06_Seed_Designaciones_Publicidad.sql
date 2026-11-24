@@ -18,7 +18,7 @@ Objetivo: Completa el seed de nucleo y publicidad una vez cargados los 24 partid
              (los espacios ya cargados por la pauta importada no se tocan; la tarifa sale de
              publicidad.Tarifa según la fase del partido).
           4. CASO OBLIGATORIO: verifica que el partido 1 tenga más de 4 mercados en prime time.
-          Idempotente. ORDEN: después de 04 y 05, y antes de los scripts de Mateo.
+          Idempotente. ORDEN: después de 04 y 05, y antes de 01, 03 y 02 (jugadores y eventos).
 */
 USE MundialFutbol;
 GO

@@ -17,7 +17,7 @@ Objetivo: Seed de catálogos y entidades base de nucleo y publicidad (idempotent
           partido 1 debe ser ARG vs BRA. Los partidos y sedes los carga 05_Importar_Nucleo_Publicidad.sql.
           También deja la regla de cupos de convocatoria (23 a 26 jugadores) que necesita
           01_Importar_Convocatoria_XML.sql antes de 03_Seed_Jugadores_Eventos.sql.
-ORDEN: ejecutar primero (antes de 05, 06 y 07 de esta carpeta y de los scripts de Mateo).
+ORDEN: ejecutar primero (antes de 05, 06 y 07 de esta carpeta y de los scripts de Mateo). Orden completo: 04, 05, 06, 01, 03, 02, 07, 08 (00_Cargar_Seeds.sql los corre en ese orden).
 */
 USE MundialFutbol;
 GO
