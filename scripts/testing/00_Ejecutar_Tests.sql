@@ -341,6 +341,50 @@ GO
 USE MundialFutbol;
 GO
 
+PRINT '===== TEST 32 Rol Administrador (usuario usr_admin_test)';
+GO
+:r $(RUTA)\32_Test_Rol_Administrador.sql
+GO
+REVERT;
+GO
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
+GO
+USE MundialFutbol;
+GO
+
+PRINT '===== TEST 32 Rol OperadorResultados (usuario usr_resultados_test)';
+GO
+:r $(RUTA)\32_Test_Rol_OperadorResultados.sql
+GO
+REVERT;
+GO
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
+GO
+USE MundialFutbol;
+GO
+
+PRINT '===== TEST 32 Rol GestorPublicidad (usuario usr_publicidad_test)';
+GO
+:r $(RUTA)\32_Test_Rol_GestorPublicidad.sql
+GO
+REVERT;
+GO
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
+GO
+USE MundialFutbol;
+GO
+
+PRINT '===== TEST 32 Rol Consulta (usuario usr_consulta_test)';
+GO
+:r $(RUTA)\32_Test_Rol_Consulta.sql
+GO
+REVERT;
+GO
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedó una transacción abierta tras el test anterior; se deshizo.'; END;
+GO
+USE MundialFutbol;
+GO
+
 PRINT '===== TEST 33 Procedimientos de Backup (Entrega 8)';
 GO
 :r $(RUTA)\33_Test_Backups.sql
