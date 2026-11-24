@@ -40,15 +40,13 @@ DECLARE @idReglaConv INT,
         @idTarjeta   INT;
 
 IF NOT EXISTS (SELECT 1 FROM jugadores.ReglaConvocados)
-    EXEC jugadores.SP_ABM_ReglaConvocados
-        @operacion = 'ALTA',
+    EXEC jugadores.SP_ALTA_ReglaConvocados
         @idRegla   = @idReglaConv OUTPUT,
         @minimo    = 23,
         @maximo    = 26;
 
 IF NOT EXISTS (SELECT 1 FROM jugadores.ReglaCambios)
-    EXEC jugadores.SP_ABM_ReglaCambios
-        @operacion                = 'ALTA',
+    EXEC jugadores.SP_ALTA_ReglaCambios
         @idRegla                  = @idReglaCamb OUTPUT,
         @maxCambiosRegular        = 5,
         @maxVentanasRegular       = 3,
@@ -56,24 +54,21 @@ IF NOT EXISTS (SELECT 1 FROM jugadores.ReglaCambios)
         @maxVentanasSuplementario = 1;
 
 IF NOT EXISTS (SELECT 1 FROM eventos.ReglaSuspension WHERE Criterio = 'Acumulacion Amarillas')
-    EXEC eventos.SP_ABM_ReglaSuspension
-        @operacion          = 'ALTA',
+    EXEC eventos.SP_ALTA_ReglaSuspension
         @idReglaSuspension  = @idReglaSusp OUTPUT,
         @criterio           = 'Acumulacion Amarillas',
         @cantidadAmarillas  = 2,
         @partidosSuspension = 1;
 
 IF NOT EXISTS (SELECT 1 FROM eventos.ReglaSuspension WHERE Criterio = 'Doble Amarilla')
-    EXEC eventos.SP_ABM_ReglaSuspension
-        @operacion          = 'ALTA',
+    EXEC eventos.SP_ALTA_ReglaSuspension
         @idReglaSuspension  = @idReglaSusp OUTPUT,
         @criterio           = 'Doble Amarilla',
         @cantidadAmarillas  = NULL,
         @partidosSuspension = 1;
 
 IF NOT EXISTS (SELECT 1 FROM eventos.ReglaSuspension WHERE Criterio = 'Roja Directa')
-    EXEC eventos.SP_ABM_ReglaSuspension
-        @operacion          = 'ALTA',
+    EXEC eventos.SP_ALTA_ReglaSuspension
         @idReglaSuspension  = @idReglaSusp OUTPUT,
         @criterio           = 'Roja Directa',
         @cantidadAmarillas  = NULL,
@@ -89,7 +84,7 @@ WHILE @i <= @n
 BEGIN
     SELECT @desc = Descripcion FROM @tiposGol WHERE IdOrden = @i;
     IF NOT EXISTS (SELECT 1 FROM eventos.TipoGol WHERE Descripcion = @desc)
-        EXEC eventos.SP_ABM_TipoGol @operacion = 'ALTA', @idTipoGol = @idTipoGol OUTPUT, @descripcion = @desc;
+        EXEC eventos.SP_ALTA_TipoGol @idTipoGol = @idTipoGol OUTPUT, @descripcion = @desc;
     SET @i += 1;
 END;
 
@@ -105,7 +100,7 @@ WHILE @i <= @n
 BEGIN
     SELECT @desc = Descripcion FROM @periodos WHERE IdOrden = @i;
     IF NOT EXISTS (SELECT 1 FROM eventos.Periodo WHERE Descripcion = @desc)
-        EXEC eventos.SP_ABM_Periodo @operacion = 'ALTA', @idPeriodo = @idPeriodo OUTPUT, @descripcion = @desc;
+        EXEC eventos.SP_ALTA_Periodo @idPeriodo = @idPeriodo OUTPUT, @descripcion = @desc;
     SET @i += 1;
 END;
 
@@ -120,7 +115,7 @@ WHILE @i <= @n
 BEGIN
     SELECT @desc = Tipo FROM @tarjetas WHERE IdOrden = @i;
     IF NOT EXISTS (SELECT 1 FROM eventos.Tarjeta WHERE Tipo = @desc)
-        EXEC eventos.SP_ABM_Tarjeta @operacion = 'ALTA', @idTarjeta = @idTarjeta OUTPUT, @tipo = @desc;
+        EXEC eventos.SP_ALTA_Tarjeta @idTarjeta = @idTarjeta OUTPUT, @tipo = @desc;
     SET @i += 1;
 END;
 
@@ -142,7 +137,7 @@ WHILE @i <= @n
 BEGIN
     SELECT @nombreClub = Nombre FROM @clubesSeed WHERE IdOrden = @i;
     IF NOT EXISTS (SELECT 1 FROM jugadores.Club WHERE Nombre = @nombreClub)
-        EXEC jugadores.SP_ABM_Club @operacion = 'ALTA', @idClub = @idClubSeed OUTPUT, @nombre = @nombreClub;
+        EXEC jugadores.SP_ALTA_Club @idClub = @idClubSeed OUTPUT, @nombre = @nombreClub;
     SET @i += 1;
 END;
 
@@ -216,8 +211,7 @@ BEGIN
             SELECT @idJugNuevo = IdJugador FROM jugadores.Jugador WHERE Documento = @docJug;
 
             IF @idJugNuevo IS NULL
-                EXEC jugadores.SP_ABM_Jugador
-                    @operacion       = 'ALTA',
+                EXEC jugadores.SP_ALTA_Jugador
                     @idJugador       = @idJugNuevo OUTPUT,
                     @nombre          = @nomJug,
                     @apellido        = @apeJug,

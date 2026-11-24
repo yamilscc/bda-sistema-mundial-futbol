@@ -79,14 +79,14 @@ Cada archivo empieza con dos dígitos que marcan su orden. Los números 01 a 28 
 | 10 | `10_Funciones_Eventos.sql` | `fn_ResultadoPartido` y `fn_EstaSuspendido` | Mateo |
 | 11 | `11_SP_RegistrarGol.sql` | `SP_REGISTRAR_GOL` | Mateo |
 | 12 | `12_SP_RegistrarAmonestacion.sql` | `SP_REGISTRAR_AMONESTACION` con cálculo de suspensión | Mateo |
-| 13 | `13_SP_ABM_Eventos.sql` | ABM de reglas de suspensión, tipos de gol, períodos, tarjetas y goles | Mateo |
+| 13 | `13_SP_ABM_Eventos.sql` | ABM (`SP_ALTA_`, `SP_MODIFICACION_` y `SP_BAJA_`) de reglas de suspensión, tipos de gol, períodos, tarjetas, goles y amonestaciones | Mateo |
 | 14 | `14_Funciones_Jugadores.sql` | `fn_EsquemaValido`, `fn_JugadorEnCancha`, `fn_JugadoresEnCancha` y funciones de validación de convocatoria, formación y sustitución | Mateo |
 | 15 | `15_SP_Convocatoria_Baja.sql` | `SP_CONVOCAR_JUGADOR` y `SP_REGISTRAR_BAJA_CONVOCATORIA` (con reemplazo opcional en la misma transacción) | Mateo |
 | 16 | `16_SP_RegistrarFormacion.sql` | `SP_REGISTRAR_FORMACION` y `SP_AGREGAR_JUGADOR_FORMACION` (titulares y suplentes) | Mateo |
 | 17 | `17_SP_RegistrarSustitucion.sql` | `SP_REGISTRAR_SUSTITUCION` con control de ventanas y cantidad de cambios | Mateo |
-| 18 | `18_SP_ABM_Jugadores.sql` | ABM del módulo de jugadores (reglas, clubes, jugadores, convocatoria, bajas, formaciones y sustituciones) | Mateo |
-| 19 | `19_SP_ABM_Nucleo.sql` | ABM restantes del núcleo: confederaciones, países, ciudades, fases, grupos, selecciones, staff técnico, idiomas, categorías, árbitros, designaciones y sanciones | Denis |
-| 20 | `20_SP_ABM_Publicidad.sql` | ABM de monedas, anunciantes, piezas, orientación por país y espacios publicitarios | Denis |
+| 18 | `18_SP_ABM_Jugadores.sql` | ABM (`SP_ALTA_`, `SP_MODIFICACION_` y `SP_BAJA_`) del módulo de jugadores: reglas, clubes, jugadores, convocatoria, bajas, formaciones, jugadores de formación y sustituciones | Mateo |
+| 19 | `19_SP_ABM_Nucleo.sql` | ABM restantes del núcleo (`SP_ALTA_`, `SP_MODIFICACION_` y `SP_BAJA_`): confederaciones, países, ciudades, fases, grupos, selecciones, staff técnico, idiomas, categorías, árbitros, idiomas de árbitros (solo alta y baja), designaciones, sanciones y regla de clasificación | Denis |
+| 20 | `20_SP_ABM_Publicidad.sql` | ABM (`SP_ALTA_`, `SP_MODIFICACION_` y `SP_BAJA_`) de monedas, anunciantes, piezas, orientación por país (solo alta y baja) y espacios publicitarios | Denis |
 | 21 | `21_SP_AsignarPublicidad.sql` | `SP_ASIGNAR_PUBLICIDAD`: asigna las piezas a los espacios libres de un partido según país de las selecciones, PBI y prime time | Elías |
 | 23 | `23_SP_Importacion_Jugadores.sql` | Importación XML de jugadores | Mateo |
 | 24 | `24_SP_Importacion_Eventos.sql` | Importación CSV de eventos | Mateo |
@@ -94,6 +94,8 @@ Cada archivo empieza con dos dígitos que marcan su orden. Los números 01 a 28 
 | 26 | `26_SP_FinalizarPartido.sql` | `SP_FINALIZAR_PARTIDO`: cierra un partido y registra la concurrencia, validando que los goles cargados definan el resultado | Yamil |
 | 27 | `27_SP_CalculoSeleccionesClasificadas.sql` | `SP_CALCULO_DE_SELECCIONES_CLASIFICADAS`: posiciones, clasificados y fase inicial de la eliminación directa | Yamil |
 | 28 | `28_SP_DefinirCruceEliminatorio.sql` | `SP_DEFINIR_CRUCE_ELIMINATORIO`: asigna las selecciones de un partido eliminatorio (ver [Cruces eliminatorios](#cruces-eliminatorios)) | Yamil |
+
+**Convención de los ABM:** cada tabla tiene un SP por operación: `SP_ALTA_<Tabla>`, `SP_MODIFICACION_<Tabla>` y `SP_BAJA_<Tabla>` (por ejemplo `nucleo.SP_ALTA_Partido`). Las tablas asociativas (`ArbitroIdioma` y `OrientacionPais`) solo tienen alta y baja. Los archivos conservan el nombre `SP_ABM_` del módulo.
 
 Scripts de testing (en `scripts/testing/`):
 

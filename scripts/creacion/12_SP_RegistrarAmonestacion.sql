@@ -37,7 +37,7 @@ BEGIN
             @idTarjetaFinal     INT,
             @partidosSuspension INT = 0;
 
-    -- Todas las validaciones están en eventos.fn_ValidarAmonestacion (la comparte SP_ABM_Amonestacion).
+    -- Todas las validaciones están en eventos.fn_ValidarAmonestacion (la comparte SP_MODIFICACION_Amonestacion).
     SET @errores = eventos.fn_ValidarAmonestacion(@idPartido, @tipoTarjeta, @minuto, @motivo, @idJugador,
                                                   @idStaffTecnico, @permitirFechaFutura, NULL);
 

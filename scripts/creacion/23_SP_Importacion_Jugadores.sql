@@ -197,8 +197,7 @@ BEGIN
                 SELECT @idClub = IdClub FROM jugadores.Club WHERE Nombre = @club;
 
                 IF @idClub IS NULL
-                    EXEC jugadores.SP_ABM_Club
-                        @operacion = 'ALTA',
+                    EXEC jugadores.SP_ALTA_Club
                         @idClub    = @idClub OUTPUT,
                         @nombre    = @club;
             END;
@@ -210,8 +209,7 @@ BEGIN
             SELECT @idJugador = IdJugador FROM jugadores.Jugador WHERE Documento = @documento;
 
             IF @idJugador IS NULL
-                EXEC jugadores.SP_ABM_Jugador
-                    @operacion       = 'ALTA',
+                EXEC jugadores.SP_ALTA_Jugador
                     @idJugador       = @idJugador OUTPUT,
                     @nombre          = @nombre,
                     @apellido        = @apellido,
@@ -221,8 +219,7 @@ BEGIN
                     @posicion        = @posicion,
                     @idClub          = @idClub;
             ELSE
-                EXEC jugadores.SP_ABM_Jugador
-                    @operacion       = 'MODIFICACION',
+                EXEC jugadores.SP_MODIFICACION_Jugador
                     @idJugador       = @idJugador,
                     @nombre          = @nombre,
                     @apellido        = @apellido,
@@ -245,8 +242,7 @@ BEGIN
                     @fechaAlta      = @fechaAlta,
                     @idConvocatoria = @idConvocatoria OUTPUT;
             ELSE
-                EXEC jugadores.SP_ABM_Convocatoria
-                    @operacion      = 'MODIFICACION',
+                EXEC jugadores.SP_MODIFICACION_Convocatoria
                     @idConvocatoria = @idConvocatoria,
                     @idSeleccion    = @idSeleccion,
                     @idJugador      = @idJugador,

@@ -35,7 +35,7 @@ GO
 -- REGLAS:
 --   - Son candidatas las piezas con al menos un país de orientación y que todavía no están
 --     asignadas en ese partido (una pieza no puede ocupar dos espacios, UQ_EspacioPublicitario_Partido_Pieza).
---   - Si el partido ya tiene espacios cargados (por ejemplo, a mano con SP_ABM_EspacioPublicitario),
+--   - Si el partido ya tiene espacios cargados (por ejemplo, a mano con SP_ALTA_EspacioPublicitario),
 --     solo se completan los números libres; los ya ocupados no se tocan.
 --   - La prioridad 1 recibe el número libre más bajo, la 2 el siguiente, y así sucesivamente.
 --   - La tarifa y la moneda recibidas se aplican a cada franja asignada en esta corrida

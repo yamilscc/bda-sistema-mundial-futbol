@@ -236,8 +236,7 @@ BEGIN
                         @permitirFechaFutura = @permitirFechaFutura,
                         @idGol               = @idGolExistente OUTPUT;
                 ELSE
-                    EXEC eventos.SP_ABM_Gol
-                        @operacion           = 'MODIFICACION',
+                    EXEC eventos.SP_MODIFICACION_Gol
                         @idGol               = @idGolExistente,
                         @idPartido           = @idPartido,
                         @idJugadorAutor      = @idJugadorAutor,
@@ -282,8 +281,7 @@ BEGIN
                         @permitirFechaFutura = @permitirFechaFutura,
                         @idAmonestacion      = @idAmonExistente OUTPUT;
                 ELSE
-                    EXEC eventos.SP_ABM_Amonestacion
-                        @operacion           = 'MODIFICACION',
+                    EXEC eventos.SP_MODIFICACION_Amonestacion
                         @idAmonestacion      = @idAmonExistente,
                         @idPartido           = @idPartido,
                         @tipoTarjeta         = @detalleTipo,

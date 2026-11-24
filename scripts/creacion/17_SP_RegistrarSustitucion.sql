@@ -38,7 +38,7 @@ BEGIN
     SET @periodo = LTRIM(RTRIM(@periodo));
     SET @motivo  = LTRIM(RTRIM(@motivo));
 
-    -- Todas las validaciones están en jugadores.fn_ValidarSustitucion (la comparte SP_ABM_Sustitucion).
+    -- Todas las validaciones están en jugadores.fn_ValidarSustitucion (la comparte SP_MODIFICACION_Sustitucion).
     SET @errores = jugadores.fn_ValidarSustitucion(
         @idPartido,
         @idJugadorSaliente,
