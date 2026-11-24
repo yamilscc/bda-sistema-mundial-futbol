@@ -8,8 +8,8 @@ Integrantes:
 - Chungara Tenorio, Denis Abner
 - Torczuk, Elías Alexei
 - Canseco Carrizo, Yamil Simón
-Objetivo: Crear las tablas de staging (eventos.StagingEvento y eventos.StagingFixture) y de log
-          (eventos.LogImportacion) para los procesos de importación de datos.
+Objetivo: Crear las tablas de staging (eventos.StagingEvento, eventos.StagingFixture y
+          publicidad.StagingCampania) y de log (eventos.LogImportacion) para los procesos de importación.
 */
 
 USE MundialFutbol;
@@ -65,5 +65,24 @@ CREATE TABLE eventos.StagingFixture (
     FechaHoraLocal     VARCHAR(30)  NULL,
     SeleccionLocal     VARCHAR(10)  NULL,
     SeleccionVisitante VARCHAR(10)  NULL
+);
+GO
+
+-- Staging de las campañas del dossier de publicidad (CSV del scraping). Mismo patrón que StagingFixture
+-- (NombreArchivo con default 'PENDIENTE', se carga por BULK INSERT estático a través de la vista
+-- publicidad.vw_CargaStagingCampania), pero en el schema publicidad porque es de ese módulo; los errores por fila
+-- siguen yendo a eventos.LogImportacion. Los largos superan los de las tablas destino (100) a propósito:
+-- así los textos demasiado largos llegan a la tabla y el SP los informa por fila, en vez de truncarlos.
+IF OBJECT_ID('publicidad.StagingCampania', 'U') IS NULL
+CREATE TABLE publicidad.StagingCampania (
+    IdFila        INT IDENTITY(1,1) CONSTRAINT PK_StagingCampania PRIMARY KEY,
+    NombreArchivo VARCHAR(255) NOT NULL CONSTRAINT DF_StagingCampania_NombreArchivo DEFAULT ('PENDIENTE'),
+    Anunciante    VARCHAR(300) NULL,
+    Marca         VARCHAR(300) NULL,
+    Titulo        VARCHAR(300) NULL,
+    Agencia       VARCHAR(300) NULL,
+    Productora    VARCHAR(300) NULL,
+    Periodo       VARCHAR(100) NULL,
+    Categorias    VARCHAR(300) NULL
 );
 GO
