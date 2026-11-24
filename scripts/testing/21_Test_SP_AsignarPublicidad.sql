@@ -17,6 +17,8 @@ Objetivo: Probar publicidad.SP_ASIGNAR_PUBLICIDAD (script 21_SP_AsignarPublicida
             con muchas corridas aparezcan piezas distintas), sin repetir piezas dentro de un partido.
           - Partido sin cruce definido (espacios 1 y 2 sin candidata: queda advertencia), espacios cargados
             a mano (se completan solo los libres), sin ninguna candidata y validaciones fallidas.
+          - Cada franja asignada deja registrado su CriterioAsignacion (las cargadas a mano quedan en NULL).
+          Las piezas cuelgan de una campaña de cada anunciante (Anunciante 1-N Campania 1-N Pieza).
           Requiere ejecutados los scripts 01 a 21 (usa nucleo.SP_ALTA_Sede y nucleo.SP_ALTA_Partido).
           Todo corre dentro de una transacción que se deshace al final (ROLLBACK).
 */
@@ -51,7 +53,10 @@ BEGIN TRANSACTION;
 DELETE FROM publicidad.EspacioPublicitario;
 DELETE FROM publicidad.OrientacionPais;
 DELETE FROM publicidad.Pieza;
+DELETE FROM publicidad.Campania;
 DELETE FROM publicidad.Anunciante;
+DELETE FROM publicidad.Tarifa;
+DELETE FROM publicidad.CotizacionMoneda;
 DELETE FROM publicidad.Moneda;
 
 INSERT INTO nucleo.Confederacion (Nombre, Sigla) VALUES ('TEST PU21 Confederacion', 'TP21');
@@ -128,23 +133,29 @@ DECLARE @idIdioma TINYINT = (SELECT IdIdioma FROM nucleo.Idioma WHERE Nombre = '
 DECLARE @idUSD INT;
 EXEC publicidad.SP_ALTA_Moneda @idUSD OUTPUT, 'USD', 'Dolar Estadounidense';
 
--- Tres anunciantes y diez piezas. El orden de alta define el IdPieza (Z10 antes que Z4 a propósito).
+-- Tres anunciantes, una campaña por anunciante y diez piezas. El orden de alta define el IdPieza
+-- (Z10 antes que Z4 a propósito).
 DECLARE @idAnA INT, @idAnB INT, @idAnC INT;
 EXEC publicidad.SP_ALTA_Anunciante @idAnA OUTPUT, 'TEST PU21 Anunciante A', @pAR1;
 EXEC publicidad.SP_ALTA_Anunciante @idAnB OUTPUT, 'TEST PU21 Anunciante B', @pMK3;
 EXEC publicidad.SP_ALTA_Anunciante @idAnC OUTPUT, 'TEST PU21 Anunciante C', @pMK5;
 
+DECLARE @idCaA INT, @idCaB INT, @idCaC INT;
+EXEC publicidad.SP_ALTA_Campania @idCaA OUTPUT, @idAnA, 'TEST PU21 Campaña A';
+EXEC publicidad.SP_ALTA_Campania @idCaB OUTPUT, @idAnB, 'TEST PU21 Campaña B';
+EXEC publicidad.SP_ALTA_Campania @idCaC OUTPUT, @idAnC, 'TEST PU21 Campaña C';
+
 DECLARE @z1 INT, @z2 INT, @z3 INT, @z4 INT, @z5 INT, @z6 INT, @z7 INT, @z8 INT, @z9 INT, @z10 INT;
-EXEC publicidad.SP_ALTA_Pieza @z1  OUTPUT, @idAnA, @idIdioma, 'Z1',  NULL;
-EXEC publicidad.SP_ALTA_Pieza @z2  OUTPUT, @idAnA, @idIdioma, 'Z2',  NULL;
-EXEC publicidad.SP_ALTA_Pieza @z10 OUTPUT, @idAnA, @idIdioma, 'Z10', NULL;
-EXEC publicidad.SP_ALTA_Pieza @z3  OUTPUT, @idAnB, @idIdioma, 'Z3',  NULL;
-EXEC publicidad.SP_ALTA_Pieza @z4  OUTPUT, @idAnB, @idIdioma, 'Z4',  NULL;
-EXEC publicidad.SP_ALTA_Pieza @z5  OUTPUT, @idAnC, @idIdioma, 'Z5',  NULL;
-EXEC publicidad.SP_ALTA_Pieza @z6  OUTPUT, @idAnC, @idIdioma, 'Z6',  NULL;
-EXEC publicidad.SP_ALTA_Pieza @z7  OUTPUT, @idAnC, @idIdioma, 'Z7',  NULL;
-EXEC publicidad.SP_ALTA_Pieza @z8  OUTPUT, @idAnA, @idIdioma, 'Z8',  NULL;
-EXEC publicidad.SP_ALTA_Pieza @z9  OUTPUT, @idAnA, @idIdioma, 'Z9',  NULL;
+EXEC publicidad.SP_ALTA_Pieza @z1  OUTPUT, @idCaA, @idIdioma, 'Z1',  NULL;
+EXEC publicidad.SP_ALTA_Pieza @z2  OUTPUT, @idCaA, @idIdioma, 'Z2',  NULL;
+EXEC publicidad.SP_ALTA_Pieza @z10 OUTPUT, @idCaA, @idIdioma, 'Z10', NULL;
+EXEC publicidad.SP_ALTA_Pieza @z3  OUTPUT, @idCaB, @idIdioma, 'Z3',  NULL;
+EXEC publicidad.SP_ALTA_Pieza @z4  OUTPUT, @idCaB, @idIdioma, 'Z4',  NULL;
+EXEC publicidad.SP_ALTA_Pieza @z5  OUTPUT, @idCaC, @idIdioma, 'Z5',  NULL;
+EXEC publicidad.SP_ALTA_Pieza @z6  OUTPUT, @idCaC, @idIdioma, 'Z6',  NULL;
+EXEC publicidad.SP_ALTA_Pieza @z7  OUTPUT, @idCaC, @idIdioma, 'Z7',  NULL;
+EXEC publicidad.SP_ALTA_Pieza @z8  OUTPUT, @idCaA, @idIdioma, 'Z8',  NULL;
+EXEC publicidad.SP_ALTA_Pieza @z9  OUTPUT, @idCaA, @idIdioma, 'Z9',  NULL;
 
 EXEC publicidad.SP_ALTA_OrientacionPais @z1,  @pAR1;
 EXEC publicidad.SP_ALTA_OrientacionPais @z2,  @pAR2;
@@ -205,6 +216,23 @@ IF @cantidad = 4
 ELSE
     PRINT '1.B: FALLÓ - espacios con la tarifa esperada: ' + CAST(@cantidad AS VARCHAR(10)) + ' (esperado 4).';
 
+-- 1.B.2 Cada franja quedó registrada con el criterio de su número de espacio y la fecha de asignación.
+-- Resultado esperado: los 4 espacios con el criterio que corresponde y FechaAsignacion informada.
+SELECT @cantidad = COUNT(*)
+FROM publicidad.EspacioPublicitario
+WHERE IdPartido = @p251
+  AND FechaAsignacion IS NOT NULL
+  AND CriterioAsignacion = CASE NumeroEspacio
+                               WHEN 1 THEN 'Pais de la seleccion local'
+                               WHEN 2 THEN 'Pais de la seleccion visitante'
+                               WHEN 3 THEN 'Top 3 paises por PBI per capita'
+                               WHEN 4 THEN 'Pais en prime time local'
+                           END;
+IF @cantidad = 4
+    PRINT '1.B.2: OK - los 4 espacios guardaron el criterio de asignación de su número.';
+ELSE
+    PRINT '1.B.2: FALLÓ - espacios con el criterio esperado: ' + CAST(@cantidad AS VARCHAR(10)) + ' (esperado 4).';
+
 -- 1.C Un partido con los cuatro espacios ocupados no admite otra asignación.
 -- Resultado esperado: error "ya tiene sus cuatro espacios publicitarios asignados".
 BEGIN TRY
@@ -221,8 +249,9 @@ END CATCH;
 PRINT '--- TEST 2: partido sin cruce y elección aleatoria ---';
 
 -- 2.A Sin selecciones no hay país local ni visitante: los espacios 1 y 2 quedan libres con advertencia;
--- los espacios 3 y 4 se completan con sus criterios.
--- Resultado esperado: espacios 3 y 4 ocupados (Z8/Z3/Z10 y Z3/Z4/Z5/Z6/Z7), 1 y 2 libres y advertencia
+-- los espacios 3 y 4 se completan con sus criterios. Como el espacio 1 queda libre, Z1 (AR1, en prime
+-- time) sí es candidata para el espacio 4 en este partido.
+-- Resultado esperado: espacios 3 y 4 ocupados (Z8/Z3/Z10 y Z1/Z3/Z4/Z5/Z6/Z7), 1 y 2 libres y advertencia
 -- "sin pieza candidata para los espacios 1, 2".
 BEGIN TRY
     EXEC publicidad.SP_ASIGNAR_PUBLICIDAD @p252, 18000.00, @idUSD, @advertencia OUTPUT;
@@ -236,7 +265,7 @@ BEGIN TRY
 
     IF @cantidad = 0
        AND @t3 IN ('Z8', 'Z3', 'Z10')
-       AND @t4 IN ('Z3', 'Z4', 'Z5', 'Z6', 'Z7')
+       AND @t4 IN ('Z1', 'Z3', 'Z4', 'Z5', 'Z6', 'Z7')
        AND @advertencia LIKE '%espacios 1, 2%'
         PRINT '2.A: OK - espacios 3 y 4 = ' + @t3 + ',' + @t4 + '; 1 y 2 libres. ' + @advertencia;
     ELSE
@@ -248,8 +277,8 @@ BEGIN CATCH
 END CATCH;
 
 -- 2.B Se repite la asignación 30 veces (liberando antes los espacios 3 y 4) y se juntan las piezas
--- elegidas. Resultado esperado: el espacio 3 siempre cae en Z8/Z3/Z10, el 4 en Z3/Z4/Z5/Z6/Z7, nunca la
--- misma pieza en ambos, y en total aparecen al menos 2 piezas distintas en cada espacio (con 3 y 5
+-- elegidas. Resultado esperado: el espacio 3 siempre cae en Z8/Z3/Z10, el 4 en Z1/Z3/Z4/Z5/Z6/Z7, nunca la
+-- misma pieza en ambos, y en total aparecen al menos 2 piezas distintas en cada espacio (con 3 y 6
 -- opciones al azar, la probabilidad de que salga siempre la misma en 30 corridas es despreciable).
 DECLARE @vuelta INT = 1, @malas INT = 0, @repetidas INT = 0;
 DECLARE @elegidasTest TABLE (Vuelta INT, Espacio TINYINT, Titulo VARCHAR(100));
@@ -273,7 +302,7 @@ BEGIN TRY
 
     SELECT @malas = COUNT(*) FROM @elegidasTest
     WHERE (Espacio = 3 AND Titulo NOT IN ('Z8', 'Z3', 'Z10'))
-       OR (Espacio = 4 AND Titulo NOT IN ('Z3', 'Z4', 'Z5', 'Z6', 'Z7'));
+       OR (Espacio = 4 AND Titulo NOT IN ('Z1', 'Z3', 'Z4', 'Z5', 'Z6', 'Z7'));
 
     SELECT @repetidas = COUNT(*)
     FROM (SELECT Vuelta FROM @elegidasTest GROUP BY Vuelta HAVING COUNT(DISTINCT Titulo) < COUNT(*)) AS x;
@@ -346,19 +375,34 @@ IF @cantidad = 4
 ELSE
     PRINT '3.C: FALLÓ - espacios con la tarifa esperada: ' + CAST(@cantidad AS VARCHAR(10)) + ' (esperado 4).';
 
+-- 3.D Los espacios cargados a mano no tienen criterio (NULL); los que completó el SP sí.
+-- Resultado esperado: espacios 2 y 4 con criterio NULL; espacios 1 y 3 con su criterio.
+SELECT @cantidad = COUNT(*)
+FROM publicidad.EspacioPublicitario
+WHERE IdPartido = @p253
+  AND ((NumeroEspacio IN (2, 4) AND CriterioAsignacion IS NULL)
+    OR (NumeroEspacio = 1 AND CriterioAsignacion = 'Pais de la seleccion local')
+    OR (NumeroEspacio = 3 AND CriterioAsignacion = 'Top 3 paises por PBI per capita'));
+IF @cantidad = 4
+    PRINT '3.D: OK - criterio NULL en los manuales y el criterio de cada número en los automáticos.';
+ELSE
+    PRINT '3.D: FALLÓ - espacios con el criterio esperado: ' + CAST(@cantidad AS VARCHAR(10)) + ' (esperado 4).';
+
 -- =========================================================================
 -- TEST 4: Sin candidatas para los espacios libres (254)
 -- =========================================================================
 PRINT '--- TEST 4: ninguna pieza candidata para el espacio libre ---';
 
--- 4.A Se cargan a mano los espacios 1, 2 y 4 con Z8, Z3 y Z10, que son todas las piezas del top 3 de PBI.
--- Queda libre el espacio 3 y no queda ninguna pieza de su criterio sin usar en el partido.
--- Resultado esperado: error "No hay piezas publicitarias candidatas" y el espacio 3 sigue libre.
+-- 4.A Se cargan a mano los espacios 1, 2 y 3 con Z1, Z2 y Z3, y se quita la orientación del resto de las
+-- piezas de países en prime time (Z4 a Z7) y de las del top 3 de PBI (Z8 y Z10).
+-- Queda libre el espacio 4 y no queda ninguna pieza de su criterio (prime time) sin usar en el partido.
+-- Resultado esperado: error "No hay piezas publicitarias candidatas" y el espacio 4 sigue libre.
 BEGIN TRY
     EXEC publicidad.SP_ALTA_EspacioPublicitario @p254, 1, @z1, 500.00, @idUSD;
     EXEC publicidad.SP_ALTA_EspacioPublicitario @p254, 2, @z2, 500.00, @idUSD;
     EXEC publicidad.SP_ALTA_EspacioPublicitario @p254, 3, @z3, 500.00, @idUSD;
 
+    EXEC publicidad.SP_BAJA_OrientacionPais @z4,  @pMK4;
     EXEC publicidad.SP_BAJA_OrientacionPais @z5,  @pMK5;
     EXEC publicidad.SP_BAJA_OrientacionPais @z6,  @pMK6;
     EXEC publicidad.SP_BAJA_OrientacionPais @z7,  @pMK7;
@@ -369,7 +413,7 @@ BEGIN TRY
     PRINT '4.A: FALLÓ - permitió asignar sin piezas candidatas.';
 END TRY
 BEGIN CATCH
-    SELECT @cantidad = COUNT(*) FROM publicidad.EspacioPublicitario WHERE IdPartido = @p254 AND NumeroEspacio = 3;
+    SELECT @cantidad = COUNT(*) FROM publicidad.EspacioPublicitario WHERE IdPartido = @p254 AND NumeroEspacio = 4;
     IF @cantidad = 0 AND ERROR_MESSAGE() LIKE '%No hay piezas publicitarias candidatas%'
         PRINT '4.A: OK (Bloqueado) - ' + REPLACE(ERROR_MESSAGE(), CHAR(13) + CHAR(10), ' | ');
     ELSE
