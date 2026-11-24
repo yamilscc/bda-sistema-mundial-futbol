@@ -1,34 +1,34 @@
-/*
+Ôªø/*
 Universidad: Universidad Nacional de La Matanza
 Materia: Bases de Datos Aplicadas - Grupo 05
-Autor: Canseco Carrizo, Yamil SimÛn
+Autor: Canseco Carrizo, Yamil Sim√≥n
 Integrantes:
 Casella, Mateo Ezequiel
 Chungara Tenorio, Denis Abner
-Torczuk, ElÌas Alexei
-Canseco Carrizo, Yamil SimÛn
+Torczuk, El√≠as Alexei
+Canseco Carrizo, Yamil Sim√≥n
 Objetivo:
-	- Orquestar la ejecuciÛn de TODOS los scripts de testing en el orden de su n˙mero
-	  (01 a 28 y el test del seed en importacion/), igual que 00_Reset_Total.sql orquesta los scripts de creaciÛn.
-	- Entre test y test, deshacer cualquier transacciÛn que haya quedado abierta, para que
+	- Orquestar la ejecuci√≥n de TODOS los scripts de testing en el orden de su n√∫mero
+	  (01 a 33 y el test del seed en importacion/), igual que 00_Reset_Total.sql orquesta los scripts de creaci√≥n.
+	- Entre test y test, deshacer cualquier transacci√≥n que haya quedado abierta, para que
 	  un test cortado a mitad de camino no arrastre sus datos al siguiente.
-	- Verificar al inicio que la base exista y estÈ reciÈn creada (el test 01 lo requiere).
+	- Verificar al inicio que la base exista y est√© reci√©n creada (el test 01 lo requiere).
 
 REQUISITOS PARA EJECUTARLO:
-	- Ejecutar ANTES creacion\00_Reset_Total.sql (base reciÈn creada, sin datos de prueba).
-	- Activar el modo SQLCMD en SSMS: men˙ Consulta > Modo SQLCMD (sin esto fallan :setvar y :r).
+	- Ejecutar ANTES creacion\00_Reset_Total.sql (base reci√©n creada, sin datos de prueba).
+	- Activar el modo SQLCMD en SSMS: men√∫ Consulta > Modo SQLCMD (sin esto fallan :setvar y :r).
 	- Editar abajo la variable RUTA con la carpeta scripts\testing de TU copia del repositorio,
 	  sin barra final. Ejemplo: C:\Users\elias\bda-sistema-mundial-futbol\scripts\testing
-	- Recomendado: Resultados a texto (Ctrl+T) en vez de cuadrÌcula. Varios tests devuelven
-	  muchos SELECT de evidencia y la cuadrÌcula consume mucha memoria en SSMS.
+	- Recomendado: Resultados a texto (Ctrl+T) en vez de cuadr√≠cula. Varios tests devuelven
+	  muchos SELECT de evidencia y la cuadr√≠cula consume mucha memoria en SSMS.
 
-C”MO LEER EL RESULTADO:
-	- Cada test imprime su encabezado "===== TEST xx" en la pestaÒa Mensajes.
-	- Buscar (Ctrl+F) "FALL”" en Mensajes: no deberÌa aparecer ninguna vez.
+C√ìMO LEER EL RESULTADO:
+	- Cada test imprime su encabezado "===== TEST xx" en la pesta√±a Mensajes.
+	- Buscar (Ctrl+F) "FALL√ì" en Mensajes: no deber√≠a aparecer ninguna vez.
 	- Los casos que se verifican con SELECT traen el valor esperado en el nombre de la
 	  columna (ej: Filas_Esperadas_0) o en el comentario "-- Esperado:" del test.
-	- Se usa ":on error ignore" a propÛsito: un error no controlado en un test se informa
-	  en Mensajes pero NO corta la corrida, asÌ se ejecutan todos los tests igual.
+	- Se usa ":on error ignore" a prop√≥sito: un error no controlado en un test se informa
+	  en Mensajes pero NO corta la corrida, as√≠ se ejecutan todos los tests igual.
 */
 
 :on error ignore
@@ -38,17 +38,17 @@ SET NOCOUNT ON;
 GO
 
 -- =========================================================================
--- VERIFICACI”N PREVIA
+-- VERIFICACI√ìN PREVIA
 -- =========================================================================
 IF DB_ID('MundialFutbol') IS NULL
-	PRINT 'ATENCI”N: la base MundialFutbol no existe. Ejecutar primero creacion\00_Reset_Total.sql.';
+	PRINT 'ATENCI√ìN: la base MundialFutbol no existe. Ejecutar primero creacion\00_Reset_Total.sql.';
 GO
 
 USE MundialFutbol;
 GO
 
 IF EXISTS (SELECT 1 FROM nucleo.Grupo) OR EXISTS (SELECT 1 FROM nucleo.Partido)
-	PRINT 'ATENCI”N: la base ya tiene grupos o partidos cargados. El test 01 espera una base reciÈn '
+	PRINT 'ATENCI√ìN: la base ya tiene grupos o partidos cargados. El test 01 espera una base reci√©n '
 	    + 'creada: conviene ejecutar antes creacion\00_Reset_Total.sql.';
 GO
 
@@ -57,16 +57,16 @@ PRINT 'Inicio de la corrida de tests: ' + CONVERT(VARCHAR(19), @inicio, 120);
 GO
 
 -- =========================================================================
--- EJECUCI”N ORDENADA DE LOS TESTS
--- DespuÈs de cada :r va el bloque de control: deshace transacciones abiertas y vuelve a la
--- base MundialFutbol (por si un test cambiÛ de contexto).
+-- EJECUCI√ìN ORDENADA DE LOS TESTS
+-- Despu√©s de cada :r va el bloque de control: deshace transacciones abiertas y vuelve a la
+-- base MundialFutbol (por si un test cambi√≥ de contexto).
 -- =========================================================================
 
-PRINT '===== TEST 01 Tablas del n˙cleo';
+PRINT '===== TEST 01 Tablas del n√∫cleo';
 GO
 :r $(RUTA)\01_Test_Tablas_Nucleo.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedÛ una transacciÛn abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued√≥ una transacci√≥n abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
@@ -75,7 +75,7 @@ PRINT '===== TEST 02 Tablas de jugadores';
 GO
 :r $(RUTA)\02_Test_Tablas_Jugadores.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedÛ una transacciÛn abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued√≥ una transacci√≥n abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
@@ -84,7 +84,7 @@ PRINT '===== TEST 03 Tablas de eventos';
 GO
 :r $(RUTA)\03_Test_Tablas_Eventos.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedÛ una transacciÛn abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued√≥ una transacci√≥n abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
@@ -93,16 +93,16 @@ PRINT '===== TEST 04 Tablas de publicidad';
 GO
 :r $(RUTA)\04_Test_Tablas_Publicidad.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedÛ una transacciÛn abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued√≥ una transacci√≥n abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
 
-PRINT '===== TEST 07 Funciones del n˙cleo';
+PRINT '===== TEST 07 Funciones del n√∫cleo';
 GO
 :r $(RUTA)\07_Test_Funciones_Nucleo.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedÛ una transacciÛn abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued√≥ una transacci√≥n abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
@@ -111,7 +111,7 @@ PRINT '===== TEST 08 SP de control arbitral';
 GO
 :r $(RUTA)\08_Test_SP_ControlArbitral.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedÛ una transacciÛn abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued√≥ una transacci√≥n abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
@@ -120,7 +120,7 @@ PRINT '===== TEST 09 SP de sedes y partidos';
 GO
 :r $(RUTA)\09_Test_SP_Sedes_Partidos.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedÛ una transacciÛn abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued√≥ una transacci√≥n abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
@@ -129,7 +129,7 @@ PRINT '===== TEST 10 Funciones de eventos';
 GO
 :r $(RUTA)\10_Test_Funciones_Eventos.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedÛ una transacciÛn abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued√≥ una transacci√≥n abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
@@ -138,16 +138,16 @@ PRINT '===== TEST 11 SP registrar gol';
 GO
 :r $(RUTA)\11_Test_SP_RegistrarGol.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedÛ una transacciÛn abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued√≥ una transacci√≥n abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
 
-PRINT '===== TEST 12 SP registrar amonestaciÛn';
+PRINT '===== TEST 12 SP registrar amonestaci√≥n';
 GO
 :r $(RUTA)\12_Test_SP_RegistrarAmonestacion.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedÛ una transacciÛn abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued√≥ una transacci√≥n abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
@@ -156,7 +156,7 @@ PRINT '===== TEST 13 SP ABM de eventos';
 GO
 :r $(RUTA)\13_Test_SP_ABM_Eventos.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedÛ una transacciÛn abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued√≥ una transacci√≥n abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
@@ -165,7 +165,7 @@ PRINT '===== TEST 14 Funciones de jugadores';
 GO
 :r $(RUTA)\14_Test_Funciones_Jugadores.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedÛ una transacciÛn abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued√≥ una transacci√≥n abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
@@ -174,25 +174,25 @@ PRINT '===== TEST 15 SP de convocatoria y bajas';
 GO
 :r $(RUTA)\15_Test_SP_Convocatoria_Baja.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedÛ una transacciÛn abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued√≥ una transacci√≥n abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
 
-PRINT '===== TEST 16 SP registrar formaciÛn';
+PRINT '===== TEST 16 SP registrar formaci√≥n';
 GO
 :r $(RUTA)\16_Test_SP_RegistrarFormacion.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedÛ una transacciÛn abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued√≥ una transacci√≥n abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
 
-PRINT '===== TEST 17 SP registrar sustituciÛn';
+PRINT '===== TEST 17 SP registrar sustituci√≥n';
 GO
 :r $(RUTA)\17_Test_SP_RegistrarSustitucion.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedÛ una transacciÛn abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued√≥ una transacci√≥n abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
@@ -201,16 +201,16 @@ PRINT '===== TEST 18 SP ABM de jugadores';
 GO
 :r $(RUTA)\18_Test_SP_ABM_Jugadores.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedÛ una transacciÛn abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued√≥ una transacci√≥n abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
 
-PRINT '===== TEST 19 SP ABM restantes del n˙cleo';
+PRINT '===== TEST 19 SP ABM restantes del n√∫cleo';
 GO
 :r $(RUTA)\19_Test_SP_ABM_Nucleo.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedÛ una transacciÛn abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued√≥ una transacci√≥n abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
@@ -219,7 +219,7 @@ PRINT '===== TEST 20 SP ABM de publicidad';
 GO
 :r $(RUTA)\20_Test_SP_ABM_Publicidad.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedÛ una transacciÛn abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued√≥ una transacci√≥n abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
@@ -228,34 +228,34 @@ PRINT '===== TEST 21 SP asignar publicidad';
 GO
 :r $(RUTA)\21_Test_SP_AsignarPublicidad.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedÛ una transacciÛn abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued√≥ una transacci√≥n abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
 
-PRINT '===== TEST 22 ImportaciÛn de nucleo y publicidad (fixture, PBI, cotizaciones y pauta)';
+PRINT '===== TEST 22 Importaci√≥n de nucleo y publicidad (fixture, PBI, cotizaciones y pauta)';
 GO
 :r $(RUTA)\22_Test_SP_Importacion_Nucleo_Publicidad.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedÛ una transacciÛn abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued√≥ una transacci√≥n abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
 
-PRINT '===== TEST 23 SP importaciÛn XML de jugadores';
+PRINT '===== TEST 23 SP importaci√≥n XML de jugadores';
 GO
 :r $(RUTA)\23_Test_SP_Importacion_Jugadores.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedÛ una transacciÛn abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued√≥ una transacci√≥n abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
 
-PRINT '===== TEST 24 SP importaciÛn CSV de eventos';
+PRINT '===== TEST 24 SP importaci√≥n CSV de eventos';
 GO
 :r $(RUTA)\24_Test_SP_Importacion_Eventos.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedÛ una transacciÛn abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued√≥ una transacci√≥n abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
@@ -264,7 +264,7 @@ PRINT '===== TEST 25 Funciones de partidos';
 GO
 :r $(RUTA)\25_Test_Funciones_Partidos.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedÛ una transacciÛn abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued√≥ una transacci√≥n abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
@@ -273,16 +273,16 @@ PRINT '===== TEST 26 SP finalizar partido';
 GO
 :r $(RUTA)\26_Test_SP_FinalizarPartido.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedÛ una transacciÛn abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued√≥ una transacci√≥n abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
 
-PRINT '===== TEST 27 SP c·lculo de selecciones clasificadas';
+PRINT '===== TEST 27 SP c√°lculo de selecciones clasificadas';
 GO
 :r $(RUTA)\27_Test_SP_CalculoSeleccionesClasificadas.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedÛ una transacciÛn abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued√≥ una transacci√≥n abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
@@ -291,7 +291,16 @@ PRINT '===== TEST 28 SP definir cruce eliminatorio';
 GO
 :r $(RUTA)\28_Test_SP_DefinirCruceEliminatorio.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedÛ una transacciÛn abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued√≥ una transacci√≥n abierta tras el test anterior; se deshizo.'; END;
+GO
+USE MundialFutbol;
+GO
+
+PRINT '===== TEST 29 SP importaci√≥n de campa√±as del dossier';
+GO
+:r $(RUTA)\29_Test_SP_Importacion_Campanias.sql
+GO
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued√≥ una transacci√≥n abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
@@ -300,7 +309,87 @@ PRINT '===== TEST importacion/03 Seed de jugadores y eventos (escenario aislado)
 GO
 :r $(RUTA)\importacion\03_Test_Seed_Jugadores_Eventos.sql
 GO
-WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: quedÛ una transacciÛn abierta tras el test anterior; se deshizo.'; END;
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued√≥ una transacci√≥n abierta tras el test anterior; se deshizo.'; END;
+GO
+USE MundialFutbol;
+GO
+
+PRINT '===== TEST 30 Stored Procedures de Reportes (Entrega 7)';
+GO
+:r $(RUTA)\30_Test_SP_Reportes.sql
+GO
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued√≥ una transacci√≥n abierta tras el test anterior; se deshizo.'; END;
+GO
+USE MundialFutbol;
+GO
+
+PRINT '===== TEST 31 Seguridad: Cifrado de Datos Sensibles (Entrega 8)';
+GO
+:r $(RUTA)\31_Test_Seguridad_Cifrado.sql
+GO
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued√≥ una transacci√≥n abierta tras el test anterior; se deshizo.'; END;
+GO
+USE MundialFutbol;
+GO
+
+PRINT '===== TEST 32 Seguridad: Roles y Permisos (Entrega 8)';
+GO
+:r $(RUTA)\32_Test_Seguridad_Roles_Permisos.sql
+GO
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued√≥ una transacci√≥n abierta tras el test anterior; se deshizo.'; END;
+GO
+USE MundialFutbol;
+GO
+
+PRINT '===== TEST 32 Rol Administrador (usuario usr_admin_test)';
+GO
+:r $(RUTA)\32_Test_Rol_Administrador.sql
+GO
+REVERT;
+GO
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued√≥ una transacci√≥n abierta tras el test anterior; se deshizo.'; END;
+GO
+USE MundialFutbol;
+GO
+
+PRINT '===== TEST 32 Rol OperadorResultados (usuario usr_resultados_test)';
+GO
+:r $(RUTA)\32_Test_Rol_OperadorResultados.sql
+GO
+REVERT;
+GO
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued√≥ una transacci√≥n abierta tras el test anterior; se deshizo.'; END;
+GO
+USE MundialFutbol;
+GO
+
+PRINT '===== TEST 32 Rol GestorPublicidad (usuario usr_publicidad_test)';
+GO
+:r $(RUTA)\32_Test_Rol_GestorPublicidad.sql
+GO
+REVERT;
+GO
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued√≥ una transacci√≥n abierta tras el test anterior; se deshizo.'; END;
+GO
+USE MundialFutbol;
+GO
+
+PRINT '===== TEST 32 Rol Consulta (usuario usr_consulta_test)';
+GO
+:r $(RUTA)\32_Test_Rol_Consulta.sql
+GO
+REVERT;
+GO
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued√≥ una transacci√≥n abierta tras el test anterior; se deshizo.'; END;
+GO
+USE MundialFutbol;
+GO
+
+PRINT '===== TEST 33 Procedimientos de Backup (Entrega 8)';
+GO
+:r $(RUTA)\33_Test_Backups.sql
+GO
+WHILE @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; PRINT 'Aviso: qued√≥ una transacci√≥n abierta tras el test anterior; se deshizo.'; END;
 GO
 USE MundialFutbol;
 GO
@@ -325,7 +414,7 @@ FROM (
 ) AS t;
 
 PRINT 'Fin de la corrida de tests: ' + CONVERT(VARCHAR(19), SYSDATETIME(), 120);
-PRINT 'Buscar "FALL”" en la pestaÒa Mensajes: no deberÌa aparecer ninguna vez.';
+PRINT 'Buscar "FALL√ì" en la pesta√±a Mensajes: no deber√≠a aparecer ninguna vez.';
 GO
 
 SET NOCOUNT OFF;

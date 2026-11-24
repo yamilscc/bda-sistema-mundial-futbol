@@ -20,8 +20,8 @@ Objetivo: Cierra los partidos programados con nucleo.SP_FINALIZAR_PARTIDO (el pa
           - Al final muestra un resumen desde nucleo.vw_PartidoResultado.
           Idempotente: solo procesa partidos en estado 'Programado'; una segunda ejecución no cambia nada.
           Requiere ejecutados los scripts de creación 01 a 28 y, de esta carpeta, 04, 05 y 06 (partidos y
-          designaciones) y 03, 01 y 02 (jugadores, formaciones y goles).
-          ORDEN: ejecutar al final de la carpeta importacion, después de 03, 01 y 02 de Mateo.
+          designaciones) y 01, 03 y 02 (jugadores, formaciones y goles).
+          ORDEN: ejecutar al final de la carpeta importacion, después de 01, 03 y 02 de Mateo.
 */
 USE MundialFutbol;
 GO

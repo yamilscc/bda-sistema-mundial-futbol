@@ -34,8 +34,8 @@ IF NOT EXISTS (SELECT 1 FROM nucleo.Grupo WHERE Nombre = 'Z')
 DECLARE @idGrupo TINYINT = (SELECT IdGrupo FROM nucleo.Grupo WHERE Nombre = 'Z');
 
 INSERT INTO nucleo.Pais (Nombre, CodigoISO2, CodigoISO3, HusoHorarioComercial, IdConfederacion)
-VALUES ('TEST CB Pais 1', 'CA', 'TCA', 'Argentina Standard Time', @idConf),
-       ('TEST CB Pais 2', 'CB', 'TCB', 'Argentina Standard Time', @idConf);
+VALUES ('TEST CB Pais 1', 'QC', 'TCA', 'Argentina Standard Time', @idConf),
+       ('TEST CB Pais 2', 'QD', 'TCB', 'Argentina Standard Time', @idConf);
 
 DECLARE @idPais1 SMALLINT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'TCA');
 DECLARE @idPais2 SMALLINT = (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'TCB');

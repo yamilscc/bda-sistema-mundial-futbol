@@ -2,7 +2,7 @@
 Universidad: Universidad Nacional de La Matanza
 Materia: Bases de Datos Aplicadas - Grupo 05
 Autor: Torczuk, Elías Alexei
-Fecha: 2026-11-23
+Fecha: 2026-11-24
 Integrantes:
 - Casella, Mateo Ezequiel
 - Chungara Tenorio, Denis Abner
@@ -11,7 +11,9 @@ Integrantes:
 Objetivo: Probar los SP del script 22: nucleo.SP_IMPORTAR_FIXTURE_CSV, nucleo.SP_IMPORTAR_PBI_JSON,
           publicidad.SP_IMPORTAR_COTIZACIONES_JSON y publicidad.SP_IMPORTAR_PAUTA_JSON: lote mixto con errores
           parciales en eventos.LogImportacion, re-ejecución idempotente (Upsert), modificación de datos
-          existentes, conversión de moneda y validaciones de entrada. Requiere ejecutados los scripts 01 a 22.
+          existentes, conversión de moneda y validaciones de entrada. La pauta busca la pieza por anunciante,
+          título e idioma a través de las campañas del anunciante, y no puede modificar espacios de un partido
+          Finalizado. Requiere ejecutados los scripts 01 a 22.
           Los JSON de este test son datos de prueba con el formato de las APIs (no son respuestas reales).
           Todo corre dentro de una transacción que se deshace al final (ROLLBACK).
           Resultado: no debe aparecer "FALLÓ" en Mensajes.
@@ -176,7 +178,14 @@ INSERT INTO nucleo.Idioma (Nombre) VALUES ('TEST IMP Idioma');
 DECLARE @idIdioma INT = (SELECT IdIdioma FROM nucleo.Idioma WHERE Nombre = 'TEST IMP Idioma');
 INSERT INTO publicidad.Anunciante (Nombre, IdPais) VALUES ('TEST IMP Anunciante', (SELECT IdPais FROM nucleo.Pais WHERE CodigoISO3 = 'TQP'));
 DECLARE @idAnu INT = (SELECT IdAnunciante FROM publicidad.Anunciante WHERE Nombre = 'TEST IMP Anunciante');
-INSERT INTO publicidad.Pieza (IdAnunciante, IdIdioma, Titulo) VALUES (@idAnu, @idIdioma, 'TEST IMP P1'), (@idAnu, @idIdioma, 'TEST IMP P2'), (@idAnu, @idIdioma, 'TEST IMP P3');
+-- Dos campañas del mismo anunciante. La campaña 2 repite la pieza 'TEST IMP P1' (mismo título e idioma), que
+-- se da de alta después: como el archivo no informa la campaña, la pauta debe tomar la de menor IdPieza.
+INSERT INTO publicidad.Campania (IdAnunciante, Titulo) VALUES (@idAnu, 'TEST IMP Campaña 1'), (@idAnu, 'TEST IMP Campaña 2');
+DECLARE @idCam1 INT = (SELECT IdCampania FROM publicidad.Campania WHERE IdAnunciante = @idAnu AND Titulo = 'TEST IMP Campaña 1');
+DECLARE @idCam2 INT = (SELECT IdCampania FROM publicidad.Campania WHERE IdAnunciante = @idAnu AND Titulo = 'TEST IMP Campaña 2');
+INSERT INTO publicidad.Pieza (IdCampania, IdIdioma, Titulo) VALUES (@idCam1, @idIdioma, 'TEST IMP P1'), (@idCam1, @idIdioma, 'TEST IMP P2'), (@idCam1, @idIdioma, 'TEST IMP P3');
+INSERT INTO publicidad.Pieza (IdCampania, IdIdioma, Titulo) VALUES (@idCam2, @idIdioma, 'TEST IMP P1');
+DECLARE @idP1Cam1 INT = (SELECT IdPieza FROM publicidad.Pieza WHERE IdCampania = @idCam1 AND Titulo = 'TEST IMP P1');
 
 DECLARE @pauta NVARCHAR(MAX) = N'[
  {"numeroPartido":245,"numeroEspacio":1,"anunciante":"TEST IMP Anunciante","titulo":"TEST IMP P1","idioma":"TEST IMP Idioma","monto":100,"moneda":"EUR"},
@@ -196,7 +205,8 @@ IF @ok <> 3 OR @err <> 3
    OR (SELECT TarifaPublicitaria FROM publicidad.EspacioPublicitario WHERE IdPartido = @idP245 AND NumeroEspacio = 1) <> 200
    OR (SELECT TarifaPublicitaria FROM publicidad.EspacioPublicitario WHERE IdPartido = @idP245 AND NumeroEspacio = 2) <> 100
    OR (SELECT TarifaPublicitaria FROM publicidad.EspacioPublicitario WHERE IdPartido = @idP245 AND NumeroEspacio = 3) <> 50
-    PRINT 'TEST 10 FALLÓ: la conversión de moneda o el lote mixto de la pauta son incorrectos.';
+   OR (SELECT IdPieza FROM publicidad.EspacioPublicitario WHERE IdPartido = @idP245 AND NumeroEspacio = 1) <> @idP1Cam1
+    PRINT 'TEST 10 FALLÓ: la conversión de moneda, el lote mixto o la pieza elegida (menor IdPieza) son incorrectos.';
 ELSE PRINT 'TEST 10 OK';
 
 -- TEST 11: re-ejecución idempotente (mismos 3 espacios, sin error de "espacio ocupado")
@@ -220,6 +230,34 @@ BEGIN TRY
     PRINT 'TEST 13 FALLÓ: aceptó una moneda destino inexistente.';
 END TRY
 BEGIN CATCH PRINT 'TEST 13 OK (Bloqueado): ' + ERROR_MESSAGE(); END CATCH;
+
+-- =========================================================================
+-- TEST 14: pauta sobre un partido Finalizado (los espacios son histórico de facturación)
+-- Se carga el espacio 1 del partido 246 (50 USD), se finaliza el partido y se re-importa:
+--   14.A misma fila: no cambia nada, así que se procesa sin error (no hace falta modificar).
+--   14.B monto distinto: se rechaza (queda en LogImportacion) y la tarifa no cambia.
+-- SP_ALTA_Partido solo crea partidos 'Programado': el estado se deja como preparación del escenario.
+-- =========================================================================
+DECLARE @idP246 INT = (SELECT IdPartido FROM nucleo.Partido WHERE NumeroPartido = 246);
+SET @pauta = N'[{"numeroPartido":246,"numeroEspacio":1,"anunciante":"TEST IMP Anunciante","titulo":"TEST IMP P2","idioma":"TEST IMP Idioma","monto":50,"moneda":"USD"}]';
+EXEC publicidad.SP_IMPORTAR_PAUTA_JSON @nombreArchivo = 'test_pauta_fin.json', @contenidoJSON = @pauta, @filasProcesadas = @ok OUTPUT, @filasConError = @err OUTPUT;
+UPDATE nucleo.Partido SET Estado = 'Finalizado' WHERE IdPartido = @idP246;
+
+EXEC publicidad.SP_IMPORTAR_PAUTA_JSON @nombreArchivo = 'test_pauta_fin.json', @contenidoJSON = @pauta, @filasProcesadas = @ok OUTPUT, @filasConError = @err OUTPUT;
+IF @ok <> 1 OR @err <> 0
+    PRINT 'TEST 14.A FALLÓ: la re-importación idéntica sobre un partido finalizado dio error.';
+ELSE PRINT 'TEST 14.A OK';
+
+SET @pauta = N'[{"numeroPartido":246,"numeroEspacio":1,"anunciante":"TEST IMP Anunciante","titulo":"TEST IMP P2","idioma":"TEST IMP Idioma","monto":75,"moneda":"USD"}]';
+EXEC publicidad.SP_IMPORTAR_PAUTA_JSON @nombreArchivo = 'test_pauta_fin.json', @contenidoJSON = @pauta, @filasProcesadas = @ok OUTPUT, @filasConError = @err OUTPUT;
+SELECT '14.B' AS Test, @ok AS OK_Esperado_0, @err AS Error_Esperado_1,
+       (SELECT TarifaPublicitaria FROM publicidad.EspacioPublicitario WHERE IdPartido = @idP246 AND NumeroEspacio = 1) AS Tarifa_Esperada_50;
+IF @ok <> 0 OR @err <> 1
+   OR (SELECT TarifaPublicitaria FROM publicidad.EspacioPublicitario WHERE IdPartido = @idP246 AND NumeroEspacio = 1) <> 50
+   OR NOT EXISTS (SELECT 1 FROM eventos.LogImportacion
+                  WHERE NombreArchivo = 'test_pauta_fin.json' AND MensajeError LIKE '%finalizado%')
+    PRINT 'TEST 14.B FALLÓ: la pauta modificó un espacio de un partido finalizado o no lo registró en el log.';
+ELSE PRINT 'TEST 14.B OK (Bloqueado): el espacio del partido finalizado no se modificó y quedó en LogImportacion.';
 
 -- =========================================================================
 -- FIN: se deshacen todos los cambios de la prueba.

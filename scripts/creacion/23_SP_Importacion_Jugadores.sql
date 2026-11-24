@@ -206,7 +206,7 @@ BEGIN
             IF @documento IS NULL OR @documento = ''
                 THROW 52000, N'El documento del jugador es obligatorio.', 1;
 
-            SELECT @idJugador = IdJugador FROM jugadores.Jugador WHERE Documento = @documento;
+            SET @idJugador = jugadores.fn_IdJugadorPorDocumento(@documento);
 
             IF @idJugador IS NULL
                 EXEC jugadores.SP_ALTA_Jugador

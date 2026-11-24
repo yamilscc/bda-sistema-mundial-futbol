@@ -14,13 +14,15 @@ Objetivo: Ejecutar la importación del archivo XML de convocatorias desde disco 
 
 REQUISITOS PARA EJECUTARLO:
   - Activar el modo SQLCMD en SSMS: menú Consulta > Modo SQLCMD.
-  - Editar RUTA_IMP con la ruta local de la carpeta scripts\importacion (sin barra final).
+  - Editar RUTA_IMP con la ruta local de la carpeta scripts\importacion (sin barra final) (solo si se ejecuta suelto: ver abajo).
   - Tener cargadas previamente las selecciones en nucleo.Seleccion y la regla de cupos
-    en jugadores.ReglaConvocados.
+    en jugadores.ReglaConvocados (las deja 04_Seed_Nucleo_Publicidad.sql).
+  - ORDEN: después de 04, 05 y 06 y antes de 03_Seed_Jugadores_Eventos.sql, que completa los dorsales libres.
 */
 
 :on error exit
-:setvar RUTA_IMP "C:\CAMBIAR\bda-sistema-mundial-futbol\scripts\importacion"
+-- Con 00_Cargar_Seeds.sql la ruta se define una sola vez ahí. Si este script se ejecuta suelto, descomentar y editar:
+-- :setvar RUTA_IMP "C:\CAMBIAR\bda-sistema-mundial-futbol\scripts\importacion"
 :setvar ARCHIVO_XML "planteles_convocatoria.xml"
 
 USE MundialFutbol;

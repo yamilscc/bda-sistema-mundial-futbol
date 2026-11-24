@@ -2,7 +2,7 @@
 Universidad: Universidad Nacional de La Matanza
 Materia: Bases de Datos Aplicadas - Grupo 05
 Autor: Torczuk, Elías Alexei
-Fecha: 2026-11-23
+Fecha: 2026-11-24
 Integrantes:
 - Casella, Mateo Ezequiel
 - Chungara Tenorio, Denis Abner
@@ -25,46 +25,13 @@ GO
 -- =========================================================================
 -- Objetos auxiliares
 -- =========================================================================
--- Staging del fixture (CSV). Mismo patrón que eventos.StagingEvento: NombreArchivo con default
--- 'PENDIENTE' para cargar por BULK INSERT estático a través de una vista de aterrizaje.
-IF OBJECT_ID('eventos.StagingFixture', 'U') IS NULL
-CREATE TABLE eventos.StagingFixture (
-    IdFila             INT IDENTITY(1,1) CONSTRAINT PK_StagingFixture PRIMARY KEY,
-    NombreArchivo      VARCHAR(255) NOT NULL CONSTRAINT DF_StagingFixture_NombreArchivo DEFAULT ('PENDIENTE'),
-    NumeroPartido      VARCHAR(20)  NULL,
-    Fase               VARCHAR(50)  NULL,
-    NombreEstadio      VARCHAR(100) NULL,
-    Ciudad             VARCHAR(100) NULL,
-    PaisISO3           VARCHAR(10)  NULL,
-    HusoHorario        VARCHAR(50)  NULL,
-    Capacidad          VARCHAR(20)  NULL,
-    Latitud            VARCHAR(20)  NULL,
-    Longitud           VARCHAR(20)  NULL,
-    FechaHoraLocal     VARCHAR(30)  NULL,
-    SeleccionLocal     VARCHAR(10)  NULL,
-    SeleccionVisitante VARCHAR(10)  NULL
-);
-GO
-
+-- La tabla eventos.StagingFixture se crea en 05_Tablas_Logs_Staging.sql; acá solo la vista de aterrizaje
+-- para el BULK INSERT estático (NombreArchivo toma el default 'PENDIENTE').
 CREATE OR ALTER VIEW eventos.vw_CargaStagingFixture
 AS
 SELECT NumeroPartido, Fase, NombreEstadio, Ciudad, PaisISO3, HusoHorario, Capacidad,
        Latitud, Longitud, FechaHoraLocal, SeleccionLocal, SeleccionVisitante
 FROM eventos.StagingFixture;
-GO
-
--- Cotizaciones de Frankfurter: 1 unidad de MonedaBase = Tasa unidades de Moneda, a la Fecha indicada.
-IF OBJECT_ID('publicidad.CotizacionMoneda', 'U') IS NULL
-CREATE TABLE publicidad.CotizacionMoneda (
-    MonedaBase CHAR(3)       NOT NULL,
-    Moneda     CHAR(3)       NOT NULL,
-    Fecha      DATE          NOT NULL,
-    Tasa       DECIMAL(18,8) NOT NULL,
-    CONSTRAINT PK_CotizacionMoneda PRIMARY KEY (MonedaBase, Moneda, Fecha),
-    CONSTRAINT CK_CotizacionMoneda_Tasa CHECK (Tasa > 0),
-    CONSTRAINT FK_CotizacionMoneda_MonedaBase FOREIGN KEY (MonedaBase) REFERENCES publicidad.Moneda (Codigo),
-    CONSTRAINT FK_CotizacionMoneda_Moneda     FOREIGN KEY (Moneda)     REFERENCES publicidad.Moneda (Codigo)
-);
 GO
 
 -- =========================================================================
@@ -345,14 +312,18 @@ BEGIN
 
             SELECT @idPartido = IdPartido FROM nucleo.Partido WHERE NumeroPartido = @numPartido;
             SELECT @idMonedaOrigen = IdMoneda FROM publicidad.Moneda WHERE Codigo = @monedaOrigen;
-            SELECT @idPieza = pz.IdPieza
+            -- La pieza cuelga de una campaña del anunciante. Si dos campañas del mismo anunciante tienen una
+            -- pieza con igual título e idioma se toma la de menor IdPieza (el archivo no informa la campaña).
+            SELECT TOP (1) @idPieza = pz.IdPieza
             FROM @filas AS f
             INNER JOIN publicidad.Anunciante AS an ON an.Nombre = LTRIM(RTRIM(f.Anunciante))
             INNER JOIN nucleo.Idioma         AS id ON id.Nombre = LTRIM(RTRIM(f.Idioma))
-            INNER JOIN publicidad.Pieza      AS pz ON pz.IdAnunciante = an.IdAnunciante
-                                                  AND pz.IdIdioma     = id.IdIdioma
-                                                  AND pz.Titulo       = LTRIM(RTRIM(f.Titulo))
-            WHERE f.IdOrden = @i;
+            INNER JOIN publicidad.Campania   AS cp ON cp.IdAnunciante = an.IdAnunciante
+            INNER JOIN publicidad.Pieza      AS pz ON pz.IdCampania = cp.IdCampania
+                                                  AND pz.IdIdioma   = id.IdIdioma
+                                                  AND pz.Titulo     = LTRIM(RTRIM(f.Titulo))
+            WHERE f.IdOrden = @i
+            ORDER BY pz.IdPieza;
 
             IF @idPartido IS NULL        SET @errores += N'- El partido indicado no existe.' + @salto;
             IF @numEspacio IS NULL OR @numEspacio NOT BETWEEN 1 AND 4

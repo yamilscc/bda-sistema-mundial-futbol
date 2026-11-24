@@ -33,6 +33,7 @@ Ejemplos:
 
 - `feat: agrega tabla EspacioPublicitario`
 - `fix: corrige validación de prime time en SP_ASIGNAR_PUBLICIDAD`
+- `test: adapta el test 20 a los ABM de Campania y Tarifa`
 
 ## Ramas
 
@@ -54,13 +55,13 @@ Ejemplos:
 |---|---|---|
 | Database | PascalCase | `MundialFutbol` |
 | Esquemas | camelCase | `jugadores` |
-| Tablas | PascalCase en singular | `Seleccion`, `EspacioPublicitario`, `Partido` |
+| Tablas | PascalCase en singular, sin tildes ni ñ | `Seleccion`, `EspacioPublicitario`, `Partido`, `Campania` (no `Campaña`) |
 | Claves primarias (PK) | `IdNombreTabla` | `IdPartido` |
 | Claves foráneas (FK) | Mismo nombre que la PK referenciada | `IdPartido` |
-| Constraints | Prefijos estandarizados | `PK_Tabla`, `FK_TablaHija_TablaPadre`, `UQ_Tabla_Campo`, `CK_Tabla_Regla`, `DF_Tabla_Campo` |
+| Constraints | Prefijos estandarizados; si abarca varios campos, se nombran en orden | `PK_Tabla`, `FK_TablaHija_TablaPadre`, `UQ_Tabla_Campo`, `UQ_Tarifa_Fase_Moneda_Vigencia`, `CK_Tabla_Regla`, `DF_Tabla_Campo` |
 | Stored procedures | Prefijo `SP_` en mayúsculas | `SP_CONTROL_ARBITRAL`, `SP_CALCULO_DE_SELECCIONES_CLASIFICADAS` |
-| Procedimientos ABM | Un SP por operación y tabla: `SP_ALTA_`, `SP_MODIFICACION_` o `SP_BAJA_` + nombre de la tabla | `SP_ALTA_Partido`, `SP_MODIFICACION_Partido`, `SP_BAJA_Partido` |
-| Funciones | Prefijo `fn_` + PascalCase | `fn_MercadosEnPrimeTime` |
+| Procedimientos ABM | Un SP por operación y tabla: `SP_ALTA_`, `SP_MODIFICACION_` o `SP_BAJA_` + nombre de la tabla. Las tablas asociativas solo tienen alta y baja | `SP_ALTA_Partido`, `SP_MODIFICACION_Campania`, `SP_BAJA_Tarifa`, `SP_ALTA_OrientacionPais` |
+| Funciones | Prefijo `fn_` + PascalCase; las de validación de los ABM, `fn_Validar` + tabla | `fn_MercadosEnPrimeTime`, `fn_ValidarCampania` |
 | Variables y parámetros | `@camelCase` | `@miVariable` |
 | Triggers | `TR_Tabla_Evento` | `TR_Gol_Insert` |
 | Índices | `IX_Tabla_Campo` | `IX_Partido_Fecha` |
