@@ -86,7 +86,7 @@ Cada archivo empieza con dos dígitos que marcan su orden. Los números 01 a 21 
 | 18 | `18_SP_ABM_Jugadores.sql` | ABM del módulo de jugadores (reglas, clubes, jugadores, convocatoria, bajas, formaciones y sustituciones) | Mateo |
 | 19 | `19_SP_ABM_Nucleo.sql` | ABM restantes del núcleo: confederaciones, países, ciudades, fases, grupos, selecciones, staff técnico, idiomas, categorías, árbitros, designaciones y sanciones | Denis |
 | 20 | `20_SP_ABM_Publicidad.sql` | ABM de monedas, anunciantes, piezas, orientación por país y espacios publicitarios | Denis |
-| 21 | `21_SP_AsignarPublicidad.sql` | `SP_ASIGNAR_PUBLICIDAD`: asigna las piezas a los espacios libres de un partido según país de las selecciones, PBI y prime time | Elías |
+| 21 | `21_SP_AsignarPublicidad.sql` | `SP_ASIGNAR_PUBLICIDAD`: completa los espacios libres de un partido eligiendo al azar una pieza por espacio: 1 = país de la selección local, 2 = país de la visitante, 3 = top 3 de PBI per cápita, 4 = países en prime time | Elías |
 | 22 | `22_SP_Importacion_Nucleo_Publicidad.sql` | `SP_IMPORTAR_PBI_JSON`, `SP_IMPORTAR_COTIZACIONES_JSON`, `SP_IMPORTAR_PAUTA_JSON` y `SP_IMPORTAR_FIXTURE_CSV` (+ `eventos.StagingFixture`, `eventos.vw_CargaStagingFixture` y `publicidad.CotizacionMoneda`) | Elías |
 | 23 / 24 | `23_SP_Importacion_Jugadores.sql`, `24_SP_Importacion_Eventos.sql` | Importación XML de convocatorias y CSV de eventos | Mateo |
 
@@ -112,7 +112,7 @@ Scripts de testing (en `scripts/testing/`):
 | `18_Test_SP_ABM_Jugadores.sql` | SP ABM de jugadores |
 | `19_Test_SP_ABM_Nucleo.sql` | SP ABM restantes del núcleo |
 | `20_Test_SP_ABM_Publicidad.sql` | SP ABM de publicidad |
-| `21_Test_SP_AsignarPublicidad.sql` | `SP_ASIGNAR_PUBLICIDAD` (prime time en más de cuatro mercados, criterios de prioridad y validaciones) |
+| `21_Test_SP_AsignarPublicidad.sql` | `SP_ASIGNAR_PUBLICIDAD` (criterio de cada espacio, elección aleatoria, espacios sin candidata y validaciones) |
 | `22_Test_SP_Importacion_Nucleo_Publicidad.sql` | Importaciones de fixture, PBI, cotizaciones y pauta: errores parciales, idempotencia, conversión de moneda y validaciones |
 
 Pendientes: reportes, seguridad y respaldo.

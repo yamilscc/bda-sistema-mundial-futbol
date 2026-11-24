@@ -53,7 +53,7 @@ Ejemplos:
 | Elemento | Convención | Ejemplo |
 |---|---|---|
 | Database | PascalCase | `MundialFutbol` |
-| Esquemas | camelCase | `jugador` |
+| Esquemas | camelCase | `jugadores` |
 | Tablas | PascalCase en singular | `Seleccion`, `EspacioPublicitario`, `Partido` |
 | Claves primarias (PK) | `IdNombreTabla` | `IdPartido` |
 | Claves foráneas (FK) | Mismo nombre que la PK referenciada | `IdPartido` |

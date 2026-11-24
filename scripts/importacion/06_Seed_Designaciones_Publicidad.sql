@@ -78,7 +78,7 @@ GO
 -- ===== 3. Publicidad: completa los espacios libres de cada partido (USD 75.000 por espacio) =====
 DECLARE @res TABLE (NumeroEspacio TINYINT, IdPieza INT, Titulo VARCHAR(100), Anunciante VARCHAR(100),
                     TarifaPublicitaria DECIMAL(12,2), Moneda CHAR(3), AsignadoAhora BIT,
-                    ApuntaAParticipante BIT, PBIMaximo DECIMAL(12,2), EnPrimeTime BIT);
+                    Criterio VARCHAR(60));
 DECLARE @part TABLE (Id INT IDENTITY(1,1) PRIMARY KEY, IdPartido INT);
 INSERT INTO @part (IdPartido)
 SELECT p.IdPartido FROM nucleo.Partido AS p
