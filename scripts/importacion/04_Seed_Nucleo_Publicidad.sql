@@ -2,7 +2,7 @@
 Universidad: Universidad Nacional de La Matanza
 Materia: Bases de Datos Aplicadas - Grupo 05
 Autor: Torczuk, Elías Alexei
-Fecha: 2026-11-23
+Fecha: 2026-11-24
 Integrantes:
 - Casella, Mateo Ezequiel
 - Chungara Tenorio, Denis Abner
@@ -10,8 +10,8 @@ Integrantes:
 - Canseco Carrizo, Yamil Simón
 Objetivo: Seed de catálogos y entidades base de nucleo y publicidad (idempotente: se puede re-ejecutar):
           confederaciones, 22 países (16 participantes + 6 neutrales), 4 grupos, 16 selecciones, cuerpo técnico,
-          idiomas, categorías, 18 árbitros con idiomas, monedas, 9 anunciantes de 9 países y 12 piezas con
-          sus países de orientación. Usa los SP_ALTA_<Tabla> de las entregas anteriores (sin SQL dinámico ni cursores).
+          idiomas, categorías, 18 árbitros con idiomas, monedas, 9 anunciantes de 9 países, 9 campañas (una por anunciante),
+          12 piezas con sus países de orientación y una tarifa por fase (valores ficticios en USD). Usa los SP_ALTA_<Tabla> de las entregas anteriores (sin SQL dinámico ni cursores).
           Los grupos respetan el contrato con Mateo, salvo que BRA se ubica en el Grupo A (junto a ARG) porque
           SP_ALTA_Partido exige que los partidos de fase de grupos sean entre selecciones del mismo grupo y el
           partido 1 debe ser ARG vs BRA. Los partidos y sedes los carga 05_Importar_Nucleo_Publicidad.sql.
@@ -189,6 +189,19 @@ BEGIN
     SET @i += 1;
 END;
 
+-- Una campaña por anunciante (las piezas cuelgan de la campaña).
+DECLARE @idAnuCamp INT;
+SET @i = 1;
+WHILE @i <= @n
+BEGIN
+    SELECT @nombre = a.Nombre, @idAnuCamp = an.IdAnunciante
+    FROM @anu AS a INNER JOIN publicidad.Anunciante AS an ON an.Nombre = a.Nombre WHERE a.Id = @i;
+    IF NOT EXISTS (SELECT 1 FROM publicidad.Campania WHERE IdAnunciante = @idAnuCamp AND Titulo = 'Mundial 2026')
+        EXEC publicidad.SP_ALTA_Campania @idAnunciante = @idAnuCamp, @titulo = 'Mundial 2026',
+                                         @marca = @nombre, @fechaDesde = '2026-06-11', @fechaHasta = '2026-07-19';
+    SET @i += 1;
+END;
+
 DECLARE @pieza TABLE (Id INT IDENTITY(1,1) PRIMARY KEY, Anunciante VARCHAR(100), Titulo VARCHAR(100), Idioma VARCHAR(100), Paises VARCHAR(100));
 INSERT INTO @pieza (Anunciante, Titulo, Idioma, Paises) VALUES
  ('Pampa Telecom', 'Conectá el Mundial', 'Español', 'ARG,URU,CHI'),
@@ -203,17 +216,18 @@ INSERT INTO @pieza (Anunciante, Titulo, Idioma, Paises) VALUES
  ('Liberty Sportswear', 'Pura Pasión', 'Español', 'ARG,BRA,URU'),
  ('Rhein Auto', 'Fahrfreude', 'Alemán', 'GER,NED,ESP'),
  ('Soleil Parfums', 'Allez les Bleus', 'Francés', 'FRA,MAR,SUI');
-DECLARE @idAnu INT, @idIdioma INT, @titulo VARCHAR(100), @idPieza INT;
+DECLARE @idCamp INT, @idIdioma INT, @titulo VARCHAR(100), @idPieza INT;
 SELECT @i = 1, @n = COUNT(*) FROM @pieza;
 WHILE @i <= @n
 BEGIN
-    SELECT @idAnu = an.IdAnunciante, @idIdioma = id.IdIdioma, @titulo = z.Titulo
+    SELECT @idCamp = cp.IdCampania, @idIdioma = id.IdIdioma, @titulo = z.Titulo
     FROM @pieza AS z
     INNER JOIN publicidad.Anunciante AS an ON an.Nombre = z.Anunciante
+    INNER JOIN publicidad.Campania AS cp ON cp.IdAnunciante = an.IdAnunciante AND cp.Titulo = 'Mundial 2026'
     INNER JOIN nucleo.Idioma AS id ON id.Nombre = z.Idioma
     WHERE z.Id = @i;
-    IF NOT EXISTS (SELECT 1 FROM publicidad.Pieza WHERE IdAnunciante = @idAnu AND Titulo = @titulo AND IdIdioma = @idIdioma)
-        EXEC publicidad.SP_ALTA_Pieza @idAnunciante = @idAnu, @idIdioma = @idIdioma,
+    IF NOT EXISTS (SELECT 1 FROM publicidad.Pieza WHERE IdCampania = @idCamp AND Titulo = @titulo AND IdIdioma = @idIdioma)
+        EXEC publicidad.SP_ALTA_Pieza @idCampania = @idCamp, @idIdioma = @idIdioma,
                                       @titulo = @titulo, @descripcion = 'Campaña Mundial 2026';
     SET @i += 1;
 END;
@@ -223,8 +237,9 @@ INSERT INTO @orient (IdPieza, IdPais)
 SELECT pz.IdPieza, pa.IdPais
 FROM @pieza AS z
 INNER JOIN publicidad.Anunciante AS an ON an.Nombre = z.Anunciante
+INNER JOIN publicidad.Campania AS cp ON cp.IdAnunciante = an.IdAnunciante AND cp.Titulo = 'Mundial 2026'
 INNER JOIN nucleo.Idioma AS id ON id.Nombre = z.Idioma
-INNER JOIN publicidad.Pieza AS pz ON pz.IdAnunciante = an.IdAnunciante AND pz.IdIdioma = id.IdIdioma AND pz.Titulo = z.Titulo
+INNER JOIN publicidad.Pieza AS pz ON pz.IdCampania = cp.IdCampania AND pz.IdIdioma = id.IdIdioma AND pz.Titulo = z.Titulo
 CROSS APPLY STRING_SPLIT(z.Paises, ',') AS s
 INNER JOIN nucleo.Pais AS pa ON pa.CodigoISO3 = s.value
 ORDER BY pz.IdPieza, pa.IdPais;
@@ -239,9 +254,28 @@ BEGIN
 END;
 GO
 
+-- ===== Tarifas por fase (valores ficticios en USD, para el cálculo de ingresos del reporte) =====
+DECLARE @tarifa TABLE (Id INT IDENTITY(1,1) PRIMARY KEY, Fase VARCHAR(28), Monto DECIMAL(12,2));
+INSERT INTO @tarifa (Fase, Monto) VALUES
+ ('Fase de grupos', 100000), ('Dieciseisavos de final', 150000), ('Octavos de final', 200000),
+ ('Cuartos de final', 300000), ('Semifinal', 500000), ('Tercer puesto', 250000), ('Final', 1000000);
+DECLARE @i2 INT = 1, @n2 INT = (SELECT COUNT(*) FROM @tarifa), @idFase INT, @idUsd INT, @monto DECIMAL(12,2);
+SELECT @idUsd = IdMoneda FROM publicidad.Moneda WHERE Codigo = 'USD';
+WHILE @i2 <= @n2
+BEGIN
+    SELECT @idFase = f.IdFase, @monto = t.Monto
+    FROM @tarifa AS t INNER JOIN nucleo.Fase AS f ON f.Nombre = t.Fase WHERE t.Id = @i2;
+    IF NOT EXISTS (SELECT 1 FROM publicidad.Tarifa WHERE IdFase = @idFase AND IdMoneda = @idUsd AND VigenciaDesde = '2026-06-01')
+        EXEC publicidad.SP_ALTA_Tarifa @idFase = @idFase, @idMoneda = @idUsd, @monto = @monto, @vigenciaDesde = '2026-06-01';
+    SET @i2 += 1;
+END;
+GO
+
 SELECT 'Seed nucleo/publicidad' AS Resumen,
        (SELECT COUNT(*) FROM nucleo.Pais) AS Paises_22, (SELECT COUNT(*) FROM nucleo.Seleccion) AS Selecciones_16,
        (SELECT COUNT(*) FROM nucleo.StaffTecnico) AS Staff_32, (SELECT COUNT(*) FROM nucleo.Arbitro) AS Arbitros_18,
        (SELECT COUNT(DISTINCT IdPais) FROM publicidad.Anunciante) AS PaisesAnunciantes_9,
-       (SELECT COUNT(*) FROM publicidad.Pieza) AS Piezas_12;
+       (SELECT COUNT(*) FROM publicidad.Campania) AS Campanias_9,
+       (SELECT COUNT(*) FROM publicidad.Pieza) AS Piezas_12,
+       (SELECT COUNT(*) FROM publicidad.Tarifa) AS Tarifas_7;
 GO

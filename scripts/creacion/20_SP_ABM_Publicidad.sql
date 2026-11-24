@@ -2,7 +2,7 @@
 Universidad: Universidad Nacional de La Matanza
 Materia: Bases de Datos Aplicadas - Grupo 05
 Autor: Chungara Tenorio, Denis Abner
-Fecha: 2026-11-19
+Fecha: 2026-11-24
 Integrantes:
 - Casella, Mateo Ezequiel
 - Chungara Tenorio, Denis Abner
@@ -10,7 +10,8 @@ Integrantes:
 - Canseco Carrizo, Yamil Simón
 Objetivo: Stored procedures ABM del módulo de publicidad, uno por operación y tabla
           (SP_ALTA_<Tabla>, SP_MODIFICACION_<Tabla> y SP_BAJA_<Tabla>) para:
-          1. Moneda   2. Anunciante   3. Pieza   4. OrientacionPais   5. EspacioPublicitario
+          1. Moneda   2. Anunciante   3. Campania   4. Pieza   5. OrientacionPais   6. Tarifa
+          7. EspacioPublicitario
           OrientacionPais es una tabla asociativa (PK compuesta): solo tiene alta y baja, no modificación.
           Las validaciones que comparten el alta y la modificación (y la baja) están en funciones
           publicidad.fn_Validar*: no hay código repetido entre los SP.
@@ -82,8 +83,16 @@ BEGIN
 END;
 GO
 
--- Pieza (alta y modificación).
-CREATE OR ALTER FUNCTION publicidad.fn_ValidarPieza (@idExcluido INT, @idAnunciante INT, @idIdioma INT, @titulo VARCHAR(100))
+-- Campania (alta y modificación): el anunciante existe, el título es obligatorio y no se repite dentro del
+-- anunciante, y el período (si se informa completo) no termina antes de empezar.
+CREATE OR ALTER FUNCTION publicidad.fn_ValidarCampania
+(
+    @idExcluido   INT,
+    @idAnunciante INT,
+    @titulo       VARCHAR(100),
+    @fechaDesde   DATE,
+    @fechaHasta   DATE
+)
 RETURNS NVARCHAR(MAX)
 AS
 BEGIN
@@ -94,6 +103,35 @@ BEGIN
        OR NOT EXISTS (SELECT 1 FROM publicidad.Anunciante WHERE IdAnunciante = @idAnunciante)
         SET @errores += N'- El anunciante indicado no existe.' + @salto;
 
+    IF @titulo IS NULL OR @titulo = ''
+        SET @errores += N'- El título de la campaña es obligatorio.' + @salto;
+    ELSE IF @idAnunciante IS NOT NULL
+            AND EXISTS (SELECT 1
+                        FROM publicidad.Campania
+                        WHERE IdAnunciante = @idAnunciante
+                          AND Titulo       = @titulo
+                          AND (@idExcluido IS NULL OR IdCampania <> @idExcluido))
+        SET @errores += N'- Ya existe otra campaña de ese anunciante con el mismo título.' + @salto;
+
+    IF @fechaDesde IS NOT NULL AND @fechaHasta IS NOT NULL AND @fechaHasta < @fechaDesde
+        SET @errores += N'- La fecha de fin de la campaña no puede ser anterior a la de inicio.' + @salto;
+
+    RETURN @errores;
+END;
+GO
+
+-- Pieza (alta y modificación).
+CREATE OR ALTER FUNCTION publicidad.fn_ValidarPieza (@idExcluido INT, @idCampania INT, @idIdioma INT, @titulo VARCHAR(100))
+RETURNS NVARCHAR(MAX)
+AS
+BEGIN
+    DECLARE @errores NVARCHAR(MAX) = N'',
+            @salto   NVARCHAR(2)   = CHAR(13) + CHAR(10);
+
+    IF @idCampania IS NULL
+       OR NOT EXISTS (SELECT 1 FROM publicidad.Campania WHERE IdCampania = @idCampania)
+        SET @errores += N'- La campaña indicada no existe.' + @salto;
+
     IF @idIdioma IS NULL
        OR NOT EXISTS (SELECT 1 FROM nucleo.Idioma WHERE IdIdioma = @idIdioma)
         SET @errores += N'- El idioma indicado no existe.' + @salto;
@@ -101,14 +139,54 @@ BEGIN
     IF @titulo IS NULL OR @titulo = ''
         SET @errores += N'- El título de la pieza publicitaria es obligatorio.' + @salto;
 
-    IF @idAnunciante IS NOT NULL AND @idIdioma IS NOT NULL AND @titulo IS NOT NULL AND @titulo <> ''
+    IF @idCampania IS NOT NULL AND @idIdioma IS NOT NULL AND @titulo IS NOT NULL AND @titulo <> ''
        AND EXISTS (SELECT 1
                    FROM publicidad.Pieza
-                   WHERE IdAnunciante = @idAnunciante
-                     AND Titulo       = @titulo
-                     AND IdIdioma     = @idIdioma
+                   WHERE IdCampania = @idCampania
+                     AND Titulo     = @titulo
+                     AND IdIdioma   = @idIdioma
                      AND (@idExcluido IS NULL OR IdPieza <> @idExcluido))
-        SET @errores += N'- Ya existe otra pieza de ese anunciante con el mismo título e idioma.' + @salto;
+        SET @errores += N'- Ya existe otra pieza de esa campaña con el mismo título e idioma.' + @salto;
+
+    RETURN @errores;
+END;
+GO
+
+-- Tarifa (alta y modificación): la fase y la moneda existen, el monto no es negativo y no se repite la
+-- combinación (fase, moneda, vigencia).
+CREATE OR ALTER FUNCTION publicidad.fn_ValidarTarifa
+(
+    @idExcluido    INT,
+    @idFase        INT,
+    @idMoneda      INT,
+    @monto         DECIMAL(12,2),
+    @vigenciaDesde DATE
+)
+RETURNS NVARCHAR(MAX)
+AS
+BEGIN
+    DECLARE @errores NVARCHAR(MAX) = N'',
+            @salto   NVARCHAR(2)   = CHAR(13) + CHAR(10);
+
+    IF @idFase IS NULL OR NOT EXISTS (SELECT 1 FROM nucleo.Fase WHERE IdFase = @idFase)
+        SET @errores += N'- La fase indicada no existe.' + @salto;
+
+    IF @idMoneda IS NULL OR NOT EXISTS (SELECT 1 FROM publicidad.Moneda WHERE IdMoneda = @idMoneda)
+        SET @errores += N'- La moneda indicada no existe.' + @salto;
+
+    IF @monto IS NULL OR @monto < 0
+        SET @errores += N'- El monto de la tarifa es obligatorio y no puede ser negativo.' + @salto;
+
+    IF @vigenciaDesde IS NULL
+        SET @errores += N'- La fecha de vigencia de la tarifa es obligatoria.' + @salto;
+    ELSE IF @idFase IS NOT NULL AND @idMoneda IS NOT NULL
+            AND EXISTS (SELECT 1
+                        FROM publicidad.Tarifa
+                        WHERE IdFase        = @idFase
+                          AND IdMoneda      = @idMoneda
+                          AND VigenciaDesde = @vigenciaDesde
+                          AND (@idExcluido IS NULL OR IdTarifa <> @idExcluido))
+        SET @errores += N'- Ya existe una tarifa para esa fase, moneda y fecha de vigencia.' + @salto;
 
     RETURN @errores;
 END;
@@ -202,6 +280,21 @@ BEGIN
     IF @idMoneda IS NULL
        OR NOT EXISTS (SELECT 1 FROM publicidad.Moneda WHERE IdMoneda = @idMoneda)
         SET @errores += N'- La moneda indicada no existe.' + @salto;
+
+    RETURN @errores;
+END;
+GO
+
+-- EspacioPublicitario (modificación y baja): el histórico para facturar no se toca una vez finalizado el partido.
+CREATE OR ALTER FUNCTION publicidad.fn_ValidarEspacioEditable (@idPartido INT)
+RETURNS NVARCHAR(MAX)
+AS
+BEGIN
+    DECLARE @errores NVARCHAR(MAX) = N'',
+            @salto   NVARCHAR(2)   = CHAR(13) + CHAR(10);
+
+    IF EXISTS (SELECT 1 FROM nucleo.Partido WHERE IdPartido = @idPartido AND Estado = 'Finalizado')
+        SET @errores += N'- El partido ya está finalizado: sus espacios publicitarios son histórico de facturación y no pueden modificarse ni eliminarse.' + @salto;
 
     RETURN @errores;
 END;
@@ -306,6 +399,8 @@ BEGIN
 
     IF EXISTS (SELECT 1 FROM publicidad.EspacioPublicitario WHERE IdMoneda = @idMoneda)
         SET @errores += N'- La moneda está asociada a espacios publicitarios facturados y no puede eliminarse.' + @salto;
+    IF EXISTS (SELECT 1 FROM publicidad.Tarifa WHERE IdMoneda = @idMoneda)
+        SET @errores += N'- La moneda está asociada a tarifas y no puede eliminarse.' + @salto;
 
     IF LEN(@errores) > 0
     BEGIN
@@ -421,8 +516,8 @@ BEGIN
        OR NOT EXISTS (SELECT 1 FROM publicidad.Anunciante WHERE IdAnunciante = @idAnunciante)
         SET @errores += N'- El anunciante indicado no existe.' + @salto;
 
-    IF EXISTS (SELECT 1 FROM publicidad.Pieza WHERE IdAnunciante = @idAnunciante)
-        SET @errores += N'- El anunciante tiene piezas publicitarias asociadas y no puede eliminarse.' + @salto;
+    IF EXISTS (SELECT 1 FROM publicidad.Campania WHERE IdAnunciante = @idAnunciante)
+        SET @errores += N'- El anunciante tiene campañas asociadas y no puede eliminarse.' + @salto;
 
     IF LEN(@errores) > 0
     BEGIN
@@ -444,11 +539,145 @@ END;
 GO
 
 -- =========================================================================
--- 3. Pieza
+-- 3. Campania
+-- =========================================================================
+CREATE OR ALTER PROCEDURE publicidad.SP_ALTA_Campania
+    @idCampania   INT          = NULL OUTPUT,
+    @idAnunciante INT          = NULL,
+    @titulo       VARCHAR(100) = NULL,
+    @marca        VARCHAR(100) = NULL,
+    @agencia      VARCHAR(100) = NULL,
+    @fechaDesde   DATE         = NULL,
+    @fechaHasta   DATE         = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @errores NVARCHAR(MAX),
+            @mensaje NVARCHAR(2048),
+            @salto   NVARCHAR(2)   = CHAR(13) + CHAR(10);
+
+    SET @titulo  = LTRIM(RTRIM(@titulo));
+    SET @marca   = NULLIF(LTRIM(RTRIM(@marca)), '');
+    SET @agencia = NULLIF(LTRIM(RTRIM(@agencia)), '');
+
+    SET @errores = publicidad.fn_ValidarCampania(NULL, @idAnunciante, @titulo, @fechaDesde, @fechaHasta);
+
+    IF LEN(@errores) > 0
+    BEGIN
+        SET @mensaje = LEFT(N'SP_ALTA_Campania - No se pudo completar la operación:' + @salto + @errores, 2048);
+        THROW 52000, @mensaje, 1;
+    END;
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+        INSERT INTO publicidad.Campania (IdAnunciante, Titulo, Marca, Agencia, FechaDesde, FechaHasta)
+        VALUES (@idAnunciante, @titulo, @marca, @agencia, @fechaDesde, @fechaHasta);
+        SET @idCampania = SCOPE_IDENTITY();
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH;
+END;
+GO
+
+CREATE OR ALTER PROCEDURE publicidad.SP_MODIFICACION_Campania
+    @idCampania   INT          = NULL,
+    @idAnunciante INT          = NULL,
+    @titulo       VARCHAR(100) = NULL,
+    @marca        VARCHAR(100) = NULL,
+    @agencia      VARCHAR(100) = NULL,
+    @fechaDesde   DATE         = NULL,
+    @fechaHasta   DATE         = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @errores NVARCHAR(MAX) = N'',
+            @mensaje NVARCHAR(2048),
+            @salto   NVARCHAR(2)   = CHAR(13) + CHAR(10);
+
+    SET @titulo  = LTRIM(RTRIM(@titulo));
+    SET @marca   = NULLIF(LTRIM(RTRIM(@marca)), '');
+    SET @agencia = NULLIF(LTRIM(RTRIM(@agencia)), '');
+
+    IF @idCampania IS NULL
+       OR NOT EXISTS (SELECT 1 FROM publicidad.Campania WHERE IdCampania = @idCampania)
+        SET @errores += N'- La campaña indicada no existe.' + @salto;
+
+    SET @errores += publicidad.fn_ValidarCampania(@idCampania, @idAnunciante, @titulo, @fechaDesde, @fechaHasta);
+
+    IF LEN(@errores) > 0
+    BEGIN
+        SET @mensaje = LEFT(N'SP_MODIFICACION_Campania - No se pudo completar la operación:' + @salto + @errores, 2048);
+        THROW 52000, @mensaje, 1;
+    END;
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+        UPDATE publicidad.Campania
+        SET IdAnunciante = @idAnunciante,
+            Titulo       = @titulo,
+            Marca        = @marca,
+            Agencia      = @agencia,
+            FechaDesde   = @fechaDesde,
+            FechaHasta   = @fechaHasta
+        WHERE IdCampania = @idCampania;
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH;
+END;
+GO
+
+CREATE OR ALTER PROCEDURE publicidad.SP_BAJA_Campania
+    @idCampania INT = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @errores NVARCHAR(MAX) = N'',
+            @mensaje NVARCHAR(2048),
+            @salto   NVARCHAR(2)   = CHAR(13) + CHAR(10);
+
+    IF @idCampania IS NULL
+       OR NOT EXISTS (SELECT 1 FROM publicidad.Campania WHERE IdCampania = @idCampania)
+        SET @errores += N'- La campaña indicada no existe.' + @salto;
+
+    IF EXISTS (SELECT 1 FROM publicidad.Pieza WHERE IdCampania = @idCampania)
+        SET @errores += N'- La campaña tiene piezas publicitarias asociadas y no puede eliminarse.' + @salto;
+
+    IF LEN(@errores) > 0
+    BEGIN
+        SET @mensaje = LEFT(N'SP_BAJA_Campania - No se pudo completar la operación:' + @salto + @errores, 2048);
+        THROW 52000, @mensaje, 1;
+    END;
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+        DELETE FROM publicidad.Campania WHERE IdCampania = @idCampania;
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH;
+END;
+GO
+
+-- =========================================================================
+-- 4. Pieza
 -- =========================================================================
 CREATE OR ALTER PROCEDURE publicidad.SP_ALTA_Pieza
     @idPieza      INT          = NULL OUTPUT,
-    @idAnunciante INT          = NULL,
+    @idCampania   INT          = NULL,
     @idIdioma     INT          = NULL,
     @titulo       VARCHAR(100) = NULL,
     @descripcion  VARCHAR(300) = NULL
@@ -463,7 +692,7 @@ BEGIN
     SET @titulo      = LTRIM(RTRIM(@titulo));
     SET @descripcion = LTRIM(RTRIM(@descripcion));
 
-    SET @errores = publicidad.fn_ValidarPieza(NULL, @idAnunciante, @idIdioma, @titulo);
+    SET @errores = publicidad.fn_ValidarPieza(NULL, @idCampania, @idIdioma, @titulo);
 
     IF LEN(@errores) > 0
     BEGIN
@@ -473,8 +702,8 @@ BEGIN
 
     BEGIN TRY
         BEGIN TRANSACTION;
-        INSERT INTO publicidad.Pieza (IdAnunciante, IdIdioma, Titulo, Descripcion)
-        VALUES (@idAnunciante, @idIdioma, @titulo, @descripcion);
+        INSERT INTO publicidad.Pieza (IdCampania, IdIdioma, Titulo, Descripcion)
+        VALUES (@idCampania, @idIdioma, @titulo, @descripcion);
         SET @idPieza = SCOPE_IDENTITY();
         COMMIT TRANSACTION;
     END TRY
@@ -488,7 +717,7 @@ GO
 
 CREATE OR ALTER PROCEDURE publicidad.SP_MODIFICACION_Pieza
     @idPieza      INT          = NULL,
-    @idAnunciante INT          = NULL,
+    @idCampania   INT          = NULL,
     @idIdioma     INT          = NULL,
     @titulo       VARCHAR(100) = NULL,
     @descripcion  VARCHAR(300) = NULL
@@ -507,7 +736,7 @@ BEGIN
        OR NOT EXISTS (SELECT 1 FROM publicidad.Pieza WHERE IdPieza = @idPieza)
         SET @errores += N'- La pieza publicitaria indicada no existe.' + @salto;
 
-    SET @errores += publicidad.fn_ValidarPieza(@idPieza, @idAnunciante, @idIdioma, @titulo);
+    SET @errores += publicidad.fn_ValidarPieza(@idPieza, @idCampania, @idIdioma, @titulo);
 
     IF LEN(@errores) > 0
     BEGIN
@@ -518,10 +747,10 @@ BEGIN
     BEGIN TRY
         BEGIN TRANSACTION;
         UPDATE publicidad.Pieza
-        SET IdAnunciante = @idAnunciante,
-            IdIdioma     = @idIdioma,
-            Titulo       = @titulo,
-            Descripcion  = @descripcion
+        SET IdCampania  = @idCampania,
+            IdIdioma    = @idIdioma,
+            Titulo      = @titulo,
+            Descripcion = @descripcion
         WHERE IdPieza = @idPieza;
         COMMIT TRANSACTION;
     END TRY
@@ -572,7 +801,7 @@ END;
 GO
 
 -- =========================================================================
--- 4. OrientacionPais
+-- 5. OrientacionPais
 -- Tabla asociativa (PK compuesta IdPieza, IdPais): solo tiene alta y baja (no hay nada que modificar:
 -- para cambiar un país se da de baja y de alta).
 -- =========================================================================
@@ -651,15 +880,16 @@ END;
 GO
 
 -- =========================================================================
--- 5. EspacioPublicitario
--- Entidad débil de Partido (PK compuesta IdPartido, NumeroEspacio entre 1 y 4).
+-- 6. Tarifa
+-- Tarifa de la franja publicitaria por fase y moneda. Es el dato maestro del que sale la tarifa que se
+-- copia a EspacioPublicitario al asignar. Modificarla no afecta a los espacios ya asignados (guardan su copia).
 -- =========================================================================
-CREATE OR ALTER PROCEDURE publicidad.SP_ALTA_EspacioPublicitario
-    @idPartido          INT,
-    @numeroEspacio      TINYINT,
-    @idPieza            INT           = NULL,
-    @tarifaPublicitaria DECIMAL(12,2) = NULL,
-    @idMoneda           INT           = NULL
+CREATE OR ALTER PROCEDURE publicidad.SP_ALTA_Tarifa
+    @idTarifa      INT           = NULL OUTPUT,
+    @idFase        INT           = NULL,
+    @idMoneda      INT           = NULL,
+    @monto         DECIMAL(12,2) = NULL,
+    @vigenciaDesde DATE          = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -667,6 +897,129 @@ BEGIN
     DECLARE @errores NVARCHAR(MAX),
             @mensaje NVARCHAR(2048),
             @salto   NVARCHAR(2)   = CHAR(13) + CHAR(10);
+
+    SET @vigenciaDesde = ISNULL(@vigenciaDesde, CAST(GETDATE() AS DATE));
+
+    SET @errores = publicidad.fn_ValidarTarifa(NULL, @idFase, @idMoneda, @monto, @vigenciaDesde);
+
+    IF LEN(@errores) > 0
+    BEGIN
+        SET @mensaje = LEFT(N'SP_ALTA_Tarifa - No se pudo completar la operación:' + @salto + @errores, 2048);
+        THROW 52000, @mensaje, 1;
+    END;
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+        INSERT INTO publicidad.Tarifa (IdFase, IdMoneda, Monto, VigenciaDesde)
+        VALUES (@idFase, @idMoneda, @monto, @vigenciaDesde);
+        SET @idTarifa = SCOPE_IDENTITY();
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH;
+END;
+GO
+
+CREATE OR ALTER PROCEDURE publicidad.SP_MODIFICACION_Tarifa
+    @idTarifa      INT           = NULL,
+    @idFase        INT           = NULL,
+    @idMoneda      INT           = NULL,
+    @monto         DECIMAL(12,2) = NULL,
+    @vigenciaDesde DATE          = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @errores NVARCHAR(MAX) = N'',
+            @mensaje NVARCHAR(2048),
+            @salto   NVARCHAR(2)   = CHAR(13) + CHAR(10);
+
+    IF @idTarifa IS NULL
+       OR NOT EXISTS (SELECT 1 FROM publicidad.Tarifa WHERE IdTarifa = @idTarifa)
+        SET @errores += N'- La tarifa indicada no existe.' + @salto;
+
+    SET @errores += publicidad.fn_ValidarTarifa(@idTarifa, @idFase, @idMoneda, @monto, @vigenciaDesde);
+
+    IF LEN(@errores) > 0
+    BEGIN
+        SET @mensaje = LEFT(N'SP_MODIFICACION_Tarifa - No se pudo completar la operación:' + @salto + @errores, 2048);
+        THROW 52000, @mensaje, 1;
+    END;
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+        UPDATE publicidad.Tarifa
+        SET IdFase        = @idFase,
+            IdMoneda      = @idMoneda,
+            Monto         = @monto,
+            VigenciaDesde = @vigenciaDesde
+        WHERE IdTarifa = @idTarifa;
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH;
+END;
+GO
+
+CREATE OR ALTER PROCEDURE publicidad.SP_BAJA_Tarifa
+    @idTarifa INT = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @errores NVARCHAR(MAX) = N'',
+            @mensaje NVARCHAR(2048),
+            @salto   NVARCHAR(2)   = CHAR(13) + CHAR(10);
+
+    IF @idTarifa IS NULL
+       OR NOT EXISTS (SELECT 1 FROM publicidad.Tarifa WHERE IdTarifa = @idTarifa)
+        SET @errores += N'- La tarifa indicada no existe.' + @salto;
+
+    IF LEN(@errores) > 0
+    BEGIN
+        SET @mensaje = LEFT(N'SP_BAJA_Tarifa - No se pudo completar la operación:' + @salto + @errores, 2048);
+        THROW 52000, @mensaje, 1;
+    END;
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+        DELETE FROM publicidad.Tarifa WHERE IdTarifa = @idTarifa;
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH;
+END;
+GO
+
+-- =========================================================================
+-- 7. EspacioPublicitario
+-- Entidad débil de Partido (PK compuesta IdPartido, NumeroEspacio entre 1 y 4).
+-- =========================================================================
+CREATE OR ALTER PROCEDURE publicidad.SP_ALTA_EspacioPublicitario
+    @idPartido          INT,
+    @numeroEspacio      TINYINT,
+    @idPieza            INT           = NULL,
+    @tarifaPublicitaria DECIMAL(12,2) = NULL,
+    @idMoneda           INT           = NULL,
+    @criterioAsignacion VARCHAR(60)   = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @errores NVARCHAR(MAX),
+            @mensaje NVARCHAR(2048),
+            @salto   NVARCHAR(2)   = CHAR(13) + CHAR(10);
+
+    SET @criterioAsignacion = NULLIF(LTRIM(RTRIM(@criterioAsignacion)), '');
 
     SET @errores = publicidad.fn_ValidarEspacioClave(@idPartido, @numeroEspacio, 0)
                  + publicidad.fn_ValidarEspacioDatos(@idPartido, NULL, @idPieza, @tarifaPublicitaria, @idMoneda);
@@ -679,8 +1032,8 @@ BEGIN
 
     BEGIN TRY
         BEGIN TRANSACTION;
-        INSERT INTO publicidad.EspacioPublicitario (IdPartido, NumeroEspacio, IdPieza, TarifaPublicitaria, IdMoneda)
-        VALUES (@idPartido, @numeroEspacio, @idPieza, @tarifaPublicitaria, @idMoneda);
+        INSERT INTO publicidad.EspacioPublicitario (IdPartido, NumeroEspacio, IdPieza, TarifaPublicitaria, IdMoneda, CriterioAsignacion)
+        VALUES (@idPartido, @numeroEspacio, @idPieza, @tarifaPublicitaria, @idMoneda, @criterioAsignacion);
         COMMIT TRANSACTION;
     END TRY
     BEGIN CATCH
@@ -706,6 +1059,7 @@ BEGIN
             @salto   NVARCHAR(2)   = CHAR(13) + CHAR(10);
 
     SET @errores = publicidad.fn_ValidarEspacioClave(@idPartido, @numeroEspacio, 1)
+                 + publicidad.fn_ValidarEspacioEditable(@idPartido)
                  + publicidad.fn_ValidarEspacioDatos(@idPartido, @numeroEspacio, @idPieza, @tarifaPublicitaria, @idMoneda);
 
     IF LEN(@errores) > 0
@@ -743,7 +1097,8 @@ BEGIN
             @mensaje NVARCHAR(2048),
             @salto   NVARCHAR(2)   = CHAR(13) + CHAR(10);
 
-    SET @errores = publicidad.fn_ValidarEspacioClave(@idPartido, @numeroEspacio, 1);
+    SET @errores = publicidad.fn_ValidarEspacioClave(@idPartido, @numeroEspacio, 1)
+                 + publicidad.fn_ValidarEspacioEditable(@idPartido);
 
     IF LEN(@errores) > 0
     BEGIN

@@ -223,8 +223,8 @@ BEGIN
     BEGIN TRY
         BEGIN TRANSACTION;
 
-        INSERT INTO publicidad.EspacioPublicitario (IdPartido, NumeroEspacio, IdPieza, TarifaPublicitaria, IdMoneda)
-        SELECT @idPartido, el.NumeroEspacio, el.IdPieza, @tarifaPublicitaria, @idMoneda
+        INSERT INTO publicidad.EspacioPublicitario (IdPartido, NumeroEspacio, IdPieza, TarifaPublicitaria, IdMoneda, CriterioAsignacion)
+        SELECT @idPartido, el.NumeroEspacio, el.IdPieza, @tarifaPublicitaria, @idMoneda, el.Criterio
         FROM @elegidas AS el;
 
         COMMIT TRANSACTION;
@@ -256,7 +256,8 @@ BEGIN
            el.Criterio
     FROM publicidad.EspacioPublicitario AS e
     INNER JOIN publicidad.Pieza       AS pz ON pz.IdPieza       = e.IdPieza
-    INNER JOIN publicidad.Anunciante  AS an ON an.IdAnunciante  = pz.IdAnunciante
+    INNER JOIN publicidad.Campania    AS cp ON cp.IdCampania    = pz.IdCampania
+    INNER JOIN publicidad.Anunciante  AS an ON an.IdAnunciante  = cp.IdAnunciante
     INNER JOIN publicidad.Moneda      AS mo ON mo.IdMoneda      = e.IdMoneda
     LEFT JOIN @elegidas               AS el ON el.NumeroEspacio = e.NumeroEspacio
                                            AND el.IdPieza       = e.IdPieza
