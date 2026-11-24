@@ -6,7 +6,7 @@
 **Comisión:** 01-2900  
 **Grupo:** 05  
 **Docentes:** HNATIUK, JAIR EZEQUIEL; PALOMARES, LUIS ALFONSO  
-**Fecha:** 23 de noviembre de 2026  
+**Fecha:** 24 de noviembre de 2026  
 
 ---
 
@@ -60,14 +60,10 @@ Tal como solicita la consigna, la seguridad no se codificó de forma estática e
    * Se removió la restricción `UQ_Jugador_Documento` sobre el campo en texto plano.
    * Se aplicó una máscara a las columnas legibles preexistentes (ejemplo: `***-1234` para documentos de jugadores y `***-CONFIDENCIAL-ID***` para árbitros y staff).
 4. **Actualización de Stored Procedures (ALTER PROCEDURE):**
-   * Se actualizaron `jugadores.SP_ABM_Jugador`, `nucleo.SP_ABM_Arbitro` y `nucleo.SP_ABM_StaffTecnico`. Los procedimientos reciben el dato sensible en texto plano por parámetro, validan unicidad contra los datos descifrados y almacenan los bytes cifrados en la base de datos junto con la máscara pública.
+   * Se actualizaron `jugadores.SP_ABM_Jugador`, `nucleo.SP_ABM_Arbitro` y `nucleo.SP_ABM_StaffTecnico` (junto con sus variantes `SP_ALTA_*` y `SP_MODIFICACION_*`). Los procedimientos reciben el dato sensible en texto plano por parámetro, validan unicidad contra los datos descifrados y almacenan los bytes cifrados en la base de datos junto con la máscara pública.
 5. **Procedimientos de consulta segura:**
    * Se implementaron `jugadores.SP_CONSULTAR_JUGADOR_DESCIFRADO`, `nucleo.SP_CONSULTAR_ARBITRO_DESCIFRADO` y `nucleo.SP_CONSULTAR_STAFF_DESCIFRADO` para habilitar el consumo descifrado únicamente a través de los canales autorizados.
 
-> [!WARNING]
-> **Impacto en el testing de entregas previas (Nota de la Cátedra):**
-> La consigna indica: *"Una vez aplicado el cifrado el testing aplicado en entregas previas puede que ya no sea exitoso."*
-> Esto se fundamenta técnicamente en que las consultas tradicionales directas que buscaban texto plano (por ejemplo: `SELECT * FROM jugadores.Jugador WHERE Documento = '40123999'`) ahora retornarán 0 filas, ya que la columna pública almacena el valor enmascarado `***-3999` y el valor fáctico reside en `DocumentoCifrado`. Todo acceso a la información sensible debe canalizarse a través de los procedimientos autorizados de descifrado.
 
 ---
 
@@ -115,12 +111,13 @@ La gestión de seguridad se encuentra 100% automatizada a través de procedimien
   * `usr_publicidad_test`
   * `usr_consulta_test`
 
-### 3.4 Evidencia de Testing por Rol
-En cumplimiento de la consigna (*"Elaboren un script para cada usuario con el que prueben cada rol"*), se generaron cuatro scripts de testing en `scripts/testing/`:
-1. `31_Test_Rol_Administrador.sql`: Valida el control total en consultas y ejecuciones transaccionales.
-2. `31_Test_Rol_OperadorResultados.sql`: Valida la carga deportiva y comprueba la denegación de permisos con captura del **Error 229** al intentar ejecutar SPs de publicidad.
-3. `31_Test_Rol_GestorPublicidad.sql`: Valida la asignación comercial y comprueba el Error 229 al intentar registrar incidencias de juego.
-4. `31_Test_Rol_Consulta.sql`: Valida la visualización de reportes y comprueba la denegación estricta de cualquier `INSERT` o procedimiento de modificación de datos.
+### 3.4 Evidencia de Testing por Rol (`31_Test_Seguridad_Roles_Permisos.sql`)
+En cumplimiento de la consigna (*"Elaboren un script para cada usuario con el que prueben cada rol"*), se consolidaron las pruebas de los cuatro usuarios en el script unificado `scripts/testing/31_Test_Seguridad_Roles_Permisos.sql`. Mediante bloques independientes de suplantación de identidad (`EXECUTE AS USER = '...'` y `REVERT`), el script verifica tanto las operaciones autorizadas como los bloqueos controlados (capturando el **Error 229** de SQL Server en `TRY/CATCH`):
+
+1. **`usr_admin_test` (`Rol_Administrador`):** Valida el control total en consultas sobre tablas y ejecución de procedimientos deportivos y publicitarios.
+2. **`usr_resultados_test` (`Rol_OperadorResultados`):** Valida la consulta de partidos y reportes deportivos, y comprueba la denegación con **Error 229** al intentar ejecutar `publicidad.SP_ASIGNAR_PUBLICIDAD` o `publicidad.SP_ABM_Anunciante`.
+3. **`usr_publicidad_test` (`Rol_GestorPublicidad`):** Valida la consulta de sedes/partidos y el reporte de ocupación publicitaria, y comprueba el **Error 229** al intentar ejecutar `eventos.SP_REGISTRAR_GOL` o `jugadores.SP_ABM_Jugador`.
+4. **`usr_consulta_test` (`Rol_Consulta`):** Valida la ejecución de reportes oficiales y comprueba la denegación estricta (**Error 229**) ante cualquier `INSERT` directo en tablas o intento de ejecución de SPs transaccionales (`eventos.SP_REGISTRAR_AMONESTACION`).
 
 ---
 
@@ -209,9 +206,6 @@ WITH RECOVERY;
 | `scripts/creacion/` | `31_Seguridad_Roles_Permisos.sql` | SPs de creación y gestión de 4 roles, asignación granular de permisos y usuarios de prueba. |
 | `scripts/creacion/` | `32_Procedimientos_Backups.sql` | SPs para modo FULL, backups Full, Diferencial y de Log de transacciones. |
 | `scripts/testing/` | `30_Test_Seguridad_Cifrado.sql` | Test de funciones de cifrado, persistencia binaria y validación de impacto en queries previas. |
-| `scripts/testing/` | `31_Test_Rol_Administrador.sql` | Test de privilegios totales para `usr_admin_test`. |
-| `scripts/testing/` | `31_Test_Rol_OperadorResultados.sql` | Test de permisos deportivos y denegación de publicidad (Error 229) para `usr_resultados_test`. |
-| `scripts/testing/` | `31_Test_Rol_GestorPublicidad.sql` | Test de permisos comerciales y denegación deportiva (Error 229) para `usr_publicidad_test`. |
-| `scripts/testing/` | `31_Test_Rol_Consulta.sql` | Test de acceso a reportes y denegación de modificaciones para `usr_consulta_test`. |
+| `scripts/testing/` | `31_Test_Seguridad_Roles_Permisos.sql` | Test unificado de permisos y denegaciones (Error 229) para los 4 roles (`usr_admin_test`, `usr_resultados_test`, `usr_publicidad_test`, `usr_consulta_test`). |
 | `scripts/testing/` | `32_Test_Backups.sql` | Validación de ejecución de respaldos Full, Diff, Log y consulta de historial en msdb. |
-| `doc/` | `entrega8_seguridad_y_respaldo.md` | Documento técnico formal de la Entrega 8. |
+| `doc/entrega8/` | `entrega8_seguridad_y_respaldo.md` | Documento técnico formal de la Entrega 8. |
