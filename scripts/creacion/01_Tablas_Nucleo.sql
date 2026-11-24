@@ -11,8 +11,9 @@ Objetivo:
 	- Generar las tablas núcleo del sistema: 
 		  Confederacion, Pais, Ciudad, Sede, Grupo, Fase, Partido, Seleccion, 
 		  StaffTecnico, Idioma, Categoria, Arbitro, ArbitroIdioma,
-	      DesignacionArbitral, Sancion
+	      DesignacionArbitral, Sancion, ReglaClasificacion
 	- Inicializar la tabla Fase con datos de referencia fijos
+	- Inicializar la tabla ReglaClasificacion (una sola fila) con el cupo por defecto
 */
 
 -- La base de datos y los schemas los crea 00_Reset_Total.sql, que se ejecuta 
@@ -396,6 +397,34 @@ END
 GO
 
 -- =========================================================================
+-- TABLA DE REGLAS: CUPO DE CLASIFICADOS
+-- Una sola fila (IdRegla = 1). Igual que las demás tablas de reglas, no tiene FKs
+-- hacia entidades transaccionales: la consultan los SP y funciones de clasificación.
+-- Presets (ClasificadosPorGrupo, MejoresTerceros):
+--   (2, 0) Modalidad de 8 grupos de 4 equipos (Catar 2022, por ejemplo):
+--          8 grupos x 2 = 16 clasificados, la eliminación empieza en octavos.
+--   (2, 8) Modalidad de 12 grupos de 4 equipos (Mundial 2026, por ejemplo):
+--          12 grupos x 2 + 8 mejores terceros = 32 clasificados, empieza en dieciseisavos.
+-- =========================================================================
+
+-- Tabla ReglaClasificacion
+IF OBJECT_ID('nucleo.ReglaClasificacion','U') IS NULL
+BEGIN
+	CREATE TABLE nucleo.ReglaClasificacion (
+		IdRegla TINYINT NOT NULL,
+		ClasificadosPorGrupo TINYINT NOT NULL,
+		MejoresTerceros TINYINT NOT NULL,
+
+		CONSTRAINT PK_ReglaClasificacion PRIMARY KEY (IdRegla),
+		-- Garantiza una sola fila: la PK solo admite el valor 1.
+		CONSTRAINT CK_ReglaClasificacion_FilaUnica CHECK (IdRegla = 1),
+		CONSTRAINT CK_ReglaClasificacion_ClasificadosPorGrupo CHECK (ClasificadosPorGrupo >= 1)
+		-- MejoresTerceros >= 0 queda garantizado por el tipo TINYINT.
+	);
+END
+GO
+
+-- =========================================================================
 -- DATOS DE REFERENCIA FIJOS: FASES DEL TORNEO
 -- (Valores que usan SP_CONTROL_ARBITRAL y los SP de partidos)
 -- =========================================================================
@@ -444,7 +473,18 @@ GO
 
 IF NOT EXISTS (SELECT 1 FROM nucleo.Fase WHERE Nombre = 'Final')
 BEGIN
-	INSERT INTO nucleo.Fase (Nombre, Orden, EsEliminatoria) 
+	INSERT INTO nucleo.Fase (Nombre, Orden, EsEliminatoria)
 	VALUES ('Final', 7, 1)
+END
+GO
+
+-- =========================================================================
+-- DATOS DE REFERENCIA FIJOS: CUPO DE CLASIFICADOS (valor inicial (2, 0): 2 por grupo, sin mejores terceros)
+-- =========================================================================
+
+IF NOT EXISTS (SELECT 1 FROM nucleo.ReglaClasificacion WHERE IdRegla = 1)
+BEGIN
+	INSERT INTO nucleo.ReglaClasificacion (IdRegla, ClasificadosPorGrupo, MejoresTerceros)
+	VALUES (1, 2, 0)
 END
 GO

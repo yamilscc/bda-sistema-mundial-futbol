@@ -12,8 +12,8 @@ Objetivo:
 	  en 01_Tablas_Nucleo.sql:
 		  Confederacion, Pais, Ciudad, Sede, Grupo, Fase, Seleccion, Partido,
 		  StaffTecnico, Idioma, Categoria, Arbitro, ArbitroIdioma,
-		  DesignacionArbitral, Sancion
-	- Verificar los datos de referencia fijos de la tabla Fase
+		  DesignacionArbitral, Sancion, ReglaClasificacion
+	- Verificar los datos de referencia fijos de las tablas Fase y ReglaClasificacion
 	- Requiere haber ejecutado 00_Reset_Total.sql y 01_Tablas_Nucleo.sql (BD sin otros datos
 	  de Grupo, para que las letras de prueba no colisionen).
 	- Los casos de prueba insertan directamente en las tablas porque se testean las
@@ -1081,6 +1081,77 @@ BEGIN TRY
 END TRY
 BEGIN CATCH
 	PRINT 'TEST 14.E OK (Bloqueado): ' + ERROR_MESSAGE();
+END CATCH;
+
+-- =========================================================================
+-- TEST 15: ReglaClasificacion (tabla de reglas de una sola fila)
+-- =========================================================================
+
+-- 15.A Valor inicial cargado por 01_Tablas_Nucleo.sql.
+-- Esperado: OK, hay una única fila (IdRegla = 1) con ClasificadosPorGrupo = 2 y MejoresTerceros = 0.
+IF (SELECT COUNT(*) FROM nucleo.ReglaClasificacion) = 1
+   AND EXISTS (SELECT 1 FROM nucleo.ReglaClasificacion
+               WHERE IdRegla = 1 AND ClasificadosPorGrupo = 2 AND MejoresTerceros = 0)
+	PRINT 'TEST 15.A OK: valor inicial (2, 0) cargado en una sola fila.';
+ELSE
+	PRINT 'TEST 15.A FALLÓ: la regla inicial no es (2, 0) o no hay una sola fila.';
+
+-- 15.B Cambio de preset a 2026.
+-- Esperado: OK, la fila pasa a (2, 8).
+UPDATE nucleo.ReglaClasificacion SET ClasificadosPorGrupo = 2, MejoresTerceros = 8 WHERE IdRegla = 1;
+IF EXISTS (SELECT 1 FROM nucleo.ReglaClasificacion WHERE IdRegla = 1 AND ClasificadosPorGrupo = 2 AND MejoresTerceros = 8)
+	PRINT 'TEST 15.B OK: preset 2026 (2, 8) aplicado.';
+ELSE
+	PRINT 'TEST 15.B FALLÓ: no se aplicó el preset 2026.';
+
+-- 15.C Segunda fila con otro IdRegla.
+-- Esperado: Bloqueado por CK_ReglaClasificacion_FilaUnica.
+BEGIN TRY
+	INSERT INTO nucleo.ReglaClasificacion (IdRegla, ClasificadosPorGrupo, MejoresTerceros) VALUES (2, 2, 0);
+	PRINT 'TEST 15.C FALLÓ: permitió una segunda fila.';
+END TRY
+BEGIN CATCH
+	PRINT 'TEST 15.C OK (Bloqueado): ' + ERROR_MESSAGE();
+END CATCH;
+
+-- 15.D Segunda fila con el mismo IdRegla.
+-- Esperado: Bloqueado por PK_ReglaClasificacion.
+BEGIN TRY
+	INSERT INTO nucleo.ReglaClasificacion (IdRegla, ClasificadosPorGrupo, MejoresTerceros) VALUES (1, 2, 0);
+	PRINT 'TEST 15.D FALLÓ: permitió duplicar la fila única.';
+END TRY
+BEGIN CATCH
+	PRINT 'TEST 15.D OK (Bloqueado): ' + ERROR_MESSAGE();
+END CATCH;
+
+-- 15.E ClasificadosPorGrupo en cero.
+-- Esperado: Bloqueado por CK_ReglaClasificacion_ClasificadosPorGrupo.
+BEGIN TRY
+	UPDATE nucleo.ReglaClasificacion SET ClasificadosPorGrupo = 0 WHERE IdRegla = 1;
+	PRINT 'TEST 15.E FALLÓ: permitió ClasificadosPorGrupo = 0.';
+END TRY
+BEGIN CATCH
+	PRINT 'TEST 15.E OK (Bloqueado): ' + ERROR_MESSAGE();
+END CATCH;
+
+-- 15.F MejoresTerceros negativo.
+-- Esperado: Bloqueado por el tipo TINYINT (desbordamiento aritmético; no hay CK porque el tipo ya impide negativos).
+BEGIN TRY
+	UPDATE nucleo.ReglaClasificacion SET MejoresTerceros = -1 WHERE IdRegla = 1;
+	PRINT 'TEST 15.F FALLÓ: permitió MejoresTerceros negativo.';
+END TRY
+BEGIN CATCH
+	PRINT 'TEST 15.F OK (Bloqueado): ' + ERROR_MESSAGE();
+END CATCH;
+
+-- 15.G Valores nulos.
+-- Esperado: Bloqueado por NOT NULL.
+BEGIN TRY
+	UPDATE nucleo.ReglaClasificacion SET ClasificadosPorGrupo = NULL WHERE IdRegla = 1;
+	PRINT 'TEST 15.G FALLÓ: permitió ClasificadosPorGrupo NULL.';
+END TRY
+BEGIN CATCH
+	PRINT 'TEST 15.G OK (Bloqueado): ' + ERROR_MESSAGE();
 END CATCH;
 
 -- =========================================================================
