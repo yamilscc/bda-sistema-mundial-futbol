@@ -37,7 +37,7 @@ Esta entrega integra el trabajo de las entregas anteriores en tres piezas que se
 
 **Tecnología:** Java 21, Spring Boot, Thymeleaf y Bootstrap. El acceso a la base usa solo `JdbcTemplate` y `SimpleJdbcCall`; no hay JPA, así que no existe ninguna escritura directa sobre las tablas.
 
-**Pantallas:** listado de sedes (`/sedes`), formulario de alta (`/sedes/nueva`) y de modificación (`/sedes/{id}/editar`), y botón de baja con confirmación.
+**Pantallas:** listado de sedes (`/sedes`), formulario de alta (`/sedes/nueva`) y de modificación (`/sedes/{id}/editar`), botón de baja con confirmación y la pantalla de scraping (`/scraping`, ver más abajo).
 
 **Usuario de la base.** La aplicación se conecta con un usuario de SQL Server con permisos mínimos: puede leer `Sede`, `Ciudad` y `Pais`, y ejecutar solo los tres procedimientos de sede. No tiene permiso de escritura sobre ninguna tabla.
 
@@ -98,6 +98,53 @@ Capturas de la aplicación:
 ![Alta válida](capturas/app_sede_alta_ok.png)
 
 ![Baja válida](capturas/app_sede_baja_ok.png)
+
+### Pantalla de scraping (`/scraping`)
+
+Muestra en vivo la obtención de los datos externos de la Entrega 6, para la demostración en la defensa. Tiene una tarjeta por fuente:
+
+| Fuente | Script que ejecuta | Archivo que muestra |
+|---|---|---|
+| Dossier de publicidad | `scraping_dossier.py` | `campanas_dossier.csv` |
+| Fixture y sedes (Wikipedia) | `fuentes_externas.py fixture` | `fixture_sedes.csv` |
+| PBI per cápita (Banco Mundial) | `fuentes_externas.py pbi` | `pbi_banco_mundial.json` |
+| Cotizaciones (Frankfurter) | `fuentes_externas.py cotizaciones` | `cotizaciones_frankfurter.json` |
+
+**Cómo funciona:**
+* El botón *Empezar scraping* ejecuta el script de `scripts/importacion/scraping` como un proceso aparte.
+* Cada línea que imprime el script aparece en una consola en la página, mientras se ejecuta (se envía con Server-Sent Events).
+* Al terminar, la tarjeta muestra en una tabla el archivo generado en `scripts/importacion/resultados`. Del PBI se muestra el último año con dato de cada país, igual que la importación.
+* Al abrir la pantalla se ve el último resultado que haya de cada fuente.
+
+**Solo muestra: no escribe en la base.** La importación sigue haciéndose con los scripts de `scripts/importacion/sql`, por ejemplo `08_Importar_Campanias_Dossier.sql` para el dossier. Hay dos motivos:
+* la importación usa `BULK INSERT`, que requiere un permiso de servidor que el usuario `app_mundial` no tiene, a propósito (permisos mínimos);
+* la consigna no permite modificar los archivos con otras herramientas antes de importarlos.
+
+La pantalla no necesita conexión a la base: funciona aunque no estén configuradas `DB_USER` y `DB_PASSWORD`.
+
+**Seguridad.** La aplicación solo ejecuta los cuatro scripts y argumentos fijos de la tabla: el usuario elige la fuente, nunca el comando. Corre una ejecución a la vez, con un tiempo máximo de 180 segundos (`mundial.scraping.timeout-segundos`).
+
+**Configuración** (variables de entorno opcionales):
+
+| Variable | Por defecto | Uso |
+|---|---|---|
+| `PYTHON_CMD` | `python` en Windows, `python3` en Linux y macOS | Comando de Python |
+| `SCRAPING_DIR` | `../scripts/importacion` (relativo a `app/`, desde donde se corre `mvnw`) | Carpeta que contiene `scraping/` y `resultados/` |
+
+Requiere Python 3 con `requests` y `beautifulsoup4` (este último solo para el fixture), y conexión a internet.
+
+**Casos probados** (navegador, con la aplicación levantada):
+
+| # | Caso | Resultado esperado |
+|---|---|---|
+| 3 | *Empezar scraping* en el dossier | La consola muestra el pedido, los 75 documentos recibidos y el avance de la escritura; al terminar, la tabla muestra las 75 campañas con la hora nueva |
+| 4 | *Empezar scraping* en el fixture | La consola muestra la descarga de Wikipedia y la capacidad leída para las 9 sedes; la tabla muestra los 24 partidos |
+| 5 | *Empezar scraping* en PBI y en cotizaciones | La tabla muestra los 22 países con su último PBI y las 4 monedas con su tasa respecto del USD |
+
+**Tests automáticos** (`app/src/test/.../scraping`, se corren con `.\mvnw.cmd test`). Cubren:
+* la lectura de los cuatro tipos de archivo;
+* la ejecución, con scripts de prueba que no usan internet: transmisión de líneas con acentos, argumentos fijos, código de salida, errores, tiempo máximo y script inexistente;
+* el controlador: pantalla, fragmento de resultado y fuente inexistente (404).
 
 ## 3. Tablero de BI (Power BI)
 

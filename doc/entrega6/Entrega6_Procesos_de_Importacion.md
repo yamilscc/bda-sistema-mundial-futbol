@@ -266,6 +266,8 @@ Luego, en SSMS con modo SQLCMD, abrir `sql/08_Importar_Campanias_Dossier.sql`, *
 
 Se puede ejecutar de nuevo para mostrar la idempotencia (no hay duplicados).
 
+El scraping también se puede mostrar desde la aplicación web de la Entrega 9 (pantalla `/scraping`, ver `doc/entrega9/README.md`). Ahí se ve en vivo lo que va haciendo el script y, al terminar, el CSV generado en una tabla. La importación se hace después igual, con `sql/08_Importar_Campanias_Dossier.sql`.
+
 ---
 
 ## 9. Testing

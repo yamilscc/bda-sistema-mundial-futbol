@@ -35,7 +35,7 @@ Base de datos en **SQL Server (T-SQL)** para gestionar la operación de los part
 ```
 .
 ├── README.md
-├── app/                          # aplicación de ABM de sedes (Java 21, Spring Boot) – Entrega 9
+├── app/                          # aplicación de ABM de sedes y pantalla de scraping (Java 21, Spring Boot) – Entrega 9
 ├── doc/
 │   ├── nomenclaturas.md          # encabezado de scripts, commits, ramas y convenciones de nombres
 │   └── entrega9/                 # documentación de la Entrega 9, tablero de Power BI y capturas
@@ -283,7 +283,7 @@ La documentación completa está en [doc/entrega9/README.md](doc/entrega9/README
 | Pieza | Dónde está |
 |---|---|
 | Consultas del alcance *To BE* | `scripts/creacion/34_Consultas_ToBe.sql` y `scripts/testing/34_Test_Consultas_ToBe.sql` |
-| Aplicación de ABM de sedes | `app/` (`.\mvnw.cmd spring-boot:run`, con las variables de entorno `DB_USER` y `DB_PASSWORD`) |
+| Aplicación de ABM de sedes y pantalla de scraping en vivo | `app/` (`.\mvnw.cmd spring-boot:run`, con las variables de entorno `DB_USER` y `DB_PASSWORD`). La pantalla `/scraping` ejecuta los scripts de `scripts/importacion/scraping` y muestra la salida y los resultados; no escribe en la base |
 | Tablero de BI | `doc/entrega9/Mundial.pbix` y capturas en `doc/entrega9/capturas/` |
 
 ---
