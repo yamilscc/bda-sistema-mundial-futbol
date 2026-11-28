@@ -1,1 +1,1 @@
-scripts/importacion/*.csv text eol=lf
+scripts/importacion/**/*.csv text eol=lf
