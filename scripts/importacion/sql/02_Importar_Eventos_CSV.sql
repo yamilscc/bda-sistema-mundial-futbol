@@ -13,7 +13,7 @@ Objetivo: Cargar un archivo CSV de eventos hacia eventos.StagingEvento mediante 
 
 REQUISITOS PARA EJECUTARLO:
   - Activar el modo SQLCMD en SSMS: menú Consulta > Modo SQLCMD.
-  - Editar RUTA_IMP con la ruta local de la carpeta scripts\importacion (sin barra final) (solo si se ejecuta suelto: ver abajo).
+  - Editar RUTA_IMP con la ruta local de la carpeta scripts\importacion, la que contiene sql, datos y resultados (sin barra final) (solo si se ejecuta suelto: ver abajo).
   - Tener cargados previamente los partidos y jugadores convocados.
 */
 
@@ -32,7 +32,7 @@ DELETE FROM eventos.StagingEvento
 WHERE NombreArchivo IN ('$(ARCHIVO_CSV)', 'PENDIENTE');
 
 BULK INSERT eventos.vw_CargaStagingEvento
-FROM '$(RUTA_IMP)\$(ARCHIVO_CSV)'
+FROM '$(RUTA_IMP)\datos\$(ARCHIVO_CSV)'
 WITH (
     FIRSTROW        = 2,
     FIELDTERMINATOR = ';',

@@ -2,7 +2,8 @@
 """
 Universidad Nacional de La Matanza - Bases de Datos Aplicadas - Grupo 05
 Autor: Torczuk, Elias Alexei
-Scraping del dossier de publicidad del Mundial -> campanas_dossier.csv (en esta carpeta).
+Scraping del dossier de publicidad del Mundial -> scripts/importacion/resultados/campanas_dossier.csv
+(la carpeta se crea si no existe; su contenido es local y no se sube al repositorio).
 
 Fuente: https://dossiermundial.netlify.app/  (sitio estatico que arma la pagina en el navegador con los datos
         de una base Firestore de lectura publica, sin clave). En vez de parsear el HTML renderizado, se lee el
@@ -19,7 +20,7 @@ Dependencias: solo la biblioteca estandar.
 import json, re, sys, urllib.parse, urllib.request
 from pathlib import Path
 
-DESTINO = Path(__file__).resolve().parent
+DESTINO = Path(__file__).resolve().parent.parent / "resultados"  # scripts/importacion/resultados
 UA = {"User-Agent": "BDA-UNLaM-Grupo05/1.0 (trabajo practico universitario)"}
 URL = ("https://firestore.googleapis.com/v1/projects/repositorio2026-61a28/databases/(default)/documents/campanas"
        "?pageSize=300")
@@ -54,6 +55,7 @@ def fila(documento):
 
 
 def main():
+    DESTINO.mkdir(parents=True, exist_ok=True)
     documentos, token = [], None
     while True:
         url = URL + ("&pageToken=" + urllib.parse.quote(token) if token else "")

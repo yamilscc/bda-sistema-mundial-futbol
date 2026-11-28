@@ -16,7 +16,7 @@ Objetivo: Probar los 7 Stored Procedures de reportes de la Entrega 7 (scripts/cr
             - que un filtro inexistente se rechace con un único mensaje agrupado (THROW 52000).
           Los casos que necesitan datos se informan como OMITIDO si la base no tiene partidos cargados
           (por ejemplo, corriendo la suite justo después de 00_Reset_Total.sql). Con los seeds cargados
-          (importacion/00_Cargar_Seeds.sql) los valores esperados son: 24 partidos, 96 espacios, 18 árbitros,
+          (importacion/sql/00_Cargar_Seeds.sql) los valores esperados son: 24 partidos, 96 espacios, 18 árbitros,
           16 selecciones y 368 convocados.
           Requiere ejecutados los scripts 01 a 33. No modifica datos.
 */

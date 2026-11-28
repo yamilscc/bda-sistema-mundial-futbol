@@ -17,9 +17,10 @@ Objetivo: Lanzador de las 4 importaciones de nucleo y publicidad (sin SQL dinám
           Es idempotente: se puede re-ejecutar. Las filas inválidas quedan en eventos.LogImportacion.
 
 REQUISITOS PARA EJECUTARLO:
-  - Modo SQLCMD activado en SSMS. Editar RUTA_IMP (carpeta scripts\importacion, sin barra final) (solo si se ejecuta suelto: ver abajo).
+  - Modo SQLCMD activado en SSMS. Editar RUTA_IMP (carpeta scripts\importacion, la que contiene sql, datos y resultados, sin barra final) (solo si se ejecuta suelto: ver abajo).
   - Haber ejecutado 04_Seed_Nucleo_Publicidad.sql.
-  - Haber generado los archivos de las APIs:  python fuentes_externas.py todo
+  - Haber generado los archivos de las APIs y del fixture en scripts\importacion\resultados:
+      python scraping\fuentes_externas.py todo     (la pauta está en scripts\importacion\datos)
     (fixture_sedes.csv y pauta_publicitaria.json ya vienen en el repositorio).
 */
 
@@ -34,7 +35,7 @@ GO
 
 -- ===== 1. PBI per cápita (API Banco Mundial) =====
 DECLARE @json NVARCHAR(MAX), @ok INT, @err INT;
-SELECT @json = BulkColumn FROM OPENROWSET(BULK '$(RUTA_IMP)\pbi_banco_mundial.json', SINGLE_CLOB) AS f;
+SELECT @json = BulkColumn FROM OPENROWSET(BULK '$(RUTA_IMP)\resultados\pbi_banco_mundial.json', SINGLE_CLOB) AS f;
 EXEC nucleo.SP_IMPORTAR_PBI_JSON @nombreArchivo = 'pbi_banco_mundial.json', @contenidoJSON = @json,
                                  @filasProcesadas = @ok OUTPUT, @filasConError = @err OUTPUT;
 SELECT 'PBI' AS Importacion, @ok AS Procesadas, @err AS ConError;
@@ -44,7 +45,7 @@ GO
 DELETE FROM eventos.StagingFixture WHERE NombreArchivo IN ('fixture_sedes.csv', 'PENDIENTE');
 
 BULK INSERT eventos.vw_CargaStagingFixture
-FROM '$(RUTA_IMP)\fixture_sedes.csv'
+FROM '$(RUTA_IMP)\resultados\fixture_sedes.csv'
 WITH (FIRSTROW = 2, FIELDTERMINATOR = ';', ROWTERMINATOR = '0x0a', CODEPAGE = '65001', TABLOCK);
 
 UPDATE eventos.StagingFixture SET NombreArchivo = 'fixture_sedes.csv' WHERE NombreArchivo = 'PENDIENTE';
@@ -57,7 +58,7 @@ GO
 
 -- ===== 3. Cotizaciones (API Frankfurter) =====
 DECLARE @json NVARCHAR(MAX), @ok INT, @err INT;
-SELECT @json = BulkColumn FROM OPENROWSET(BULK '$(RUTA_IMP)\cotizaciones_frankfurter.json', SINGLE_CLOB) AS f;
+SELECT @json = BulkColumn FROM OPENROWSET(BULK '$(RUTA_IMP)\resultados\cotizaciones_frankfurter.json', SINGLE_CLOB) AS f;
 EXEC publicidad.SP_IMPORTAR_COTIZACIONES_JSON @nombreArchivo = 'cotizaciones_frankfurter.json', @contenidoJSON = @json,
                                               @filasProcesadas = @ok OUTPUT, @filasConError = @err OUTPUT;
 SELECT 'Cotizaciones' AS Importacion, @ok AS Procesadas, @err AS ConError;
@@ -67,7 +68,7 @@ GO
 -- El archivo incluye a propósito 3 filas inválidas (ARS sin cotización, partido inexistente, anunciante
 -- inexistente): se importan las 6 válidas y las 3 inválidas quedan en eventos.LogImportacion.
 DECLARE @json NVARCHAR(MAX), @ok INT, @err INT;
-SELECT @json = BulkColumn FROM OPENROWSET(BULK '$(RUTA_IMP)\pauta_publicitaria.json', SINGLE_CLOB) AS f;
+SELECT @json = BulkColumn FROM OPENROWSET(BULK '$(RUTA_IMP)\datos\pauta_publicitaria.json', SINGLE_CLOB) AS f;
 EXEC publicidad.SP_IMPORTAR_PAUTA_JSON @nombreArchivo = 'pauta_publicitaria.json', @contenidoJSON = @json,
                                        @monedaDestino = 'USD', @filasProcesadas = @ok OUTPUT, @filasConError = @err OUTPUT;
 SELECT 'Pauta' AS Importacion, @ok AS Procesadas_Esperado_6, @err AS ConError_Esperado_3;

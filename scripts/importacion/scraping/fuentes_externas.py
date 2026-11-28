@@ -2,7 +2,8 @@
 """
 Universidad Nacional de La Matanza - Bases de Datos Aplicadas - Grupo 05
 Autor: Torczuk, Elias Alexei
-Descarga las fuentes externas de la Entrega 6 (nucleo y publicidad) a esta carpeta:
+Descarga las fuentes externas de la Entrega 6 (nucleo y publicidad) a scripts/importacion/resultados/
+(la carpeta se crea si no existe; su contenido es local y no se sube al repositorio):
   pbi         -> pbi_banco_mundial.json      (API Banco Mundial, indicador NY.GDP.PCAP.CD)
   cotizaciones-> cotizaciones_frankfurter.json (API Frankfurter, base USD)
   fixture     -> fixture_sedes.csv           (scraping de Wikipedia + fixture del torneo)
@@ -14,7 +15,7 @@ Ninguna de las fuentes requiere API key.
 import argparse, csv, json, re, sys, urllib.request
 from pathlib import Path
 
-DESTINO = Path(__file__).resolve().parent
+DESTINO = Path(__file__).resolve().parent.parent / "resultados"  # scripts/importacion/resultados
 UA = {"User-Agent": "BDA-UNLaM-Grupo05/1.0 (trabajo practico universitario)"}
 ISO2 = "AR;BR;UY;CO;CL;US;MX;CA;NL;ES;FR;DE;GB;PT;IT;CH;NO;SE;MA;JP;KR;AU"  # = nucleo.Pais.CodigoISO2 del seed
 MONEDAS = "EUR,BRL,JPY,GBP"  # Frankfurter (BCE) no publica ARS
@@ -113,6 +114,7 @@ def fixture(offline):
 
 
 if __name__ == "__main__":
+    DESTINO.mkdir(parents=True, exist_ok=True)
     ap = argparse.ArgumentParser()
     ap.add_argument("fuente", choices=["pbi", "cotizaciones", "fixture", "todo"])
     ap.add_argument("--offline", action="store_true")

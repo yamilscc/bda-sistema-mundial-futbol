@@ -14,7 +14,7 @@ Objetivo: Ejecutar la importación del archivo XML de convocatorias desde disco 
 
 REQUISITOS PARA EJECUTARLO:
   - Activar el modo SQLCMD en SSMS: menú Consulta > Modo SQLCMD.
-  - Editar RUTA_IMP con la ruta local de la carpeta scripts\importacion (sin barra final) (solo si se ejecuta suelto: ver abajo).
+  - Editar RUTA_IMP con la ruta local de la carpeta scripts\importacion, la que contiene sql, datos y resultados (sin barra final) (solo si se ejecuta suelto: ver abajo).
   - Tener cargadas previamente las selecciones en nucleo.Seleccion y la regla de cupos
     en jugadores.ReglaConvocados (las deja 04_Seed_Nucleo_Publicidad.sql).
   - ORDEN: después de 04, 05 y 06 y antes de 03_Seed_Jugadores_Eventos.sql, que completa los dorsales libres.
@@ -35,7 +35,7 @@ DECLARE @xml             XML,
         @filasConError   INT;
 
 SELECT @xml = CAST(BulkColumn AS XML)
-FROM OPENROWSET(BULK '$(RUTA_IMP)\$(ARCHIVO_XML)', SINGLE_BLOB) AS x;
+FROM OPENROWSET(BULK '$(RUTA_IMP)\datos\$(ARCHIVO_XML)', SINGLE_BLOB) AS x;
 
 EXEC jugadores.SP_IMPORTAR_CONVOCATORIA_XML
     @nombreArchivo   = '$(ARCHIVO_XML)',
