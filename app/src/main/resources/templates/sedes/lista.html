@@ -11,9 +11,13 @@
     </style>
 </head>
 <body class="bg-light">
-<nav class="navbar navbar-dark bg-primary mb-4">
+<nav class="navbar navbar-expand navbar-dark bg-primary mb-4">
     <div class="container">
         <span class="navbar-brand">Mundial de Fútbol · Gestión de sedes</span>
+        <div class="navbar-nav me-auto">
+            <a class="nav-link active" aria-current="page" th:href="@{/sedes}">Sedes</a>
+            <a class="nav-link" th:href="@{/scraping}">Scraping</a>
+        </div>
     </div>
 </nav>
 

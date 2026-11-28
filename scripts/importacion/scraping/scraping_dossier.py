@@ -2,7 +2,8 @@
 """
 Universidad Nacional de La Matanza - Bases de Datos Aplicadas - Grupo 05
 Autor: Torczuk, Elias Alexei
-Scraping del dossier de publicidad del Mundial -> campanas_dossier.csv (en esta carpeta).
+Scraping del dossier de publicidad del Mundial -> scripts/importacion/resultados/campanas_dossier.csv
+(la carpeta se crea si no existe; su contenido es local y no se sube al repositorio).
 
 Fuente: https://dossiermundial.netlify.app/  (sitio estatico que arma la pagina en el navegador con los datos
         de una base Firestore de lectura publica, sin clave). En vez de parsear el HTML renderizado, se lee el
@@ -19,12 +20,17 @@ Dependencias: solo la biblioteca estandar.
 import json, re, sys, urllib.parse, urllib.request
 from pathlib import Path
 
-DESTINO = Path(__file__).resolve().parent
+DESTINO = Path(__file__).resolve().parent.parent / "resultados"  # scripts/importacion/resultados
 UA = {"User-Agent": "BDA-UNLaM-Grupo05/1.0 (trabajo practico universitario)"}
 URL = ("https://firestore.googleapis.com/v1/projects/repositorio2026-61a28/databases/(default)/documents/campanas"
        "?pageSize=300")
 COLUMNAS = ["Anunciante", "Marca", "Titulo", "Agencia", "Productora", "Periodo", "Categorias"]
 CAMPOS = ["anunciante", "marca", "titulo", "agencia", "productora", "periodo"]  # categorias va aparte (array)
+
+
+def avance(mensaje):
+    # flush: la pantalla de scraping de la app (entrega 9) muestra cada linea apenas se imprime.
+    print(mensaje, flush=True)
 
 
 def descargar(url):
@@ -54,22 +60,30 @@ def fila(documento):
 
 
 def main():
-    documentos, token = [], None
+    DESTINO.mkdir(parents=True, exist_ok=True)
+    documentos, token, pagina = [], None, 1
+    avance("== Dossier de publicidad del Mundial (dossiermundial.netlify.app, base Firestore publica)")
     while True:
         url = URL + ("&pageToken=" + urllib.parse.quote(token) if token else "")
+        avance(f"Pidiendo la pagina {pagina} de la coleccion 'campanas' ...")
         datos = descargar(url)
         documentos += datos.get("documents", [])
+        avance(f"  recibidos {len(datos.get('documents', []))} documentos (total {len(documentos)})")
         token = datos.get("nextPageToken")
         if not token:
             break
+        pagina += 1
     if not documentos:
         sys.exit("La fuente no devolvio campanas: no se genera el CSV.")
+    avance("Convirtiendo los documentos a CSV (sin el campo 'creditos') ...")
     with open(DESTINO / "campanas_dossier.csv", "w", encoding="utf-8", newline="") as f:
         # Se escribe a mano: los textos ya no tienen ";" ni saltos de linea, y el BULK INSERT no interpreta comillas.
         f.write(";".join(COLUMNAS) + "\n")
-        for d in documentos:
+        for i, d in enumerate(documentos, 1):
             f.write(";".join(fila(d)) + "\n")
-    print("OK campanas_dossier.csv (%d campanas)" % len(documentos))
+            if i % 25 == 0:
+                avance(f"  {i} de {len(documentos)} campanas escritas")
+    avance("OK campanas_dossier.csv (%d campanas, en %s)" % (len(documentos), DESTINO))
 
 
 if __name__ == "__main__":

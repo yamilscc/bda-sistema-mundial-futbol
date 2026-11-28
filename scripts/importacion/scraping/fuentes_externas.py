@@ -2,7 +2,8 @@
 """
 Universidad Nacional de La Matanza - Bases de Datos Aplicadas - Grupo 05
 Autor: Torczuk, Elias Alexei
-Descarga las fuentes externas de la Entrega 6 (nucleo y publicidad) a esta carpeta:
+Descarga las fuentes externas de la Entrega 6 (nucleo y publicidad) a scripts/importacion/resultados/
+(la carpeta se crea si no existe; su contenido es local y no se sube al repositorio):
   pbi         -> pbi_banco_mundial.json      (API Banco Mundial, indicador NY.GDP.PCAP.CD)
   cotizaciones-> cotizaciones_frankfurter.json (API Frankfurter, base USD)
   fixture     -> fixture_sedes.csv           (scraping de Wikipedia + fixture del torneo)
@@ -14,7 +15,7 @@ Ninguna de las fuentes requiere API key.
 import argparse, csv, json, re, sys, urllib.request
 from pathlib import Path
 
-DESTINO = Path(__file__).resolve().parent
+DESTINO = Path(__file__).resolve().parent.parent / "resultados"  # scripts/importacion/resultados
 UA = {"User-Agent": "BDA-UNLaM-Grupo05/1.0 (trabajo practico universitario)"}
 ISO2 = "AR;BR;UY;CO;CL;US;MX;CA;NL;ES;FR;DE;GB;PT;IT;CH;NO;SE;MA;JP;KR;AU"  # = nucleo.Pais.CodigoISO2 del seed
 MONEDAS = "EUR,BRL,JPY,GBP"  # Frankfurter (BCE) no publica ARS
@@ -52,23 +53,33 @@ PARTIDOS = [
 ]
 
 
+def avance(mensaje):
+    # flush: la pantalla de scraping de la app (entrega 9) muestra cada linea apenas se imprime.
+    print(mensaje, flush=True)
+
+
 def descargar(url):
+    avance("Descargando " + url.split("?")[0] + " ...")
     with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=30) as r:
-        return r.read().decode("utf-8")
+        datos = r.read().decode("utf-8")
+    avance(f"  recibidos {len(datos)} bytes")
+    return datos
 
 
 def guardar_json(nombre, texto):
     datos = json.loads(texto)  # valida que sea JSON; ensure_ascii evita problemas de codepage en OPENROWSET
     (DESTINO / nombre).write_text(json.dumps(datos, ensure_ascii=True), encoding="ascii")
-    print("OK", nombre)
+    avance(f"OK {nombre} (en {DESTINO})")
 
 
 def pbi():
+    avance("== PBI per capita (API Banco Mundial)")
     url = f"https://api.worldbank.org/v2/country/{ISO2}/indicator/NY.GDP.PCAP.CD?format=json&date=2018:2024&per_page=1000"
     guardar_json("pbi_banco_mundial.json", descargar(url))
 
 
 def cotizaciones():
+    avance("== Cotizaciones (API Frankfurter, base USD)")
     guardar_json("cotizaciones_frankfurter.json", descargar(f"https://api.frankfurter.app/latest?from=USD&to={MONEDAS}"))
 
 
@@ -78,8 +89,9 @@ def capacidades_wikipedia():
         from bs4 import BeautifulSoup
         sopa = BeautifulSoup(descargar(WIKI), "html.parser")
     except Exception as e:  # sin red o sin bs4
-        print("AVISO: no se pudo scrapear Wikipedia:", e, file=sys.stderr)
+        print("AVISO: no se pudo scrapear Wikipedia:", e, file=sys.stderr, flush=True)
         return {}
+    avance("Buscando la tabla de sedes (columna Capacity) en el HTML ...")
     capacidades = {}
     for tabla in sopa.select("table.wikitable"):
         filas = tabla.select("tr")
@@ -96,12 +108,16 @@ def capacidades_wikipedia():
             for i, s in enumerate(SEDES):
                 if cap and any(k in texto for k in s[7]):
                     capacidades[i] = int(cap)
-    print(f"Scraping: capacidad leida para {len(capacidades)} de {len(SEDES)} sedes")
+    for i in sorted(capacidades):
+        avance(f"  {SEDES[i][0]} ({SEDES[i][1]}): capacidad {capacidades[i]}")
+    avance(f"Scraping: capacidad leida para {len(capacidades)} de {len(SEDES)} sedes")
     return capacidades
 
 
 def fixture(offline):
+    avance("== Fixture y sedes" + (" (offline: sin scraping)" if offline else " (scraping de Wikipedia)"))
     caps = {} if offline else capacidades_wikipedia()
+    avance(f"Escribiendo {len(PARTIDOS)} partidos en fixture_sedes.csv ...")
     with open(DESTINO / "fixture_sedes.csv", "w", encoding="utf-8", newline="") as f:
         w = csv.writer(f, delimiter=";", lineterminator="\n")
         w.writerow(["NumeroPartido", "Fase", "NombreEstadio", "Ciudad", "PaisISO3", "HusoHorario", "Capacidad",
@@ -109,10 +125,11 @@ def fixture(offline):
         for nro, i, fecha, loc, vis in PARTIDOS:
             e, c, iso3, huso, cap, lat, lon, _ = SEDES[i]
             w.writerow([nro, "Fase de grupos", e, c, iso3, huso, caps.get(i, cap), f"{lat:.6f}", f"{lon:.6f}", fecha, loc, vis])
-    print("OK fixture_sedes.csv")
+    avance(f"OK fixture_sedes.csv (en {DESTINO})")
 
 
 if __name__ == "__main__":
+    DESTINO.mkdir(parents=True, exist_ok=True)
     ap = argparse.ArgumentParser()
     ap.add_argument("fuente", choices=["pbi", "cotizaciones", "fixture", "todo"])
     ap.add_argument("--offline", action="store_true")

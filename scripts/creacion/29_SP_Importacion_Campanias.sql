@@ -9,7 +9,7 @@ Integrantes:
 - Torczuk, Elías Alexei
 - Canseco Carrizo, Yamil Simón
 Objetivo: Importación de las campañas del dossier de publicidad del Mundial (web scraping, ver
-          importacion/scraping_dossier.py), sin SQL dinámico ni cursores:
+          importacion/scraping/scraping_dossier.py), sin SQL dinámico ni cursores:
           publicidad.SP_IMPORTAR_CAMPANIAS_CSV procesa publicidad.StagingCampania (cargada por BULK INSERT estático
           a través de publicidad.vw_CargaStagingCampania) y hace Upsert de Anunciante, Campania, Pieza y
           OrientacionPais con los SP ABM del script 20. Es idempotente y registra los errores por fila en

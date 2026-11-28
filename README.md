@@ -35,7 +35,7 @@ Base de datos en **SQL Server (T-SQL)** para gestionar la operación de los part
 ```
 .
 ├── README.md
-├── app/                          # aplicación de ABM de sedes (Java 21, Spring Boot) – Entrega 9
+├── app/                          # aplicación de ABM de sedes y pantalla de scraping (Java 21, Spring Boot) – Entrega 9
 ├── doc/
 │   ├── nomenclaturas.md          # encabezado de scripts, commits, ramas y convenciones de nombres
 │   └── entrega9/                 # documentación de la Entrega 9, tablero de Power BI y capturas
@@ -44,8 +44,12 @@ Base de datos en **SQL Server (T-SQL)** para gestionar la operación de los part
     │   ├── 00_Reset_Total.sql    # maestro: borra y recrea la base, crea schemas y ejecuta el resto
     │   └── 01_… a 34_…           # un archivo por módulo, con prefijo numérico de orden de ejecución
     ├── testing/                  # scripts de testing (uno por cada script de creación probado)
-    │   └── importacion/          # tests en espejo de scripts/importacion/ (ej. 03_Test_Seed_Jugadores_Eventos.sql)
-    └── importacion/              # seeds e importaciones de datos externos (CSV/XML/API/scraping); 00_Cargar_Seeds.sql los lanza en orden
+    │   └── importacion/          # tests en espejo de scripts/importacion/sql/ (ej. 03_Test_Seed_Jugadores_Eventos.sql)
+    └── importacion/              # carga de datos (seeds e importaciones de CSV/XML/API/scraping)
+        ├── sql/                  # 00_Cargar_Seeds.sql (lanzador) y los scripts 01 a 08
+        ├── scraping/             # fuentes_externas.py y scraping_dossier.py
+        ├── datos/                # archivos fijos del grupo: XML de convocatoria, CSV de eventos y JSON de pauta
+        └── resultados/           # lo que generan los .py (APIs, fixture y dossier); solo local, no se versiona
 ```
 
 - Cada script empieza con dos dígitos que indican el orden de ejecución y con el encabezado definido en `doc/nomenclaturas.md`.
@@ -59,8 +63,15 @@ Base de datos en **SQL Server (T-SQL)** para gestionar la operación de los part
 1. Abrir SSMS y activar el **modo SQLCMD** (menú *Consulta → Modo SQLCMD*).
 2. Abrir `scripts/creacion/00_Reset_Total.sql` y editar la línea `:setvar RUTA "..."` con la ruta de la carpeta `scripts\creacion` de la copia local del repositorio (sin barra final).
 3. Ejecutarlo. El script elimina la base `MundialFutbol` si existe, la recrea, crea los schemas y ejecuta en orden los scripts `01` a `34`. Si alguno falla, se corta en ese punto. Al final muestra un resumen de tablas, SP, funciones y vistas por schema.
-4. Cargar los datos de `scripts/importacion/` con el lanzador `00_Cargar_Seeds.sql` (modo SQLCMD, editando `:setvar RUTA` con la carpeta `scripts\importacion`), que ejecuta en este orden y se corta ante el primer error: `04_Seed_Nucleo_Publicidad.sql` (también deja la regla de cupos de convocatoria), `05_Importar_Nucleo_Publicidad.sql` (requiere generar antes los archivos de las APIs, ver [Asignación de publicidad](#asignación-de-publicidad)), `06_Seed_Designaciones_Publicidad.sql`, `01_Importar_Convocatoria_XML.sql`, `03_Seed_Jugadores_Eventos.sql`, `02_Importar_Eventos_CSV.sql`, `07_Cierre_Resultados_Partidos.sql` y `08_Importar_Campanias_Dossier.sql` (campañas del dossier por scraping, ver [Campañas del dossier](#campañas-del-dossier-scraping)). El orden importa: el 01 va antes que el 03 porque el 03 completa solo los dorsales que el XML dejó libres, y el 04 va primero porque el 01 necesita la regla de cupos. Es idempotente: se puede ejecutar de nuevo. Si se prefiere correrlos a mano, el orden es el mismo; los que leen archivos llevan su propio `:setvar RUTA_IMP` con la carpeta `scripts\importacion`.
-5. Ejecutar `scripts/testing/00_Ejecutar_Tests.sql` (también en modo SQLCMD, editando su `:setvar RUTA` con la carpeta `scripts\testing`), que corre todos los tests en orden y al final controla que no queden datos de prueba.
+4. Generar los archivos de las fuentes externas en `scripts/importacion/resultados/` (requiere internet; ver [Asignación de publicidad](#asignación-de-publicidad)). Esa carpeta solo existe en la copia local: su contenido no está en el repositorio.
+
+   ```bash
+   python scripts/importacion/scraping/fuentes_externas.py todo
+   python scripts/importacion/scraping/scraping_dossier.py
+   ```
+
+5. Cargar los datos con el lanzador `scripts/importacion/sql/00_Cargar_Seeds.sql` (modo SQLCMD, editando `:setvar RUTA_IMP` con la carpeta `scripts\importacion`, la que contiene `sql`, `datos` y `resultados`), que ejecuta en este orden y se corta ante el primer error: `04_Seed_Nucleo_Publicidad.sql` (también deja la regla de cupos de convocatoria), `05_Importar_Nucleo_Publicidad.sql` (lee de `resultados/` el PBI, las cotizaciones y el fixture, y de `datos/` la pauta), `06_Seed_Designaciones_Publicidad.sql`, `01_Importar_Convocatoria_XML.sql`, `03_Seed_Jugadores_Eventos.sql`, `02_Importar_Eventos_CSV.sql`, `07_Cierre_Resultados_Partidos.sql` y `08_Importar_Campanias_Dossier.sql` (campañas del dossier por scraping, ver [Campañas del dossier](#campañas-del-dossier-scraping)). El orden importa: el 01 va antes que el 03 porque el 03 completa solo los dorsales que el XML dejó libres, y el 04 va primero porque el 01 necesita la regla de cupos. Es idempotente: se puede ejecutar de nuevo. Si se prefiere correrlos a mano, el orden es el mismo; los que leen archivos traen comentada su propia línea `:setvar RUTA_IMP` con la carpeta `scripts\importacion`, que hay que descomentar y editar.
+6. Ejecutar `scripts/testing/00_Ejecutar_Tests.sql` (también en modo SQLCMD, editando su `:setvar RUTA` con la carpeta `scripts\testing`), que corre todos los tests en orden y al final controla que no queden datos de prueba.
 
 Todos los scripts verifican la existencia de los objetos antes de crearlos o borrarlos, por lo que se pueden volver a ejecutar sin errores.
 
@@ -149,7 +160,7 @@ Scripts de testing (en `scripts/testing/`):
 | `32_Test_Rol_Consulta.sql` | Qué puede y qué no puede hacer `usr_consulta_test` (Rol_Consulta) | Denis / Elías |
 | `33_Test_Backups.sql` | Validaciones, backups FULL, DIFF y LOG registrados en `msdb` e historial | Denis / Elías |
 | `34_Test_Consultas_ToBe.sql` | `SP_CONSULTAR_FIXTURE` (filtros y validaciones) y las vistas del script 34 | Yamil |
-| `importacion/03_Test_Seed_Jugadores_Eventos.sql` | Seed de jugadores y eventos: volúmenes mínimos y casos obligatorios (en espejo de `scripts/importacion/03_Seed_Jugadores_Eventos.sql`) | Mateo |
+| `importacion/03_Test_Seed_Jugadores_Eventos.sql` | Seed de jugadores y eventos: volúmenes mínimos y casos obligatorios (en espejo de `scripts/importacion/sql/03_Seed_Jugadores_Eventos.sql`) | Mateo |
 
 La Entrega 9 (consultas del alcance *To BE*, aplicación de ABM y tablero de BI) se describe en [Entrega 9](#entrega-9).
 
@@ -217,13 +228,13 @@ Además:
 
 Las validaciones se juntan en un único error (`THROW 52000`) antes de abrir la transacción: partido inexistente, partido finalizado, sin espacios libres, sin tarifa para la fase a la fecha del partido y sin ninguna pieza candidata.
 
-Ninguna requiere API key. Los archivos se generan con `scripts/importacion/fuentes_externas.py` (Python 3; `pip install requests beautifulsoup4` solo para el scraping).
+Ninguna requiere API key. Los archivos se generan en `scripts/importacion/resultados/` con `scripts/importacion/scraping/fuentes_externas.py` (Python 3; `pip install requests beautifulsoup4` solo para el scraping).
 
 | Fuente | URL y parámetros | Límites de uso | Destino |
 |---|---|---|---|
 | API Banco Mundial | `https://api.worldbank.org/v2/country/AR;BR;...;AU/indicator/NY.GDP.PCAP.CD?format=json&date=2018:2024&per_page=1000` (países por ISO2) | Pública y gratuita, sin API key; sin cuota publicada (se hace 1 sola consulta) | `nucleo.SP_IMPORTAR_PBI_JSON` -> `Pais.PBIPerCapitaUSD` (último año con dato) |
 | API Frankfurter | `https://api.frankfurter.app/latest?from=USD&to=EUR,BRL,JPY,GBP` | Gratuita, sin API key ni límite fijo (se hace 1 consulta). Usa cotizaciones del BCE: **no publica ARS** | `publicidad.SP_IMPORTAR_COTIZACIONES_JSON` -> `CotizacionMoneda`; `SP_IMPORTAR_PAUTA_JSON` convierte a USD |
-| Scraping Wikipedia | `https://en.wikipedia.org/wiki/2026_FIFA_World_Cup` (tabla de sedes: capacidad) | Sin API key; se envía un `User-Agent` identificatorio y se hace 1 sola descarga. `--offline` usa los datos incluidos en el script | `fixture_sedes.csv` -> `eventos.vw_CargaStagingFixture` -> `nucleo.SP_IMPORTAR_FIXTURE_CSV` |
+| Scraping Wikipedia | `https://en.wikipedia.org/wiki/2026_FIFA_World_Cup` (tabla de sedes: capacidad) | Sin API key; se envía un `User-Agent` identificatorio y se hace 1 sola descarga. `--offline` usa los datos incluidos en el script | `resultados/fixture_sedes.csv` -> `eventos.vw_CargaStagingFixture` -> `nucleo.SP_IMPORTAR_FIXTURE_CSV` |
 
 El Banco Mundial se cruza por `CodigoISO2` y no por `CodigoISO3` porque varios códigos del torneo son códigos FIFA (NED, GER, ENG, SUI, CHI). Las coordenadas, el huso y el cruce de partidos del fixture salen del propio script; del scraping se toma la capacidad.
 
@@ -238,10 +249,10 @@ Segundo dataset obtenido por scraping (además del fixture): las campañas de pu
 | Dato | Detalle |
 |---|---|
 | Página de origen | `https://dossiermundial.netlify.app/` (sitio estático que arma la página en el navegador) |
-| Técnica | La página carga sus datos desde una base Firestore de lectura pública, sin clave. En vez de parsear el HTML renderizado, `scripts/importacion/scraping_dossier.py` hace un `GET` al mismo endpoint REST (`https://firestore.googleapis.com/v1/projects/repositorio2026-61a28/databases/(default)/documents/campanas?pageSize=300`) y convierte el JSON tipado de Firestore (`stringValue`, `arrayValue`) a CSV |
+| Técnica | La página carga sus datos desde una base Firestore de lectura pública, sin clave. En vez de parsear el HTML renderizado, `scripts/importacion/scraping/scraping_dossier.py` hace un `GET` al mismo endpoint REST (`https://firestore.googleapis.com/v1/projects/repositorio2026-61a28/databases/(default)/documents/campanas?pageSize=300`) y convierte el JSON tipado de Firestore (`stringValue`, `arrayValue`) a CSV |
 | Límites de uso | Sin API key. Se hace **1 solo pedido** (hoy son 75 campañas, cabe en una página); solo se pide otra página si la respuesta trae `nextPageToken`. Se envía un `User-Agent` identificatorio del grupo. Solo biblioteca estándar de Python 3 |
 | Datos que se guardan | `Anunciante;Marca;Titulo;Agencia;Productora;Periodo;Categorias` (UTF-8, separador `;`, categorías separadas por `\|`). El campo `creditos` del dossier tiene nombres de personas: **no se lee ni se guarda** |
-| Cómo regenerar el CSV | `python scripts/importacion/scraping_dossier.py` (pisa `scripts/importacion/campanas_dossier.csv`). El repositorio incluye un snapshot para trabajar sin conexión |
+| Cómo generar el CSV | `python scripts/importacion/scraping/scraping_dossier.py` (crea o pisa `scripts/importacion/resultados/campanas_dossier.csv`). El CSV no está en el repositorio: hay que generarlo en cada copia, con conexión |
 
 **Importación.** `08_Importar_Campanias_Dossier.sql` (modo SQLCMD, editar `RUTA_IMP`) carga el CSV con `BULK INSERT` estático en `publicidad.StagingCampania` (a través de `publicidad.vw_CargaStagingCampania`) y ejecuta `publicidad.SP_IMPORTAR_CAMPANIAS_CSV @nombreArchivo, @filasProcesadas OUTPUT, @filasConError OUTPUT, @codigoISO3Pais = 'ARG', @crearPiezas = 1`. Va después de 06 y 07 para no cambiar la pauta ya asignada en los partidos del seed. Con el snapshot actual crea 63 anunciantes, 75 campañas y 75 piezas; ejecutado después del seed 04 (9 anunciantes, 9 campañas y 12 piezas) la base queda con 72 anunciantes, 84 campañas y 87 piezas.
 
@@ -272,14 +283,14 @@ La documentación completa está en [doc/entrega9/README.md](doc/entrega9/README
 | Pieza | Dónde está |
 |---|---|
 | Consultas del alcance *To BE* | `scripts/creacion/34_Consultas_ToBe.sql` y `scripts/testing/34_Test_Consultas_ToBe.sql` |
-| Aplicación de ABM de sedes | `app/` (`.\mvnw.cmd spring-boot:run`, con las variables de entorno `DB_USER` y `DB_PASSWORD`) |
+| Aplicación de ABM de sedes y pantalla de scraping en vivo | `app/` (`.\mvnw.cmd spring-boot:run`, con las variables de entorno `DB_USER` y `DB_PASSWORD`). La pantalla `/scraping` ejecuta los scripts de `scripts/importacion/scraping` y muestra la salida y los resultados; no escribe en la base |
 | Tablero de BI | `doc/entrega9/Mundial.pbix` y capturas en `doc/entrega9/capturas/` |
 
 ---
 
 ## Carga de datos
 
-Los datos se cargan con el lanzador `scripts/importacion/00_Cargar_Seeds.sql`, después de `00_Reset_Total.sql`. El orden de los scripts y los requisitos (modo SQLCMD y archivos de las APIs) están en el paso 4 de [Cómo ejecutar](#cómo-ejecutar-corrida-desde-cero).
+Los datos se cargan con el lanzador `scripts/importacion/sql/00_Cargar_Seeds.sql`, después de `00_Reset_Total.sql`. El orden de los scripts y los requisitos (modo SQLCMD y archivos de las APIs) están en el paso 4 de [Cómo ejecutar](#cómo-ejecutar-corrida-desde-cero).
 
 ---
 

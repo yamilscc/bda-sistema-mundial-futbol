@@ -37,7 +37,7 @@ Esta entrega integra el trabajo de las entregas anteriores en tres piezas que se
 
 **Tecnología:** Java 21, Spring Boot, Thymeleaf y Bootstrap. El acceso a la base usa solo `JdbcTemplate` y `SimpleJdbcCall`; no hay JPA, así que no existe ninguna escritura directa sobre las tablas.
 
-**Pantallas:** listado de sedes (`/sedes`), formulario de alta (`/sedes/nueva`) y de modificación (`/sedes/{id}/editar`), y botón de baja con confirmación.
+**Pantallas:** listado de sedes (`/sedes`), formulario de alta (`/sedes/nueva`) y de modificación (`/sedes/{id}/editar`), botón de baja con confirmación y la pantalla de scraping (`/scraping`, ver más abajo).
 
 **Usuario de la base.** La aplicación se conecta con un usuario de SQL Server con permisos mínimos: puede leer `Sede`, `Ciudad` y `Pais`, y ejecutar solo los tres procedimientos de sede. No tiene permiso de escritura sobre ninguna tabla.
 
@@ -99,6 +99,53 @@ Capturas de la aplicación:
 
 ![Baja válida](capturas/app_sede_baja_ok.png)
 
+### Pantalla de scraping (`/scraping`)
+
+Muestra en vivo la obtención de los datos externos de la Entrega 6, para la demostración en la defensa. Tiene una tarjeta por fuente:
+
+| Fuente | Script que ejecuta | Archivo que muestra |
+|---|---|---|
+| Dossier de publicidad | `scraping_dossier.py` | `campanas_dossier.csv` |
+| Fixture y sedes (Wikipedia) | `fuentes_externas.py fixture` | `fixture_sedes.csv` |
+| PBI per cápita (Banco Mundial) | `fuentes_externas.py pbi` | `pbi_banco_mundial.json` |
+| Cotizaciones (Frankfurter) | `fuentes_externas.py cotizaciones` | `cotizaciones_frankfurter.json` |
+
+**Cómo funciona:**
+* El botón *Empezar scraping* ejecuta el script de `scripts/importacion/scraping` como un proceso aparte.
+* Cada línea que imprime el script aparece en una consola en la página, mientras se ejecuta (se envía con Server-Sent Events).
+* Al terminar, la tarjeta muestra en una tabla el archivo generado en `scripts/importacion/resultados`. Del PBI se muestra el último año con dato de cada país, igual que la importación.
+* Al abrir la pantalla se ve el último resultado que haya de cada fuente.
+
+**Solo muestra: no escribe en la base.** La importación sigue haciéndose con los scripts de `scripts/importacion/sql`, por ejemplo `08_Importar_Campanias_Dossier.sql` para el dossier. Hay dos motivos:
+* la importación usa `BULK INSERT`, que requiere un permiso de servidor que el usuario `app_mundial` no tiene, a propósito (permisos mínimos);
+* la consigna no permite modificar los archivos con otras herramientas antes de importarlos.
+
+La pantalla no necesita conexión a la base: funciona aunque no estén configuradas `DB_USER` y `DB_PASSWORD`.
+
+**Seguridad.** La aplicación solo ejecuta los cuatro scripts y argumentos fijos de la tabla: el usuario elige la fuente, nunca el comando. Corre una ejecución a la vez, con un tiempo máximo de 180 segundos (`mundial.scraping.timeout-segundos`).
+
+**Configuración** (variables de entorno opcionales):
+
+| Variable | Por defecto | Uso |
+|---|---|---|
+| `PYTHON_CMD` | `python` en Windows, `python3` en Linux y macOS | Comando de Python |
+| `SCRAPING_DIR` | `../scripts/importacion` (relativo a `app/`, desde donde se corre `mvnw`) | Carpeta que contiene `scraping/` y `resultados/` |
+
+Requiere Python 3 con `requests` y `beautifulsoup4` (este último solo para el fixture), y conexión a internet.
+
+**Casos probados** (navegador, con la aplicación levantada):
+
+| # | Caso | Resultado esperado |
+|---|---|---|
+| 3 | *Empezar scraping* en el dossier | La consola muestra el pedido, los 75 documentos recibidos y el avance de la escritura; al terminar, la tabla muestra las 75 campañas con la hora nueva |
+| 4 | *Empezar scraping* en el fixture | La consola muestra la descarga de Wikipedia y la capacidad leída para las 9 sedes; la tabla muestra los 24 partidos |
+| 5 | *Empezar scraping* en PBI y en cotizaciones | La tabla muestra los 22 países con su último PBI y las 4 monedas con su tasa respecto del USD |
+
+**Tests automáticos** (`app/src/test/.../scraping`, se corren con `.\mvnw.cmd test`). Cubren:
+* la lectura de los cuatro tipos de archivo;
+* la ejecución, con scripts de prueba que no usan internet: transmisión de líneas con acentos, argumentos fijos, código de salida, errores, tiempo máximo y script inexistente;
+* el controlador: pantalla, fragmento de resultado y fuente inexistente (404).
+
 ## 3. Tablero de BI (Power BI)
 
 Archivo: `doc/entrega9/Mundial.pbix`. Se conecta directamente a la base `MundialFutbol` de SQL Server (modo *Importar*, autenticación de Windows, servidor `localhost,1433`).
@@ -134,23 +181,24 @@ Los datos de la carga actual corresponden a la fase de grupos. La ocupación pub
 
 ### Cómo actualizar los datos
 
-Abrir el archivo con Power BI Desktop y usar *Inicio → Actualizar*. Requiere la base creada con `00_Reset_Total.sql` y cargada con `scripts/importacion/00_Cargar_Seeds.sql`. El mapa necesita conexión a internet.
+Abrir el archivo con Power BI Desktop y usar *Inicio → Actualizar*. Requiere la base creada con `00_Reset_Total.sql` y cargada con `scripts/importacion/sql/00_Cargar_Seeds.sql`. El mapa necesita conexión a internet.
 
 ## Carga de datos
 
 El orden completo desde cero (en modo SQLCMD de SSMS) es:
 
 1. `scripts/creacion/00_Reset_Total.sql`: borra y recrea la base con todos los objetos (editar su `:setvar RUTA`).
-2. Generar los archivos de las APIs (requiere internet; no necesitan clave), desde `scripts/importacion/`. `pbi_banco_mundial.json` y `cotizaciones_frankfurter.json` no vienen en el repositorio:
+2. Generar los archivos de las fuentes externas (requiere internet; no necesitan clave), desde `scripts/importacion/scraping/`. Se guardan en `scripts/importacion/resultados/`, que solo existe en la copia local:
 
    ```powershell
    python fuentes_externas.py todo
+   python scraping_dossier.py
    ```
 
-3. `scripts/importacion/00_Cargar_Seeds.sql`: lanzador de todos los seeds e importaciones, en el orden en que funcionan (04, 05, 06, 01, 03, 02, 07 y 08). Solo hay que editar su `:setvar RUTA_IMP` con la carpeta `scripts\importacion`. Se corta ante el primer error y se puede volver a ejecutar. En la importación del `05`, el fixture debe informar 24 filas procesadas y la pauta, 6 procesadas y 3 con error (las 3 filas inválidas están incluidas a propósito para probar la importación con errores parciales; quedan registradas en `eventos.LogImportacion`).
+3. `scripts/importacion/sql/00_Cargar_Seeds.sql`: lanzador de todos los seeds e importaciones, en el orden en que funcionan (04, 05, 06, 01, 03, 02, 07 y 08). Solo hay que editar su `:setvar RUTA_IMP` con la carpeta `scripts\importacion` (la que contiene `sql`, `datos` y `resultados`). Se corta ante el primer error y se puede volver a ejecutar. En la importación del `05`, el fixture debe informar 24 filas procesadas y la pauta, 6 procesadas y 3 con error (las 3 filas inválidas están incluidas a propósito para probar la importación con errores parciales; quedan registradas en `eventos.LogImportacion`).
 4. Crear el usuario de la aplicación (ver arriba).
 
-**Nota sobre los saltos de línea.** El archivo `fixture_sedes.csv` se importa con `BULK INSERT` y espera saltos de línea tipo LF. Si Git lo descarga con CRLF (configuración `core.autocrlf=true` de Windows), la última columna queda con un carácter extra y las 24 filas se rechazan con "La selección visitante no existe". En ese caso, convertir el archivo a LF antes de importar.
+**Nota sobre los saltos de línea.** Los CSV se importan con `BULK INSERT` y esperan saltos de línea tipo LF. El fixture y el dossier los genera Python en `resultados/` con LF, y para los CSV que vienen de Git (`datos/`) el `.gitattributes` fuerza LF aunque Windows tenga `core.autocrlf=true`. Si igual llegara un CSV con CRLF, la última columna queda con un carácter extra (en el fixture, las 24 filas se rechazan con "La selección visitante no existe"): convertirlo a LF antes de importar.
 
 ## Cómo ejecutar las pruebas
 

@@ -92,7 +92,7 @@ flowchart LR
 
 La verificación se implementó en `scripts/testing/30_Test_SP_Reportes.sql`, integrado en `00_Ejecutar_Tests.sql`. Cada caso imprime `OK` o `FALLÓ` comparando el reporte con lo que dicen las tablas (cantidad de filas o de nodos XML, totales de goles, tarjetas e ingresos), verifica que los dos XML tengan su raíz y no muestren nombres enmascarados, y que cada reporte rechace un filtro inexistente con un mensaje agrupado. Sin datos cargados, los casos que los necesitan se informan como `OMITIDO`.
 
-Resultado con los seeds cargados (`importacion/00_Cargar_Seeds.sql`): goleadores 13 filas (26 goles válidos), tarjetas de 4 jugadores (7 tarjetas), designaciones 18 árbitros y 120 designaciones, ocupación 96 espacios ocupados de 96, matriz de 24 partidos (partido 1 en 6 mercados), plantillas 16 selecciones y 368 convocados, resultados 24 partidos finalizados.
+Resultado con los seeds cargados (`importacion/sql/00_Cargar_Seeds.sql`): goleadores 13 filas (26 goles válidos), tarjetas de 4 jugadores (7 tarjetas), designaciones 18 árbitros y 120 designaciones, ocupación 96 espacios ocupados de 96, matriz de 24 partidos (partido 1 en 6 mercados), plantillas 16 selecciones y 368 convocados, resultados 24 partidos finalizados.
 
 ---
 

@@ -5,6 +5,10 @@
 #   DB_USER      usuario SQL (login con autenticación de SQL Server; requiere el modo mixto habilitado)
 #   DB_PASSWORD  contraseña de ese usuario
 #   DB_URL       (opcional) URL JDBC; por defecto localhost, puerto 1433, base MundialFutbol
+#   PYTHON_CMD   (opcional) comando de Python para la pantalla /scraping; por defecto "python" en Windows
+#                y "python3" en Linux/macOS
+#   SCRAPING_DIR (opcional) carpeta scripts/importacion del repositorio; por defecto ../scripts/importacion
+#                (relativa a la carpeta app, desde donde se corre mvnw)
 #
 # PowerShell (solo para la sesión actual):
 #   $env:DB_USER = "mundial_app"
@@ -19,3 +23,7 @@ spring.application.name=mundial-app
 spring.datasource.url=${DB_URL:jdbc:sqlserver://localhost:1433;databaseName=MundialFutbol;encrypt=true;trustServerCertificate=true}
 spring.datasource.username=${DB_USER:}
 spring.datasource.password=${DB_PASSWORD:}
+
+mundial.scraping.directorio=${SCRAPING_DIR:../scripts/importacion}
+mundial.scraping.python=${PYTHON_CMD:}
+mundial.scraping.timeout-segundos=180

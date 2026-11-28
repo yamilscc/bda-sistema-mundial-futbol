@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Scraping · Mundial de Fútbol</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+    <style>
+        .consola { background: #111827; color: #d1fae5; font-size: .85rem; max-height: 18rem;
+                   overflow-y: auto; white-space: pre-wrap; margin: 0; }
+        .consola .error { color: #fca5a5; }
+        .tabla-resultado { max-height: 26rem; overflow: auto; }
+    </style>
+</head>
+<body class="bg-light">
+<nav class="navbar navbar-expand navbar-dark bg-primary mb-4">
+    <div class="container">
+        <span class="navbar-brand">Mundial de Fútbol</span>
+        <div class="navbar-nav me-auto">
+            <a class="nav-link" th:href="@{/sedes}">Sedes</a>
+            <a class="nav-link active" aria-current="page" th:href="@{/scraping}">Scraping</a>
+        </div>
+    </div>
+</nav>
+
+<main class="container pb-5">
+    <h1 class="h3">Scraping de fuentes externas</h1>
+    <p class="text-muted mb-4">
+        Cada botón ejecuta el script de Python de <code>scripts/importacion/scraping</code> y muestra en vivo lo que va
+        haciendo. Al terminar, la tabla muestra el archivo generado en
+        <code th:text="${directorioResultados}">resultados</code>.
+        Esta pantalla no modifica la base: los archivos se importan con <code>scripts/importacion/sql</code>
+        (por ejemplo, <code>08_Importar_Campanias_Dossier.sql</code> para el dossier).
+        Python: <code th:text="${python}">python3</code>.
+    </p>
+
+    <div th:each="t : ${tarjetas}" class="card mb-4 shadow-sm" th:attr="data-fuente=${t.fuente().codigo}">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <div>
+                <h2 class="h5 mb-0" th:text="${t.fuente().titulo}">Fuente</h2>
+                <small class="text-muted" th:text="${t.fuente().descripcion}">Descripción</small>
+            </div>
+            <button type="button" class="btn btn-primary btn-ejecutar text-nowrap"
+                    th:attr="data-fuente=${t.fuente().codigo}">Empezar scraping</button>
+        </div>
+        <div class="card-body">
+            <pre class="consola p-3 rounded d-none" aria-live="polite"></pre>
+            <div class="estado small mt-2"></div>
+            <div class="resultado mt-3" th:fragment="resultado">
+                <div th:if="${t.resultado() == null}" class="text-muted small">
+                    Todavía no hay resultados: el archivo <code th:text="${t.fuente().archivoResultado}"></code>
+                    se genera al ejecutar el scraping.
+                </div>
+                <div th:if="${t.resultado() != null}">
+                    <div class="small text-muted mb-2">
+                        <code th:text="${t.resultado().archivo()}"></code> ·
+                        <span th:text="${t.resultado().cantidadFilas()}"></span> filas ·
+                        generado el <span th:text="${#temporals.format(t.resultado().modificado(), 'dd/MM/yyyy HH:mm:ss')}"></span>
+                    </div>
+                    <div class="table-responsive tabla-resultado">
+                        <table class="table table-sm table-striped table-hover align-middle bg-white mb-0">
+                            <thead class="table-light">
+                            <tr><th th:each="c : ${t.resultado().columnas()}" th:text="${c}"></th></tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="fila : ${t.resultado().filas()}">
+                                <td th:each="v : ${fila}" th:text="${v}"></td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<script>
+(() => {
+    const botones = document.querySelectorAll('.btn-ejecutar');
+    const habilitar = (si) => botones.forEach(b => b.disabled = !si);
+
+    botones.forEach(boton => boton.addEventListener('click', () => {
+        const codigo = boton.dataset.fuente;
+        const tarjeta = document.querySelector(`.card[data-fuente="${codigo}"]`);
+        const consola = tarjeta.querySelector('.consola');
+        const estado = tarjeta.querySelector('.estado');
+        const agregar = (texto, clase) => {
+            const linea = document.createElement('div');
+            if (clase) linea.className = clase;
+            linea.textContent = texto;
+            consola.appendChild(linea);
+            consola.scrollTop = consola.scrollHeight;
+        };
+
+        consola.replaceChildren();
+        consola.classList.remove('d-none');
+        estado.className = 'estado small mt-2 text-muted';
+        estado.textContent = 'Ejecutando…';
+        habilitar(false);
+
+        const fuente = new EventSource(`/scraping/${codigo}/ejecutar`);
+        let terminado = false;
+        const terminar = (mensaje, clase) => {
+            terminado = true;
+            fuente.close();
+            estado.className = `estado small mt-2 ${clase}`;
+            estado.textContent = mensaje;
+            habilitar(true);
+        };
+
+        fuente.addEventListener('linea', e => agregar(e.data));
+        fuente.addEventListener('falla', e => {
+            agregar(e.data, 'error');
+            terminar('No se pudo ejecutar el scraping.', 'text-danger');
+        });
+        fuente.addEventListener('fin', async e => {
+            const ok = e.data === '0';
+            terminar(ok ? 'Scraping terminado. Resultado actualizado abajo.'
+                        : `El script terminó con código ${e.data}.`, ok ? 'text-success' : 'text-danger');
+            const respuesta = await fetch(`/scraping/${codigo}/resultado`);
+            if (respuesta.ok) {
+                tarjeta.querySelector('.resultado').outerHTML = await respuesta.text();
+            }
+        });
+        fuente.onerror = () => {
+            if (!terminado) terminar('Se cortó la conexión con la aplicación.', 'text-danger');
+        };
+    }));
+})();
+</script>
+</body>
+</html>

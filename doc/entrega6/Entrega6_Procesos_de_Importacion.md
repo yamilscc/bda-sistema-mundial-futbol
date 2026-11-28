@@ -52,12 +52,13 @@ Importar información masiva a la base mediante stored procedures, tomando los a
 ## 3. Arquitectura general
 
 ```
- Fuentes externas                Descarga (Python)              SQL Server (T-SQL)
- ----------------                -----------------              ------------------
+ Fuentes externas                Descarga (scraping/*.py)       resultados/ (solo local)
+ ----------------                ------------------------       ------------------------
  API Banco Mundial   ──┐
- API Frankfurter     ──┼──►  fuentes_externas.py  ──►  *.json / *.csv  ──┐
- Wikipedia (sedes)   ──┘                                                 │
- dossiermundial.netlify.app ─►  scraping_dossier.py ─►  campanas_dossier.csv ─┤
+ API Frankfurter     ──┼──►  fuentes_externas.py  ──►  *.json / fixture_sedes.csv  ──┐
+ Wikipedia (sedes)   ──┘                                                            │
+ dossiermundial.netlify.app ─►  scraping_dossier.py ─►  campanas_dossier.csv ───────┤
+ Archivos fijos del grupo (datos/: XML, CSV de eventos, JSON de pauta) ──────────────┤
                                                                          ▼
                                               BULK INSERT / OPENROWSET (estático)
                                                                          ▼
@@ -91,17 +92,17 @@ Ninguna fuente requiere API key.
 | **Wikipedia** | Datos de sedes del Mundial 2026 (se complementan con capacidades y coordenadas incluidas en el script; con `--offline` no se scrapea) | `https://en.wikipedia.org/wiki/2026_FIFA_World_Cup` | Un pedido. Requiere `requests` y `beautifulsoup4` solo en modo en vivo. |
 | **Dossier de publicidad** | 75 campañas publicitarias del Mundial (63 anunciantes) | `https://dossiermundial.netlify.app/`, que lee la base Firestore pública `repositorio2026-61a28`, colección `campanas`. Se lee el mismo endpoint REST: `https://firestore.googleapis.com/v1/projects/repositorio2026-61a28/databases/(default)/documents/campanas?pageSize=300` | Un solo pedido (`pageSize=300`); solo se pide otra página si la respuesta trae `nextPageToken`. Se envía un `User-Agent` identificatorio del grupo. **No se lee ni se guarda el campo `creditos`**, que contiene nombres de personas. |
 
-**Fixture y pauta:** `fixture_sedes.csv` (9 sedes, 24 partidos) y `pauta_publicitaria.json` vienen en el repositorio. Las tarifas del seed son valores ficticios en USD, definidos por el grupo.
+**Dónde quedan los archivos:** los `.py` están en `scripts/importacion/scraping/` y escriben en `scripts/importacion/resultados/`, una carpeta que solo existe en la copia local (Git la ignora). Ahí quedan `pbi_banco_mundial.json`, `cotizaciones_frankfurter.json`, `fixture_sedes.csv` (9 sedes, 24 partidos) y `campanas_dossier.csv`. Los archivos fijos del grupo (`planteles_convocatoria.xml`, `eventos_partidos.csv` y `pauta_publicitaria.json`) están en `scripts/importacion/datos/` y sí vienen en el repositorio. Las tarifas del seed son valores ficticios en USD, definidos por el grupo.
 
 **Cómo regenerar los archivos:**
 
 ```bash
-cd scripts/importacion
-python fuentes_externas.py todo       # pbi_banco_mundial.json, cotizaciones_frankfurter.json, fixture_sedes.csv
-python scraping_dossier.py            # campanas_dossier.csv
+cd scripts/importacion/scraping
+python fuentes_externas.py todo       # resultados/: pbi_banco_mundial.json, cotizaciones_frankfurter.json, fixture_sedes.csv
+python scraping_dossier.py            # resultados/: campanas_dossier.csv
 ```
 
-`pbi_banco_mundial.json` y `cotizaciones_frankfurter.json` **no** vienen en el repositorio: hay que generarlos antes de correr el lanzador.
+Ninguno de los cuatro viene en el repositorio: hay que generarlos antes de correr el lanzador. Sin conexión, `python fuentes_externas.py fixture --offline` genera igual el fixture (con los datos incluidos en el script); los JSON de las APIs y el dossier sí necesitan internet.
 
 ---
 
@@ -221,7 +222,7 @@ ORDER BY IdLogImportacion DESC;
 
 ## 7. Orden de ejecución y lanzadores
 
-Los seeds y las importaciones tienen dependencias entre sí. El lanzador `scripts/importacion/00_Cargar_Seeds.sql` los ejecuta en el orden que funciona y se detiene ante el primer error (`:on error exit`):
+Los seeds y las importaciones tienen dependencias entre sí. El lanzador `scripts/importacion/sql/00_Cargar_Seeds.sql` los ejecuta en el orden que funciona y se detiene ante el primer error (`:on error exit`):
 
 | Paso | Script | Qué hace |
 |---|---|---|
@@ -238,8 +239,8 @@ Los seeds y las importaciones tienen dependencias entre sí. El lanzador `script
 
 1. Ejecutar antes `scripts/creacion/00_Reset_Total.sql`.
 2. En SSMS activar **Consulta > Modo SQLCMD** (sin esto fallan `:setvar` y `:r`).
-3. Editar la variable `RUTA_IMP` al inicio del lanzador con la carpeta `scripts\importacion` de la copia local, sin barra final. Es la única ruta a editar.
-4. Generar los archivos de las APIs: `python fuentes_externas.py todo`.
+3. Editar la variable `RUTA_IMP` al inicio del lanzador con la carpeta `scripts\importacion` de la copia local (la que contiene `sql`, `datos` y `resultados`), sin barra final. Es la única ruta a editar: cada script agrega la subcarpeta que corresponde.
+4. Generar los archivos de `resultados/`: `python fuentes_externas.py todo` y `python scraping_dossier.py` (desde `scripts/importacion/scraping`).
 5. Recomendado: resultados a texto (`Ctrl+T`).
 
 **Importante:** los seeds se ejecutan **una sola vez** tras el reset. En una segunda corrida, `02_Importar_Eventos_CSV` informa 8 errores porque el partido 1 ya está finalizado y sus eventos no pueden modificarse: es el bloqueo de historial funcionando, no un fallo.
@@ -251,11 +252,11 @@ Los seeds y las importaciones tienen dependencias entre sí. El lanzador `script
 Para demostrar la importación de un archivo scrapeado en el momento:
 
 ```bash
-cd scripts/importacion
-python scraping_dossier.py            # regenera campanas_dossier.csv desde la web
+cd scripts/importacion/scraping
+python scraping_dossier.py            # genera resultados/campanas_dossier.csv desde la web
 ```
 
-Luego, en SSMS con modo SQLCMD, abrir `08_Importar_Campanias_Dossier.sql`, **descomentar y editar** la línea `:setvar RUTA_IMP "..."` y ejecutarlo. El script:
+Luego, en SSMS con modo SQLCMD, abrir `sql/08_Importar_Campanias_Dossier.sql`, **descomentar y editar** la línea `:setvar RUTA_IMP "..."` y ejecutarlo. El script:
 
 1. borra de staging las cargas previas del mismo archivo,
 2. carga el CSV con `BULK INSERT` estático,
@@ -264,6 +265,8 @@ Luego, en SSMS con modo SQLCMD, abrir `08_Importar_Campanias_Dossier.sql`, **des
 5. muestra procesadas, con error y totales.
 
 Se puede ejecutar de nuevo para mostrar la idempotencia (no hay duplicados).
+
+El scraping también se puede mostrar desde la aplicación web de la Entrega 9 (pantalla `/scraping`, ver `doc/entrega9/README.md`). Ahí se ve en vivo lo que va haciendo el script y, al terminar, el CSV generado en una tabla. La importación se hace después igual, con `sql/08_Importar_Campanias_Dossier.sql`.
 
 ---
 
