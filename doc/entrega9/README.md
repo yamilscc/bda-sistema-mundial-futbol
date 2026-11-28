@@ -134,23 +134,24 @@ Los datos de la carga actual corresponden a la fase de grupos. La ocupación pub
 
 ### Cómo actualizar los datos
 
-Abrir el archivo con Power BI Desktop y usar *Inicio → Actualizar*. Requiere la base creada con `00_Reset_Total.sql` y cargada con `scripts/importacion/00_Cargar_Seeds.sql`. El mapa necesita conexión a internet.
+Abrir el archivo con Power BI Desktop y usar *Inicio → Actualizar*. Requiere la base creada con `00_Reset_Total.sql` y cargada con `scripts/importacion/sql/00_Cargar_Seeds.sql`. El mapa necesita conexión a internet.
 
 ## Carga de datos
 
 El orden completo desde cero (en modo SQLCMD de SSMS) es:
 
 1. `scripts/creacion/00_Reset_Total.sql`: borra y recrea la base con todos los objetos (editar su `:setvar RUTA`).
-2. Generar los archivos de las APIs (requiere internet; no necesitan clave), desde `scripts/importacion/`. `pbi_banco_mundial.json` y `cotizaciones_frankfurter.json` no vienen en el repositorio:
+2. Generar los archivos de las fuentes externas (requiere internet; no necesitan clave), desde `scripts/importacion/scraping/`. Se guardan en `scripts/importacion/resultados/`, que solo existe en la copia local:
 
    ```powershell
    python fuentes_externas.py todo
+   python scraping_dossier.py
    ```
 
-3. `scripts/importacion/00_Cargar_Seeds.sql`: lanzador de todos los seeds e importaciones, en el orden en que funcionan (04, 05, 06, 01, 03, 02, 07 y 08). Solo hay que editar su `:setvar RUTA_IMP` con la carpeta `scripts\importacion`. Se corta ante el primer error y se puede volver a ejecutar. En la importación del `05`, el fixture debe informar 24 filas procesadas y la pauta, 6 procesadas y 3 con error (las 3 filas inválidas están incluidas a propósito para probar la importación con errores parciales; quedan registradas en `eventos.LogImportacion`).
+3. `scripts/importacion/sql/00_Cargar_Seeds.sql`: lanzador de todos los seeds e importaciones, en el orden en que funcionan (04, 05, 06, 01, 03, 02, 07 y 08). Solo hay que editar su `:setvar RUTA_IMP` con la carpeta `scripts\importacion` (la que contiene `sql`, `datos` y `resultados`). Se corta ante el primer error y se puede volver a ejecutar. En la importación del `05`, el fixture debe informar 24 filas procesadas y la pauta, 6 procesadas y 3 con error (las 3 filas inválidas están incluidas a propósito para probar la importación con errores parciales; quedan registradas en `eventos.LogImportacion`).
 4. Crear el usuario de la aplicación (ver arriba).
 
-**Nota sobre los saltos de línea.** El archivo `fixture_sedes.csv` se importa con `BULK INSERT` y espera saltos de línea tipo LF. Si Git lo descarga con CRLF (configuración `core.autocrlf=true` de Windows), la última columna queda con un carácter extra y las 24 filas se rechazan con "La selección visitante no existe". En ese caso, convertir el archivo a LF antes de importar.
+**Nota sobre los saltos de línea.** Los CSV se importan con `BULK INSERT` y esperan saltos de línea tipo LF. El fixture y el dossier los genera Python en `resultados/` con LF, y para los CSV que vienen de Git (`datos/`) el `.gitattributes` fuerza LF aunque Windows tenga `core.autocrlf=true`. Si igual llegara un CSV con CRLF, la última columna queda con un carácter extra (en el fixture, las 24 filas se rechazan con "La selección visitante no existe"): convertirlo a LF antes de importar.
 
 ## Cómo ejecutar las pruebas
 
