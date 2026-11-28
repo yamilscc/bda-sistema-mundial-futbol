@@ -101,15 +101,40 @@ Capturas de la aplicación:
 
 ## 3. Tablero de BI (Power BI)
 
-El tablero se conecta a la base `MundialFutbol` de SQL Server (modo *Importar*, autenticación de Windows, servidor `localhost,1433`) y usa las vistas del script 34:
+Archivo: `doc/entrega9/Mundial.pbix`. Se conecta directamente a la base `MundialFutbol` de SQL Server (modo *Importar*, autenticación de Windows, servidor `localhost,1433`).
 
-| Visual | Vista | Campos |
+### Orígenes de datos
+
+| Origen | Tipo |
+|---|---|
+| `eventos.SP_REPORTE_GOLEADORES` | Reporte de la Entrega 7 |
+| `eventos.SP_REPORTE_TARJETAS_SUSPENSIONES` | Reporte de la Entrega 7 |
+| `nucleo.vw_Fixture` | Vista del script 34 |
+| `publicidad.vw_OcupacionPublicitariaSede` | Vista del script 34 |
+| `publicidad.vw_EspaciosPublicitariosUSD` | Vista del script 34 |
+| `nucleo.vw_SedesMapa` | Vista del script 34 |
+
+### Páginas
+
+| Página | Visual | Qué muestra |
 |---|---|---|
-| Barras: ingresos publicitarios por sede (USD) | `publicidad.vw_OcupacionPublicitariaSede` | `Estadio` e `IngresosUSD` |
-| Barras: ocupación publicitaria por sede (%) | `publicidad.vw_OcupacionPublicitariaSede` | `Estadio` y `PorcentajeOcupacion` |
-| Mapa de sedes | `nucleo.vw_SedesMapa` | `Latitud`, `Longitud` y `CantidadPartidos` |
+| Resumen deportivo | Barras | Goles de los jugadores de cada selección |
+| Resumen deportivo | Barras | Goleadores del torneo |
+| Resumen deportivo | Barras apiladas | Tarjetas amarillas, dobles amarillas y rojas directas por selección |
+| Resumen deportivo | Tabla | Resultados de los partidos |
+| Publicidad y sedes | Barras | Ingresos publicitarios por sede (USD) |
+| Publicidad y sedes | Anillo | Ingresos por anunciante (USD) |
+| Publicidad y sedes | Mapa | Ubicación de las sedes según latitud y longitud, con la cantidad de partidos |
 
-Archivo: `doc/entrega9/Mundial.pbix`. Para actualizar los datos: *Inicio → Actualizar*.
+Los datos de la carga actual corresponden a la fase de grupos. La ocupación publicitaria es del 100 % en todas las sedes, por lo que se muestran los ingresos por sede y por anunciante.
+
+![Resumen deportivo](capturas/bi_deportivo.png)
+
+![Publicidad y sedes](capturas/bi_publicidad_sedes.png)
+
+### Cómo actualizar los datos
+
+Abrir el archivo con Power BI Desktop y usar *Inicio → Actualizar*. Requiere la base creada con `00_Reset_Total.sql` y cargada con `scripts/importacion/00_Cargar_Seeds.sql`. El mapa necesita conexión a internet.
 
 ## Carga de datos
 
