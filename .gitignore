@@ -426,3 +426,7 @@ FodyWeavers.xsd
 
 # Official VS Code C# Dev Kit Extension exclusion
 #*.lscache
+
+# Resultados de los scripts de scraping/APIs: se generan localmente con scripts/importacion/scraping/*.py
+scripts/importacion/resultados/*
+!scripts/importacion/resultados/.gitkeep
